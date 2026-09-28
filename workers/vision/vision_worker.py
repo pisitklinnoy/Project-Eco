@@ -14,7 +14,7 @@ DB_USER = os.getenv("POSTGRES_USER", "admin")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "password123")
 DB_NAME = os.getenv("POSTGRES_DB", "hatyai_flood_db")
 
-def process_vision_task(ctx, payload: dict):
+async def process_vision_task(ctx, payload: dict):
     """
     Task handler สำหรับประมวลผลระดับน้ำจากภาพกล้อง CCTV
     """

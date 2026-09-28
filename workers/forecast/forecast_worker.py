@@ -9,7 +9,7 @@ DB_USER = os.getenv("POSTGRES_USER", "admin")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "password123")
 DB_NAME = os.getenv("POSTGRES_DB", "hatyai_flood_db")
 
-def run_periodic_forecast(ctx, station_code: str = "STN-HY01"):
+async def run_periodic_forecast(ctx, station_code: str = "STN-HY01"):
     """
     Task handler สำหรับการพยากรณ์ระดับน้ำล่วงหน้า 1, 2, 3 ชั่วโมง
     """

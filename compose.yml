@@ -243,6 +243,17 @@ services:
       - loki
       - tempo
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: floodlens_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+
 volumes:
   redis-data:
   postgres-data:

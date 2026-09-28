@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'floodlens_backend'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['backend:8000']
+
+  - job_name: 'otel_collector'
+    static_configs:
+      - targets: ['otel-collector:8889']

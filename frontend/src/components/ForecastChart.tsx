@@ -44,11 +44,15 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
 
   // Prepare labels & data points
   // 1. History labels & values (take last 8 points for cleanliness)
-  const recentHistory = history.slice(-8);
-  const historyLabels = recentHistory.map((h) =>
-    new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  );
-  const historyValues = recentHistory.map((h) => h.water_level);
+  const recentHistory = history.length > 0 ? history.slice(-8) : [];
+  const historyLabels = recentHistory.length > 0
+    ? recentHistory.map((h) =>
+        new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      )
+    : ['ปัจจุบัน'];
+  const historyValues = recentHistory.length > 0
+    ? recentHistory.map((h) => h.water_level)
+    : [station.normal_level];
 
   // 2. Forecast points
   const forecastLabels = ['+1 ชม.', '+2 ชม.', '+3 ชม.'];
@@ -58,13 +62,14 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   const actualDataset = [...historyValues, null, null, null];
 
   // Forecast line (connects from last history point)
-  const lastHistoryVal = historyValues[historyValues.length - 1] || station.normal_level;
+  const lastHistoryVal = historyValues[historyValues.length - 1] ?? station.normal_level;
+  const paddingLength = Math.max(0, historyValues.length - 1);
   const forecastDataset = [
-    ...new Array(historyValues.length - 1).fill(null),
+    ...new Array(paddingLength).fill(null),
     lastHistoryVal,
-    forecast?.predicted_1h ?? lastHistoryVal + 0.2,
-    forecast?.predicted_2h ?? lastHistoryVal + 0.4,
-    forecast?.predicted_3h ?? lastHistoryVal + 0.6,
+    forecast?.predicted_1h ?? Number((lastHistoryVal + 0.2).toFixed(2)),
+    forecast?.predicted_2h ?? Number((lastHistoryVal + 0.4).toFixed(2)),
+    forecast?.predicted_3h ?? Number((lastHistoryVal + 0.6).toFixed(2)),
   ];
 
   const data = {

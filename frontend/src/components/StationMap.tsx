@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import type { Station, WaterMeasurement } from '../types';
 import { MapPin } from 'lucide-react';
 
@@ -20,30 +21,41 @@ export const StationMap: React.FC<StationMapProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [code: string]: L.Marker }>({});
 
+  // 1. Initialize Map Instance Once with proper cleanup
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    if (!mapInstanceRef.current) {
-      // Hat Yai Center Coordinates
-      const centerLat = 7.005;
-      const centerLng = 100.47;
+    const centerLat = 7.005;
+    const centerLng = 100.47;
 
-      const map = L.map(mapContainerRef.current, {
-        center: [centerLat, centerLng],
-        zoom: 13,
-        zoomControl: true,
-      });
+    const map = L.map(mapContainerRef.current, {
+      center: [centerLat, centerLng],
+      zoom: 13,
+      zoomControl: true,
+    });
 
-      // OpenStreetMap Tile Layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 18,
-      }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 18,
+    }).addTo(map);
 
-      mapInstanceRef.current = map;
-    }
+    mapInstanceRef.current = map;
 
+    const resizeTimer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    return () => {
+      clearTimeout(resizeTimer);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // 2. Update Markers when stations or selectedStation change
+  useEffect(() => {
     const map = mapInstanceRef.current;
+    if (!map) return;
 
     // Clear existing markers
     Object.values(markersRef.current).forEach((m) => m.remove());

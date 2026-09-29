@@ -6,8 +6,9 @@ class StationService:
     @staticmethod
     def get_all_stations(db: Session):
         stations = db.query(Station).filter(Station.is_active == True).all()
-        if not stations:
-            # Seed initial Hat Yai monitoring pilot stations
+        # Check if real stations already exist
+        has_real_stations = any(s.station_code in ["STN-BANGSALA", "STN-MUANGKONG", "STN-HATYAINAI"] for s in stations)
+        if not stations or not has_real_stations:
             stations = StationService.seed_initial_stations(db)
         return stations
 
@@ -17,49 +18,72 @@ class StationService:
 
     @staticmethod
     def seed_initial_stations(db: Session):
-        initial = [
+        # Deactivate old mock stations if any
+        db.query(Station).filter(Station.station_code.in_(["STN-HY01", "STN-HY02", "STN-HY03"])).update({"is_active": False}, synchronize_session=False)
+
+        real_stations = [
             Station(
-                station_code="STN-HY01",
-                name="จุดเฝ้าระวังสะพานท่าเคียน (คลองอู่ตะเภา)",
-                location_name="สะพานท่าเคียน อ.หาดใหญ่",
-                latitude=7.0095,
-                longitude=100.4578,
-                normal_level=2.2,
+                station_code="STN-BANGSALA",
+                name="สะพานบางศาลา (คลองอู่ตะเภา)",
+                location_name="ต.บางศาลา อ.คลองหอยโข่ง จ.สงขลา (จุดตรวจมวลน้ำต้นน้ำ)",
+                latitude=6.931207,
+                longitude=100.439536,
+                normal_level=3.5,
+                warning_level=6.0,
+                critical_level=7.5,
+                bank_level=9.0,
+                camera_id="CAM-BANGSALA",
+                camera_stream_url="https://hatyaicityclimate.org/floodphoto/last/bangsala.jpg",
+                is_active=True
+            ),
+            Station(
+                station_code="STN-MUANGKONG",
+                name="สะพานม่วงก็อง (คลองอู่ตะเภาตอนบน)",
+                location_name="ต.พังลา อ.สะเดา จ.สงขลา (จุดตัดน้ำสะเดา)",
+                latitude=6.823193,
+                longitude=100.438272,
+                normal_level=2.5,
+                warning_level=4.5,
+                critical_level=5.5,
+                bank_level=7.0,
+                camera_id="CAM-MUANGKONG",
+                camera_stream_url="https://hatyaicityclimate.org/floodphoto/last/muangkong.jpg",
+                is_active=True
+            ),
+            Station(
+                station_code="STN-HATYAINAI",
+                name="สะพานข้างที่ว่าการ อ.หาดใหญ่ (หาดใหญ่ใน)",
+                location_name="ข้างที่ว่าการอำเภอหาดใหญ่ อ.หาดใหญ่ จ.สงขลา",
+                latitude=7.002231,
+                longitude=100.455775,
+                normal_level=2.0,
                 warning_level=3.5,
                 critical_level=4.2,
-                bank_level=5.0,
-                camera_id="CAM-HY01",
-                camera_stream_url="http://mock-cctv.hatyai/cam01.jpg"
-            ),
-            Station(
-                station_code="STN-HY02",
-                name="จุดเฝ้าระวังสถานีจันทร์วิโรจน์ (คลองเตย)",
-                location_name="ชุมชนจันทร์วิโรจน์ อ.หาดใหญ่",
-                latitude=7.0031,
-                longitude=100.4722,
-                normal_level=1.8,
-                warning_level=3.0,
-                critical_level=3.8,
-                bank_level=4.5,
-                camera_id="CAM-HY02",
-                camera_stream_url="http://mock-cctv.hatyai/cam02.jpg"
-            ),
-            Station(
-                station_code="STN-HY03",
-                name="จุดเฝ้าระวังสะพานเสนาณรงค์",
-                location_name="ค่ายเสนาณรงค์ อ.หาดใหญ่",
-                latitude=6.9850,
-                longitude=100.4850,
-                normal_level=2.0,
-                warning_level=3.2,
-                critical_level=4.0,
-                bank_level=4.8,
-                camera_id="CAM-HY03",
-                camera_stream_url="http://mock-cctv.hatyai/cam03.jpg"
+                bank_level=5.2,
+                camera_id="CAM-HATYAINAI",
+                camera_stream_url="https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg",
+                is_active=True
             )
         ]
-        db.add_all(initial)
+
+        for stn in real_stations:
+            existing = db.query(Station).filter(Station.station_code == stn.station_code).first()
+            if not existing:
+                db.add(stn)
+            else:
+                existing.name = stn.name
+                existing.location_name = stn.location_name
+                existing.latitude = stn.latitude
+                existing.longitude = stn.longitude
+                existing.normal_level = stn.normal_level
+                existing.warning_level = stn.warning_level
+                existing.critical_level = stn.critical_level
+                existing.bank_level = stn.bank_level
+                existing.camera_id = stn.camera_id
+                existing.camera_stream_url = stn.camera_stream_url
+                existing.is_active = True
+
         db.commit()
-        return initial
+        return db.query(Station).filter(Station.is_active == True).all()
 
 station_service = StationService()

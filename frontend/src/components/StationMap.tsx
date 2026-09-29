@@ -25,12 +25,13 @@ export const StationMap: React.FC<StationMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const centerLat = 7.005;
-    const centerLng = 100.47;
+    // Center of Khlong U-Taphao basin (Muang Kong -> Bang Sala -> Hat Yai)
+    const centerLat = 6.92;
+    const centerLng = 100.45;
 
     const map = L.map(mapContainerRef.current, {
       center: [centerLat, centerLng],
-      zoom: 13,
+      zoom: 11,
       zoomControl: true,
     });
 

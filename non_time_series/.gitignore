@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary / OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*.xlsx
+
+# Large video streams or temporary frames
+*.mp4
+*.avi
+*.mjpg
+
+# Virtual environment (if placed inside)
+.venv/
+venv/
+env/

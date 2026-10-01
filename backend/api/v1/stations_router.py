@@ -49,3 +49,45 @@ def save_station_calibration(
         "formula_str": payload.formula_str,
         "message": f"บันทึกค่าปรับเทียบสเกลเสาสำเร็จ ({payload.pixels_per_meter:.1f} พิกเซล/เมตร)"
     }
+
+
+@router.get("/{station_code}/cctv-analysis.jpg")
+def get_cctv_analysis_image(station_code: str, db: Session = Depends(get_db)):
+    """
+    สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime
+    ดึงภาพสดจากกล้อง CCTV ทันที ทำการ crop เสาวัดน้ำ วาดไม้บรรทัดดิจิทัล และตีกรอบบนภาพจริง
+    """
+    from fastapi.responses import Response
+    from services.vision_service import vision_service
+    
+    jpeg_bytes = vision_service.get_realtime_analysis_dashboard(station_code)
+    if not jpeg_bytes:
+        # Fallback to static public image if available
+        import os
+        static_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+                                   "..", "frontend", "public", "ai_dashboards", f"{station_code}.jpg")
+        if os.path.exists(static_path):
+            with open(static_path, "rb") as f:
+                jpeg_bytes = f.read()
+        else:
+            raise HTTPException(status_code=503, detail="Unable to generate realtime vision dashboard")
+
+    return Response(content=jpeg_bytes, media_type="image/jpeg", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    })
+
+
+@router.get("/{station_code}/vision-metadata")
+def get_vision_metadata(station_code: str):
+    """
+    ส่งคืนข้อมูลพิกัด Bounding Box และตำแหน่งเสาวัดน้ำ (% coordinates)
+    เพื่อให้ Frontend นำไปวาดกรอบเขียวและเส้นผิวน้ำบนภาพสตรีมสดได้อย่างแม่นยำ
+    """
+    from services.vision_service import vision_service
+    meta = vision_service.get_station_bbox_metadata(station_code)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Station vision metadata not found")
+    return meta
+

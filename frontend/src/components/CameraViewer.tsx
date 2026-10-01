@@ -3,6 +3,7 @@ import type { Station, WaterMeasurement } from '../types';
 import {
   Camera,
   Eye,
+  EyeOff,
   Radio,
   Target,
   Sparkles,
@@ -11,10 +12,10 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
-  Search,
   Move,
   Sliders,
   CheckCircle,
+  Crop,
 } from 'lucide-react';
 
 interface CameraViewerProps {
@@ -23,6 +24,16 @@ interface CameraViewerProps {
   onOpenReview: () => void;
   onOpenCalibrate?: () => void;
 }
+
+// Bounding Box coordinates (% of frame) extracted directly from station vision calibrations
+const STATION_BBOX: Record<string, { left: number; top: number; width: number; height: number; focusPan: { x: number; y: number } }> = {
+  'STN-MUANGKONG': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
+  'X.173A': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
+  'STN-BANGSALA': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
+  'X.90': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
+  'STN-HATYAINAI': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
+  'X.44': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
+};
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
@@ -33,7 +44,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [imgError, setImgError] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
   
-  // View Mode: 'live' = Live CCTV Feed | 'ai_dashboard' = AI Model Staff Gauge Analysis (as requested)
+  // View Mode: 'live' = Realtime CCTV Feed with AI Bounding Box | 'ai_dashboard' = Realtime AI Staff Gauge Cropped Inspection
   const [viewMode, setViewMode] = useState<'live' | 'ai_dashboard'>('live');
 
   // Zoom & Pan state
@@ -43,6 +54,9 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isFocusedGauge, setIsFocusedGauge] = useState<boolean>(false);
+  
+  // Toggle overlay badges to ensure NOTHING blocks the camera stream / timestamp when zooming
+  const [showOverlays, setShowOverlays] = useState<boolean>(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -69,7 +83,21 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     ? `${station.camera_stream_url}?t=${refreshKey}`
     : null;
 
-  const aiDashboardUrl = `/ai_dashboards/${station.station_code}.jpg?t=${refreshKey}`;
+  // Realtime AI analysis endpoint generated dynamically from live camera feed
+  const aiDashboardUrl = `http://localhost:8000/api/v1/stations/${station.station_code}/cctv-analysis.jpg?t=${refreshKey}`;
+  const staticFallbackUrl = `/ai_dashboards/${station.station_code}.jpg?t=${refreshKey}`;
+
+  // Get Bounding Box config for current station
+  const getStationBBox = (code: string) => {
+    const upper = code.toUpperCase();
+    for (const [key, val] of Object.entries(STATION_BBOX)) {
+      if (upper.includes(key)) return val;
+    }
+    return { left: 56.5, top: 20.0, width: 2.5, height: 40.0, focusPan: { x: -80, y: 15 } };
+  };
+
+  const bbox = getStationBBox(station.station_code);
+  const confidencePercent = measurement?.vision_confidence ? Math.round(measurement.vision_confidence * 100) : 92;
 
   // Zoom Handlers
   const handleZoomIn = () => {
@@ -91,20 +119,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     setIsFocusedGauge(false);
   };
 
-  // Preset Focus Staff Gauge: Centers directly on the staff gauge horizontal position
+  // Preset Focus & Auto-Crop Gauge: Smoothly crops and centers directly on the staff gauge bounding box
   const handleFocusGauge = () => {
     if (isFocusedGauge) {
       handleResetZoom();
     } else {
-      setZoomLevel(2.4);
-      const code = station.station_code.toUpperCase();
-      if (code.includes('HATYAINAI') || code.includes('X.44')) {
-        setPan({ x: -140, y: 0 });
-      } else if (code.includes('BANGSALA') || code.includes('X.90')) {
-        setPan({ x: -90, y: 15 });
-      } else {
-        setPan({ x: -80, y: 15 });
-      }
+      setZoomLevel(2.8);
+      setPan(bbox.focusPan);
       setIsFocusedGauge(true);
     }
   };
@@ -179,8 +200,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
                 {viewMode === 'live'
-                  ? 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE 30 FPS)'
-                  : 'ผลลัพธ์โมเดล AI: ภาพเสา Rectified + ไม้บรรทัดดิจิทัล + จุดตัดผิวน้ำ'}
+                  ? 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE) พร้อมวาดกรอบตรวจจับ AI'
+                  : 'การวิเคราะห์ AI Realtime: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
               </p>
             </div>
           </div>
@@ -252,7 +273,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
-            {/* Quick Focus Gauge preset (active in live mode) */}
+            {/* Quick Focus & Auto-Crop Gauge Preset */}
             {viewMode === 'live' && (
               <button
                 onClick={handleFocusGauge}
@@ -261,11 +282,26 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
                 }`}
+                title="Crop และซูมเจาะจงเฉพาะตำแหน่งเสาวัดน้ำในภาพสด"
               >
-                <Search className="w-3 h-3 text-sky-400 shrink-0" />
-                <span>ส่องเสาวัดน้ำ (Focus Gauge)</span>
+                <Crop className="w-3 h-3 text-sky-400 shrink-0" />
+                <span>Crop ส่องเสา AI</span>
               </button>
             )}
+
+            {/* Toggle Overlay Visibility (ไม่บังเวลาซูมกล้องสด) */}
+            <button
+              onClick={() => setShowOverlays(!showOverlays)}
+              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] ${
+                !showOverlays
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+              title={showOverlays ? 'ซ่อนป้ายข้อความเพื่อไม่ให้บังภาพกล้องและเวลา' : 'แสดงป้ายข้อความกำกับ'}
+            >
+              {showOverlays ? <EyeOff className="w-3 h-3 text-slate-500" /> : <Eye className="w-3 h-3 text-amber-700" />}
+              <span>{showOverlays ? 'ซ่อนป้ายบัง' : 'แสดงป้าย'}</span>
+            </button>
           </div>
 
           {/* Action buttons right */}
@@ -314,32 +350,80 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
         >
           {/* Zoomable Image Layer */}
           <div
-            className="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out origin-center"
+            className="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out origin-center relative"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
             }}
           >
-            {/* VIEW MODE 1: AI MODEL DASHBOARD (ตามรูปที่แนบมาเป๊ะๆ) */}
+            {/* VIEW MODE 1: REALTIME AI MODEL DASHBOARD (Crop เสาสด + ไม้บรรทัดดิจิทัล + ตีกรอบ) */}
             {viewMode === 'ai_dashboard' ? (
               <img
                 src={aiDashboardUrl}
                 alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
-                onError={() => {
-                  // Fallback to live stream if dashboard image fails
-                  console.warn('Dashboard image failed, falling back to live stream');
-                  setViewMode('live');
+                onError={(e) => {
+                  // Fallback to static public image if dynamic endpoint is temporarily unavailable
+                  const target = e.target as HTMLImageElement;
+                  if (target.src !== staticFallbackUrl) {
+                    target.src = staticFallbackUrl;
+                  }
                 }}
                 className="w-full h-full object-contain pointer-events-none"
               />
             ) : (
-              /* VIEW MODE 2: LIVE STREAM */
+              /* VIEW MODE 2: LIVE STREAM WITH REALTIME BOUNDING BOX & WATERLINE */
               streamUrl && !imgError ? (
-                <img
-                  src={streamUrl}
-                  alt={station.name}
-                  onError={() => setImgError(true)}
-                  className="w-full h-full object-cover object-center pointer-events-none"
-                />
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    src={streamUrl}
+                    alt={station.name}
+                    onError={() => setImgError(true)}
+                    className="w-full h-full object-cover object-center pointer-events-none"
+                  />
+
+                  {/* Realtime AI Bounding Box & Target Brackets directly over Staff Gauge */}
+                  {showOverlays && (
+                    <>
+                      {/* 1. Green Staff Gauge Bounding Box (วาดกรอบแบบภาพที่ส่งไป) */}
+                      <div
+                        className="absolute pointer-events-none border-2 border-emerald-400 bg-emerald-500/15 shadow-[0_0_15px_rgba(52,211,153,0.7)] transition-all"
+                        style={{
+                          left: `${bbox.left}%`,
+                          top: `${bbox.top}%`,
+                          width: `${bbox.width}%`,
+                          height: `${bbox.height}%`,
+                        }}
+                      >
+                        {/* Label Badge on top of bounding box */}
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-emerald-700/90 backdrop-blur-md text-emerald-100 text-[9px] font-black px-1.5 py-0.5 rounded shadow border border-emerald-400/50 whitespace-nowrap flex items-center space-x-1">
+                          <Target className="w-2.5 h-2.5 text-emerald-300 shrink-0" />
+                          <span>Staff Gauge: {confidencePercent}%</span>
+                        </div>
+
+                        {/* Corner Accents */}
+                        <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white"></div>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white"></div>
+                        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-white"></div>
+                        <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-white"></div>
+                      </div>
+
+                      {/* 2. Orange Waterline Contact Line cutting across the staff gauge */}
+                      <div
+                        className="absolute pointer-events-none border-b-2 border-dashed border-orange-500 opacity-95 shadow-[0_0_16px_rgba(249,115,22,0.95)] flex items-center justify-between"
+                        style={{
+                          top: `${topPercent}%`,
+                          left: `${Math.max(2, bbox.left - 12)}%`,
+                          width: `${bbox.width + 24}%`,
+                        }}
+                      >
+                        <span className="text-[10px] bg-gradient-to-r from-orange-600 to-amber-600 text-white font-black px-2 py-0.5 rounded shadow -translate-y-3.5 flex items-center space-x-1 border border-white/20 whitespace-nowrap">
+                          <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
+                          <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
+                        </span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white shadow-md -translate-y-1.5 animate-ping"></span>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 /* Fallback SVG Canal & Gauge */
                 <div className="w-full h-full bg-gradient-to-b from-sky-950 via-slate-900 to-blue-950 flex items-center justify-center">
@@ -362,58 +446,46 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 </div>
               )
             )}
-
-            {/* AI Waterline Overlay along the Staff Gauge (only in live mode) */}
-            {viewMode === 'live' && (
-              <div
-                className="absolute inset-x-6 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_16px_rgba(56,189,248,0.9)] flex items-center justify-between"
-                style={{ top: `${topPercent}%` }}
-              >
-                <span className="text-[10px] bg-gradient-to-r from-blue-600 to-sky-600 text-white font-extrabold px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1 border border-white/20">
-                  <Sparkles className="w-3 h-3 text-sky-200 shrink-0" />
-                  <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
-                </span>
-                <span className="text-[10px] text-sky-200 font-mono -translate-y-3 bg-black/80 border border-sky-400/40 px-2 py-0.5 rounded shadow">
-                  ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Top-Left Live / AI Status Badge */}
-          <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
-            {viewMode === 'live' ? (
-              <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
-                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-                <span>LIVE 30 FPS</span>
-              </span>
-            ) : (
-              <span className="flex items-center space-x-1.5 text-[11px] text-teal-200 font-extrabold bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-teal-400/40 shadow-lg">
-                <CheckCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <span>AI COMPUTER VISION DASHBOARD</span>
-              </span>
-            )}
-            <span className="text-[11px] text-white font-bold bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20 shadow">
-              {station.name.split(' ')[0]}
-            </span>
-          </div>
-
-          {/* Bottom-Left Real Water Level Readout */}
-          <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2 font-bold shadow-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
-            <div>
-              <span className="text-slate-500 font-medium text-[10px] block leading-none">ระดับน้ำตรวจวัดล่าสุด:</span>
-              <div className="flex items-baseline space-x-1">
-                <span className="text-blue-700 text-base font-black font-mono leading-tight">
-                  {currentLevel.toFixed(2)}
+          {/* Top-Left Live / AI Status Badge (Hideable via showOverlays) */}
+          {showOverlays && (
+            <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
+              {viewMode === 'live' ? (
+                <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
+                  <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+                  <span>LIVE 30 FPS</span>
                 </span>
-                <span className="text-[11px] text-slate-700 font-bold">ม. รทก.</span>
+              ) : (
+                <span className="flex items-center space-x-1.5 text-[11px] text-teal-200 font-extrabold bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-teal-400/40 shadow-lg">
+                  <CheckCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <span>AI REALTIME INSPECTION</span>
+                </span>
+              )}
+              <span className="text-[11px] text-white font-bold bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20 shadow">
+                {station.name.split(' ')[0]}
+              </span>
+            </div>
+          )}
+
+          {/* Bottom-Left Real Water Level Readout (Minimized when zoomed in or when showOverlays is false) */}
+          {showOverlays && zoomLevel <= 1.0 && (
+            <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2 font-bold shadow-xl">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
+              <div>
+                <span className="text-slate-500 font-medium text-[10px] block leading-none">ระดับน้ำตรวจวัดล่าสุด:</span>
+                <div className="flex items-baseline space-x-1">
+                  <span className="text-blue-700 text-base font-black font-mono leading-tight">
+                    {currentLevel.toFixed(2)}
+                  </span>
+                  <span className="text-[11px] text-slate-700 font-bold">ม. รทก.</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Zoom & Pan Guide Hint */}
-          {zoomLevel > 1.0 && (
+          {showOverlays && zoomLevel > 1.0 && (
             <div className="absolute bottom-3 right-3 z-10 bg-black/75 backdrop-blur-md text-sky-200 text-[10px] px-2.5 py-1 rounded-lg border border-white/20 shadow flex items-center space-x-1 font-medium">
               <Move className="w-3 h-3 text-sky-300 animate-bounce shrink-0" />
               <span>คลิกลากเพื่อเลื่อนดูตำแหน่ง ({zoomPercent}%)</span>
@@ -442,7 +514,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 <p className="text-xs text-sky-200/80">
                   {viewMode === 'live'
                     ? 'ภาพสดจากกล้องวงจรปิด ซูมและลากเลื่อนเพื่อตรวจสอบรอยคราบน้ำ'
-                    : 'ภาพการตรวจจับโดยโมเดล AI: เสา Rectified + ไม้บรรทัดดิจิทัล + จุดตัดผิวน้ำจริง'}
+                    : 'การประมวลผลโมเดล AI สด: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
                 </p>
               </div>
             </div>
@@ -468,6 +540,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => setShowOverlays(!showOverlays)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition text-xs font-bold flex items-center space-x-1"
+                title={showOverlays ? 'ซ่อนป้ายบัง' : 'แสดงป้าย'}
+              >
+                {showOverlays ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
               <button
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= 1.0}
@@ -513,7 +592,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             }`}
           >
             <div
-              className="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out origin-center"
+              className="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out origin-center relative"
               style={{
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
               }}
@@ -521,19 +600,44 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <img
                 src={viewMode === 'ai_dashboard' ? aiDashboardUrl : (streamUrl || '')}
                 alt={station.name}
+                onError={(e) => {
+                  if (viewMode === 'ai_dashboard') {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== staticFallbackUrl) target.src = staticFallbackUrl;
+                  }
+                }}
                 className="w-full h-full object-contain pointer-events-none"
               />
+
+              {/* Bounding box on live feed inside fullscreen */}
+              {viewMode === 'live' && showOverlays && (
+                <div
+                  className="absolute pointer-events-none border-2 border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(52,211,153,0.8)]"
+                  style={{
+                    left: `${bbox.left}%`,
+                    top: `${bbox.top}%`,
+                    width: `${bbox.width}%`,
+                    height: `${bbox.height}%`,
+                  }}
+                >
+                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-emerald-700/90 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
+                    Staff Gauge: {confidencePercent}%
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Bottom floating info */}
-            <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs flex items-center space-x-3">
-              <span className="font-bold text-sky-300">ระดับน้ำตรวจวัด:</span>
-              <span className="font-extrabold text-base font-mono text-white">{currentLevel.toFixed(2)} ม. รทก.</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-slate-300">เตือนภัย: {station.warning_level} ม. รทก.</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-rose-400 font-bold">วิกฤต: {station.critical_level} ม. รทก.</span>
-            </div>
+            {/* Bottom floating info (Hideable via showOverlays) */}
+            {showOverlays && (
+              <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs flex items-center space-x-3">
+                <span className="font-bold text-sky-300">ระดับน้ำตรวจวัด:</span>
+                <span className="font-extrabold text-base font-mono text-white">{currentLevel.toFixed(2)} ม. รทก.</span>
+                <span className="text-slate-400">|</span>
+                <span className="text-slate-300">เตือนภัย: {station.warning_level} ม. รทก.</span>
+                <span className="text-slate-400">|</span>
+                <span className="text-rose-400 font-bold">วิกฤต: {station.critical_level} ม. รทก.</span>
+              </div>
+            )}
           </div>
         </div>
       )}

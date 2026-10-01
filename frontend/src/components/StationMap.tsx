@@ -243,7 +243,7 @@ export const StationMap: React.FC<StationMapProps> = ({
   return (
     <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[480px]">
       
-      {/* Map Header with Threshold Legend */}
+      {/* Map Header with Threshold Legend & Flow Direction */}
       <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5">
           <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20">
@@ -253,9 +253,14 @@ export const StationMap: React.FC<StationMapProps> = ({
             <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">
               แผนที่ภูมิสารสนเทศ (GIS) ลุ่มน้ำคลองอู่ตะเภา
             </h2>
-            <p className="text-[11px] text-slate-500 font-medium">
-              แสดงจุดตรวจวัดและระดับน้ำเรียลไทม์ (ม. รทก.)
-            </p>
+            <div className="flex items-center space-x-2 text-[11px] text-slate-500 font-medium">
+              <span>จุดตรวจวัด 3 สถานีหลัก (ม. รทก.)</span>
+              <span className="text-slate-300">•</span>
+              <span className="inline-flex items-center space-x-1 text-sky-800 bg-sky-100/80 px-2 py-0.5 rounded-md border border-sky-200 text-[10px] font-extrabold">
+                <Navigation className="w-3 h-3 text-sky-600 rotate-45 shrink-0" />
+                <span>การไหล: สะเดา &rarr; บางศาลา &rarr; หาดใหญ่</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -276,15 +281,9 @@ export const StationMap: React.FC<StationMapProps> = ({
         </div>
       </div>
 
-      {/* Map Canvas */}
+      {/* Map Canvas - Completely clean and unobstructed */}
       <div className="relative flex-1 w-full min-h-[420px]">
         <div ref={mapContainerRef} className="w-full h-full" />
-        
-        {/* River Flow Direction Tag */}
-        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-200 shadow-md text-[11px] text-slate-700 flex items-center space-x-2 font-medium">
-          <Navigation className="w-3.5 h-3.5 text-sky-600 rotate-45 shrink-0" />
-          <span>ทิศทางการไหล: สะเดา &rarr; บางศาลา &rarr; เข้าเมืองหาดใหญ่</span>
-        </div>
       </div>
 
     </div>

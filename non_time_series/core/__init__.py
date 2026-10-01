@@ -6,18 +6,12 @@ Hatyai Flood Vision Core Module
 from .pole_coordinates import PoleCoordinateManager
 from .scale_calibrator import PiecewiseScaleCalibrator
 from .water_surface_detector import WaterSurfaceDetector
-from .dashboard_builder import build_dashboard
-try:
-    from .excel_logger import WaterLevelExcelLogger, excel_logger
-except ImportError:
-    WaterLevelExcelLogger = None
-    excel_logger = None
+from .excel_logger import WaterLevelExcelLogger, excel_logger
 
 __all__ = [
     "PoleCoordinateManager",
     "PiecewiseScaleCalibrator",
     "WaterSurfaceDetector",
-    "build_dashboard",
     "WaterLevelExcelLogger",
     "excel_logger"
 ]

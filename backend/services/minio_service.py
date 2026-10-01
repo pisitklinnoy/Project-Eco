@@ -11,7 +11,7 @@ class MinIOService:
             secret_key=settings.minio_secret_key,
             secure=settings.minio_secure
         )
-        self.init_buckets()
+        self._buckets_checked = False
 
     def init_buckets(self):
         buckets = [

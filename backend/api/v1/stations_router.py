@@ -52,24 +52,31 @@ def save_station_calibration(
 
 
 @router.get("/{station_code}/cctv-analysis.jpg")
-def get_cctv_analysis_image(station_code: str, db: Session = Depends(get_db)):
+def get_cctv_analysis_image(station_code: str, mode: str = "live", db: Session = Depends(get_db)):
     """
-    สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime
-    ดึงภาพสดจากกล้อง CCTV ทันที ทำการ crop เสาวัดน้ำ วาดไม้บรรทัดดิจิทัล และตีกรอบบนภาพจริง
+    สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime หรือ Benchmark
+    mode: 'live', 'daytime', 'nighttime', 'flood'
     """
     from fastapi.responses import Response
     from services.vision_service import vision_service
     
-    jpeg_bytes = vision_service.get_realtime_analysis_dashboard(station_code)
+    jpeg_bytes = vision_service.get_realtime_analysis_dashboard(station_code, mode=mode)
     if not jpeg_bytes:
         # Fallback to static public image if available
         import os
-        static_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
-                                   "..", "frontend", "public", "ai_dashboards", f"{station_code}.jpg")
-        if os.path.exists(static_path):
-            with open(static_path, "rb") as f:
-                jpeg_bytes = f.read()
-        else:
+        pub_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+                               "..", "frontend", "public", "ai_dashboards")
+        candidates = [
+            os.path.join(pub_dir, f"{station_code}_{mode}.jpg"),
+            os.path.join(pub_dir, f"{station_code}.jpg")
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                with open(p, "rb") as f:
+                    jpeg_bytes = f.read()
+                    break
+
+        if not jpeg_bytes:
             raise HTTPException(status_code=503, detail="Unable to generate realtime vision dashboard")
 
     return Response(content=jpeg_bytes, media_type="image/jpeg", headers={

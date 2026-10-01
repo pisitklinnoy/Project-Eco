@@ -33,15 +33,24 @@ class ForecastService:
         return record
 
     @staticmethod
-    def create_forecast(db: Session, station_code: str, p1: float, p2: float, p3: float, input_mode: str = "API_PLUS_VISION"):
+    def create_forecast(
+        db: Session, 
+        station_code: str, 
+        p1: float, 
+        p2: float, 
+        p3: float, 
+        input_mode: str = "API_PLUS_VISION",
+        model_name: str = "Flood-Forecaster-v1",
+        model_version: str = "1"
+    ):
         record = ForecastRecord(
             station_code=station_code,
             forecast_time=datetime.utcnow(),
             predicted_1h=p1,
             predicted_2h=p2,
             predicted_3h=p3,
-            model_name="Flood-Forecaster-v1",
-            model_version="1",
+            model_name=model_name,
+            model_version=model_version,
             input_mode=input_mode,
             data_quality_status="HIGH_CONFIDENCE"
         )

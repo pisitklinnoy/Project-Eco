@@ -8,6 +8,8 @@ import { ForecastChart } from './components/ForecastChart';
 import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
+import { WhatIfSimulator } from './components/WhatIfSimulator';
+import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
 
 export const App: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
@@ -20,6 +22,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [triggeringForecast, setTriggeringForecast] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
+  const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
 
   // 1. Initial Load: Stations
   useEffect(() => {
@@ -121,9 +124,17 @@ export const App: React.FC = () => {
               station={selectedStation}
               measurement={measurement}
               onOpenReview={() => setIsReviewOpen(true)}
+              onOpenCalibrate={() => setIsCalibrateOpen(true)}
             />
           </div>
         </div>
+
+        {/* Interactive "What-If" Flood Simulator */}
+        <WhatIfSimulator
+          station={selectedStation}
+          currentWaterLevel={measurement ? measurement.water_level : (selectedStation?.normal_level || 3.0)}
+          onApplySimulation={(simForecast) => setForecast(simForecast)}
+        />
 
         {/* Bottom Grid: 1-3h Forecast Chart & Alerts */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -156,6 +167,14 @@ export const App: React.FC = () => {
         station={selectedStation}
         measurement={measurement}
         onReviewSubmitted={loadStationData}
+      />
+
+      {/* Click to Calibrate Modal */}
+      <ClickToCalibrateModal
+        isOpen={isCalibrateOpen}
+        onClose={() => setIsCalibrateOpen(false)}
+        station={selectedStation}
+        onCalibrationSaved={loadStationData}
       />
 
       {/* Footer */}

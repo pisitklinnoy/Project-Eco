@@ -80,4 +80,39 @@ export const floodlensApi = {
     if (!res.ok) throw new Error('Failed to test alert trigger');
     return res.json();
   },
+
+  // 6. Interactive Features (What-If & Calibration)
+  simulateWhatIf: async (
+    stationCode: string,
+    params: {
+      rain_surge_mm: number;
+      upstream_surge_percent: number;
+      gate_r1_open_percent: number;
+      sea_tide_surge_m: number;
+    }
+  ): Promise<ForecastRecord> => {
+    const query = new URLSearchParams({
+      station_code: stationCode,
+      rain_surge_mm: params.rain_surge_mm.toString(),
+      upstream_surge_percent: params.upstream_surge_percent.toString(),
+      gate_r1_open_percent: params.gate_r1_open_percent.toString(),
+      sea_tide_surge_m: params.sea_tide_surge_m.toString(),
+    });
+    const res = await fetch(`${API_BASE}/forecast/simulate?${query.toString()}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to run what-if simulation');
+    return res.json();
+  },
+
+  saveCalibration: async (stationCode: string, calibrationData: any) => {
+    const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/calibrate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(calibrationData),
+    });
+    if (!res.ok) throw new Error('Failed to save calibration');
+    return res.json();
+  },
 };
+

@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import type { Station, WaterMeasurement } from '../types';
-import { Camera, Eye, Radio } from 'lucide-react';
+import { Camera, Eye, Radio, Target } from 'lucide-react';
 
 interface CameraViewerProps {
   station: Station | null;
   measurement: WaterMeasurement | null;
   onOpenReview: () => void;
+  onOpenCalibrate?: () => void;
 }
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
   measurement,
   onOpenReview,
+  onOpenCalibrate,
 }) => {
   const [imgError, setImgError] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
@@ -103,8 +105,19 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           <span>ระดับน้ำตรวจวัด: {currentLevel.toFixed(2)} ม.</span>
         </div>
 
-        {/* Bottom-Right Quick Review Button */}
-        <div className="absolute bottom-3 right-3 opacity-90 group-hover:opacity-100 transition">
+        {/* Bottom-Right Quick Action Buttons */}
+        <div className="absolute bottom-3 right-3 opacity-90 group-hover:opacity-100 transition flex items-center space-x-2">
+          {onOpenCalibrate && (
+            <button
+              onClick={onOpenCalibrate}
+              className="bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-xs px-2.5 py-1.5 rounded-lg backdrop-blur-md font-semibold flex items-center space-x-1.5 shadow-lg border border-slate-700 transition"
+              title="คลิกมาร์ก 2 จุดเพื่อปรับเทียบสเกลเสาวัดน้ำ"
+            >
+              <Target className="w-3.5 h-3.5 text-sky-400" />
+              <span>ปรับเทียบเสา (Calibrate)</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenReview}
             className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg backdrop-blur-md font-semibold flex items-center space-x-1.5 shadow-lg transition"

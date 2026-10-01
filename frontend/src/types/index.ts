@@ -65,3 +65,24 @@ export interface ReviewPackage {
   reason_flagged: string;
   created_at: string;
 }
+
+export interface CalibrationPoint {
+  x: number;
+  y: number;
+  value_m: number;
+}
+
+export interface CalibrationResult {
+  station_code: string;
+  point1: CalibrationPoint;
+  point2: CalibrationPoint;
+  pixels_per_meter: number;
+  formula_str?: string;
+}
+
+export interface WhatIfSimulationParams {
+  rain_surge_mm: number;
+  upstream_surge_percent: number;
+  gate_r1_open_percent: number;
+  sea_tide_surge_m: number;
+}

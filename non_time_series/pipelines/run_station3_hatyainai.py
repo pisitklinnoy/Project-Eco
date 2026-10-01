@@ -71,17 +71,11 @@ def main():
     os.makedirs(os.path.join(BASE_DIR, "output"), exist_ok=True)
     if args.output:
         out_path = args.output
-        cv2.imwrite(out_path, dashboard)
+    elif args.flood or "flood" in img_src_name.lower():
+        out_path = os.path.join(BASE_DIR, "output", "result_hatayi_daytime_generate_flood.jpg")
     else:
-        out_path = os.path.join(BASE_DIR, "output", "hatyainai_result_dashboard.jpg")
-        cv2.imwrite(out_path, dashboard)
-        if args.flood or "flood" in img_src_name.lower():
-            bench_out = os.path.join(BASE_DIR, "output", "result_hatayi_daytime_generate_flood.jpg")
-        elif args.night or "night" in img_src_name.lower():
-            bench_out = os.path.join(BASE_DIR, "output", "result_hatyai_nighttime_normal.jpg")
-        else:
-            bench_out = os.path.join(BASE_DIR, "output", "result_hatyai_nighttime_normal.jpg")
-        cv2.imwrite(bench_out, dashboard)
+        out_path = os.path.join(BASE_DIR, "output", "result_hatyai_nighttime_normal.jpg")
+    cv2.imwrite(out_path, dashboard)
 
     print("=" * 70)
     print(f"🌊 [Station 3] สะพานหาดใหญ่นอก (X.44)")

@@ -22,7 +22,7 @@ from core.water_surface_detector import WaterSurfaceDetector
 from core.excel_logger import WaterLevelExcelLogger
 
 CFG_PATH = os.path.join(BASE_DIR, "configs", "station1_muangkong.json")
-DEFAULT_IMG = os.path.join(BASE_DIR, "sample_images", "station1_muangkong.jpg")
+DEFAULT_IMG = os.path.join(BASE_DIR, "sample_images", "station1_muangkong_daytime.jpg")
 
 
 def main():
@@ -77,19 +77,15 @@ def main():
 
     dashboard = build_dashboard(frame, enhanced, water_info, pole_mgr, calibrator, cfg, img_src_name)
     
-    # บันทึกทั้งชื่อมาตรฐานและชื่อ Benchmark
+    # บันทึกภาพผลลัพธ์ Benchmark
     os.makedirs(os.path.join(BASE_DIR, "output"), exist_ok=True)
     if args.output:
         out_path = args.output
-        cv2.imwrite(out_path, dashboard)
+    elif args.night or "night" in img_src_name.lower():
+        out_path = os.path.join(BASE_DIR, "output", "result_muang_kong_nighttime_normal.jpg")
     else:
-        out_path = os.path.join(BASE_DIR, "output", "muangkong_result_dashboard.jpg")
-        cv2.imwrite(out_path, dashboard)
-        if args.night or "night" in img_src_name.lower():
-            bench_out = os.path.join(BASE_DIR, "output", "result_muang_kong_nighttime_normal.jpg")
-        else:
-            bench_out = os.path.join(BASE_DIR, "output", "result_muang_kong_daytime_normal.jpg")
-        cv2.imwrite(bench_out, dashboard)
+        out_path = os.path.join(BASE_DIR, "output", "result_muang_kong_daytime_normal.jpg")
+    cv2.imwrite(out_path, dashboard)
 
     print("=" * 70)
     print(f"🌊 [Station 1] สะพานบ้านม่วงก็อง (X.173A)")

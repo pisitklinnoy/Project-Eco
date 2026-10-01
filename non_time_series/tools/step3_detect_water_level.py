@@ -31,8 +31,8 @@ CONFIG_MAP = {
 }
 
 DEFAULT_IMAGES = {
-    "muangkong": os.path.join(BASE_DIR, "sample_images", "station1_muangkong.jpg"),
-    "bangsala": os.path.join(BASE_DIR, "sample_images", "station2_bangsala.png"),
+    "muangkong": os.path.join(BASE_DIR, "sample_images", "station1_muangkong_daytime.jpg"),
+    "bangsala": os.path.join(BASE_DIR, "sample_images", "station2_bangsala_daytime.jpg"),
     "hatyainai": os.path.join(BASE_DIR, "sample_images", "station3_hatyainai_daytime.jpg")
 }
 

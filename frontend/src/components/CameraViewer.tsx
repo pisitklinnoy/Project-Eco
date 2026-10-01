@@ -14,6 +14,7 @@ import {
   Search,
   Move,
   Sliders,
+  CheckCircle,
 } from 'lucide-react';
 
 interface CameraViewerProps {
@@ -31,6 +32,9 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 }) => {
   const [imgError, setImgError] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
+  
+  // View Mode: 'live' = Live CCTV Feed | 'ai_dashboard' = AI Model Staff Gauge Analysis (as requested)
+  const [viewMode, setViewMode] = useState<'live' | 'ai_dashboard'>('live');
 
   // Zoom & Pan state
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -65,6 +69,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     ? `${station.camera_stream_url}?t=${refreshKey}`
     : null;
 
+  const aiDashboardUrl = `/ai_dashboards/${station.station_code}.jpg?t=${refreshKey}`;
+
   // Zoom Handlers
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(Number((prev + 0.3).toFixed(1)), 3.5));
@@ -93,13 +99,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       setZoomLevel(2.4);
       const code = station.station_code.toUpperCase();
       if (code.includes('HATYAINAI') || code.includes('X.44')) {
-        // Staff gauge is near right side (~68%)
         setPan({ x: -140, y: 0 });
       } else if (code.includes('BANGSALA') || code.includes('X.90')) {
-        // Staff gauge is at ~59%
         setPan({ x: -90, y: 15 });
       } else {
-        // Muang Kong ~57%
         setPan({ x: -80, y: 15 });
       }
       setIsFocusedGauge(true);
@@ -141,16 +144,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const getStaffGaugeWaterlineY = (stnCode: string, waterLvl: number): number => {
     const code = stnCode.toUpperCase();
     if (code.includes('MUANGKONG') || code.includes('X.173A')) {
-      // Scale: 10.0m (56% Y) to 18.0m (19% Y)
       const ratio = Math.min(Math.max((waterLvl - 10.0) / 8.0, 0), 1);
       return Math.round(56 - ratio * 37);
     }
     if (code.includes('BANGSALA') || code.includes('X.90')) {
-      // Scale: 2.0m (61% Y) to 12.0m (27% Y)
       const ratio = Math.min(Math.max((waterLvl - 2.0) / 10.0, 0), 1);
       return Math.round(61 - ratio * 34);
     }
-    // HATYAINAI (X.44): Scale: 0.6m (92% Y) to 9.0m (12% Y)
     const ratio = Math.min(Math.max((waterLvl - 0.6) / 8.4, 0), 1);
     return Math.round(92 - ratio * 80);
   };
@@ -162,8 +162,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     <>
       <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[480px]">
         
-        {/* Header */}
-        <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex items-center justify-between gap-2">
+        {/* Header with View Mode Switcher */}
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2.5">
             <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20 shrink-0">
               <Camera className="w-4 h-4" />
@@ -171,22 +171,46 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                  กล้อง CCTV สด & AI ตรวจวัดผิวน้ำ
+                  กล้อง CCTV สด & AI ตรวจวัดเสาน้ำ
                 </h3>
                 <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                   {station.camera_id || station.station_code}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
-                วิเคราะห์สเกลเสาวัดน้ำและคำนวณระดับน้ำจริง (ม. รทก.) ด้วย Computer Vision
+                {viewMode === 'live'
+                  ? 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE 30 FPS)'
+                  : 'ผลลัพธ์โมเดล AI: ภาพเสา Rectified + ไม้บรรทัดดิจิทัล + จุดตัดผิวน้ำ'}
               </p>
             </div>
           </div>
 
-          <span className="flex items-center space-x-1.5 text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-sm shrink-0">
-            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-            <span>LIVE CCTV</span>
-          </span>
+          {/* Mode Toggle Buttons: [Live Feed] VS [AI Staff Gauge Model Dashboard] */}
+          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-blue-200/80 shadow-inner">
+            <button
+              onClick={() => { setViewMode('live'); handleResetZoom(); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                viewMode === 'live'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-blue-700'
+              }`}
+            >
+              <Radio className={`w-3 h-3 ${viewMode === 'live' ? 'text-white animate-pulse' : 'text-slate-400'}`} />
+              <span>ภาพกล้องสด (LIVE)</span>
+            </button>
+
+            <button
+              onClick={() => { setViewMode('ai_dashboard'); handleResetZoom(); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                viewMode === 'ai_dashboard'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-emerald-700'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${viewMode === 'ai_dashboard' ? 'text-emerald-200 animate-spin' : 'text-emerald-600'}`} />
+              <span>วิเคราะห์ AI Staff Gauge</span>
+            </button>
+          </div>
         </div>
 
         {/* Toolbar: Zoom Controls & Inspector Actions */}
@@ -228,18 +252,20 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
-            {/* Quick Focus Gauge preset */}
-            <button
-              onClick={handleFocusGauge}
-              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] ${
-                isFocusedGauge
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
-              }`}
-            >
-              <Search className="w-3 h-3 text-sky-400 shrink-0" />
-              <span>ส่องเสาวัดน้ำ (Focus Gauge)</span>
-            </button>
+            {/* Quick Focus Gauge preset (active in live mode) */}
+            {viewMode === 'live' && (
+              <button
+                onClick={handleFocusGauge}
+                className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] ${
+                  isFocusedGauge
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
+                }`}
+              >
+                <Search className="w-3 h-3 text-sky-400 shrink-0" />
+                <span>ส่องเสาวัดน้ำ (Focus Gauge)</span>
+              </button>
+            )}
           </div>
 
           {/* Action buttons right */}
@@ -274,7 +300,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           </div>
         </div>
 
-        {/* Video Canvas Container */}
+        {/* Video / Dashboard Canvas Container */}
         <div
           ref={containerRef}
           onMouseDown={handleMouseDown}
@@ -293,58 +319,80 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
             }}
           >
-            {streamUrl && !imgError ? (
+            {/* VIEW MODE 1: AI MODEL DASHBOARD (ตามรูปที่แนบมาเป๊ะๆ) */}
+            {viewMode === 'ai_dashboard' ? (
               <img
-                src={streamUrl}
-                alt={station.name}
-                onError={() => setImgError(true)}
-                className="w-full h-full object-cover object-center pointer-events-none"
+                src={aiDashboardUrl}
+                alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
+                onError={() => {
+                  // Fallback to live stream if dashboard image fails
+                  console.warn('Dashboard image failed, falling back to live stream');
+                  setViewMode('live');
+                }}
+                className="w-full h-full object-contain pointer-events-none"
               />
             ) : (
-              /* Fallback SVG Canal & Gauge */
-              <div className="w-full h-full bg-gradient-to-b from-sky-950 via-slate-900 to-blue-950 flex items-center justify-center">
-                <svg className="w-full h-full opacity-85" viewBox="0 0 640 360" preserveAspectRatio="none">
-                  <rect x="0" y="0" width="640" height="120" fill="#1e293b" />
-                  <line x1="0" y1="120" x2="640" y2="120" stroke="#475569" strokeWidth="4" />
-                  <rect x="0" y="120" width="640" height="240" fill="#0284c7" fillOpacity="0.65" />
-                  {/* Gauge Pole */}
-                  <rect x="340" y="60" width="45" height="280" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
-                  {[80, 110, 140, 170, 200, 230, 260, 290, 320].map((y, idx) => (
-                    <g key={y}>
-                      <line x1="340" y1={y} x2="358" y2={y} stroke="#dc2626" strokeWidth="2" />
-                      <line x1="358" y1={y} x2="385" y2={y} stroke="#0f172a" strokeWidth="1" />
-                      <text x="362" y={y + 4} fill="#0f172a" fontSize="9" fontWeight="bold">
-                        {(station.bank_level - idx * ((station.bank_level - station.normal_level) / 8)).toFixed(1)}
-                      </text>
-                    </g>
-                  ))}
-                  {/* Waterline */}
-                  <line x1="100" y1="210" x2="540" y2="210" stroke="#38bdf8" strokeWidth="4" strokeDasharray="8,5" />
-                </svg>
-              </div>
+              /* VIEW MODE 2: LIVE STREAM */
+              streamUrl && !imgError ? (
+                <img
+                  src={streamUrl}
+                  alt={station.name}
+                  onError={() => setImgError(true)}
+                  className="w-full h-full object-cover object-center pointer-events-none"
+                />
+              ) : (
+                /* Fallback SVG Canal & Gauge */
+                <div className="w-full h-full bg-gradient-to-b from-sky-950 via-slate-900 to-blue-950 flex items-center justify-center">
+                  <svg className="w-full h-full opacity-85" viewBox="0 0 640 360" preserveAspectRatio="none">
+                    <rect x="0" y="0" width="640" height="120" fill="#1e293b" />
+                    <line x1="0" y1="120" x2="640" y2="120" stroke="#475569" strokeWidth="4" />
+                    <rect x="0" y="120" width="640" height="240" fill="#0284c7" fillOpacity="0.65" />
+                    <rect x="340" y="60" width="45" height="280" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
+                    {[80, 110, 140, 170, 200, 230, 260, 290, 320].map((y, idx) => (
+                      <g key={y}>
+                        <line x1="340" y1={y} x2="358" y2={y} stroke="#dc2626" strokeWidth="2" />
+                        <line x1="358" y1={y} x2="385" y2={y} stroke="#0f172a" strokeWidth="1" />
+                        <text x="362" y={y + 4} fill="#0f172a" fontSize="9" fontWeight="bold">
+                          {(station.bank_level - idx * ((station.bank_level - station.normal_level) / 8)).toFixed(1)}
+                        </text>
+                      </g>
+                    ))}
+                    <line x1="100" y1="210" x2="540" y2="210" stroke="#38bdf8" strokeWidth="4" strokeDasharray="8,5" />
+                  </svg>
+                </div>
+              )
             )}
 
-            {/* AI Waterline Overlay along the Staff Gauge */}
-            <div
-              className="absolute inset-x-6 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_16px_rgba(56,189,248,0.9)] flex items-center justify-between"
-              style={{ top: `${topPercent}%` }}
-            >
-              <span className="text-[10px] bg-gradient-to-r from-blue-600 to-sky-600 text-white font-extrabold px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1 border border-white/20">
-                <Sparkles className="w-3 h-3 text-sky-200 shrink-0" />
-                <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
-              </span>
-              <span className="text-[10px] text-sky-200 font-mono -translate-y-3 bg-black/80 border border-sky-400/40 px-2 py-0.5 rounded shadow">
-                ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
-              </span>
-            </div>
+            {/* AI Waterline Overlay along the Staff Gauge (only in live mode) */}
+            {viewMode === 'live' && (
+              <div
+                className="absolute inset-x-6 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_16px_rgba(56,189,248,0.9)] flex items-center justify-between"
+                style={{ top: `${topPercent}%` }}
+              >
+                <span className="text-[10px] bg-gradient-to-r from-blue-600 to-sky-600 text-white font-extrabold px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1 border border-white/20">
+                  <Sparkles className="w-3 h-3 text-sky-200 shrink-0" />
+                  <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
+                </span>
+                <span className="text-[10px] text-sky-200 font-mono -translate-y-3 bg-black/80 border border-sky-400/40 px-2 py-0.5 rounded shadow">
+                  ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Top-Left Live Status Badge */}
+          {/* Top-Left Live / AI Status Badge */}
           <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
-            <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
-              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-              <span>LIVE</span>
-            </span>
+            {viewMode === 'live' ? (
+              <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
+                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+                <span>LIVE 30 FPS</span>
+              </span>
+            ) : (
+              <span className="flex items-center space-x-1.5 text-[11px] text-teal-200 font-extrabold bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-teal-400/40 shadow-lg">
+                <CheckCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span>AI COMPUTER VISION DASHBOARD</span>
+              </span>
+            )}
             <span className="text-[11px] text-white font-bold bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20 shadow">
               {station.name.split(' ')[0]}
             </span>
@@ -379,7 +427,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       {isFullscreen && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-4 sm:p-6 animate-fade-in">
           {/* Modal Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/20 text-white mb-2 gap-2">
+          <div className="flex items-center justify-between pb-3 border-b border-white/20 text-white mb-2 gap-2 flex-wrap">
             <div className="flex items-center space-x-3">
               <div className="p-2 rounded-xl bg-blue-600 text-white shrink-0">
                 <Camera className="w-5 h-5" />
@@ -392,9 +440,31 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   </span>
                 </h3>
                 <p className="text-xs text-sky-200/80">
-                  ซูมและลากเลื่อนเพื่อตรวจสอบรอยคราบน้ำและตัวเลขบนเสาวัดน้ำ (ม. รทก.) อย่างละเอียด
+                  {viewMode === 'live'
+                    ? 'ภาพสดจากกล้องวงจรปิด ซูมและลากเลื่อนเพื่อตรวจสอบรอยคราบน้ำ'
+                    : 'ภาพการตรวจจับโดยโมเดล AI: เสา Rectified + ไม้บรรทัดดิจิทัล + จุดตัดผิวน้ำจริง'}
                 </p>
               </div>
+            </div>
+
+            {/* Mode toggle in fullscreen */}
+            <div className="flex items-center space-x-1 bg-white/10 p-1 rounded-xl border border-white/20">
+              <button
+                onClick={() => setViewMode('live')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                  viewMode === 'live' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                ภาพกล้องสด
+              </button>
+              <button
+                onClick={() => setViewMode('ai_dashboard')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                  viewMode === 'ai_dashboard' ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                วิเคราะห์ AI Staff Gauge
+              </button>
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
@@ -448,15 +518,11 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
               }}
             >
-              {streamUrl && !imgError ? (
-                <img
-                  src={streamUrl}
-                  alt={station.name}
-                  className="w-full h-full object-contain pointer-events-none"
-                />
-              ) : (
-                <div className="text-white text-sm">กำลังโหลดภาพกล้อง CCTV...</div>
-              )}
+              <img
+                src={viewMode === 'ai_dashboard' ? aiDashboardUrl : (streamUrl || '')}
+                alt={station.name}
+                className="w-full h-full object-contain pointer-events-none"
+              />
             </div>
 
             {/* Bottom floating info */}

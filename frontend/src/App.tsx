@@ -16,6 +16,7 @@ export const App: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [measurement, setMeasurement] = useState<WaterMeasurement | null>(null);
+  const [stationMeasurements, setStationMeasurements] = useState<Record<string, WaterMeasurement>>({});
   const [history, setHistory] = useState<WaterMeasurement[]>([]);
   const [forecast, setForecast] = useState<ForecastRecord | null>(null);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
@@ -25,6 +26,30 @@ export const App: React.FC = () => {
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
 
+  // Fetch telemetry for all active stations
+  const loadAllStationMeasurements = useCallback(async (stnList: Station[]) => {
+    if (!stnList || stnList.length === 0) return;
+    try {
+      const results = await Promise.all(
+        stnList.map(async (stn) => {
+          try {
+            const data = await floodlensApi.getLatestWater(stn.station_code);
+            return { code: stn.station_code, data };
+          } catch {
+            return null;
+          }
+        })
+      );
+      const map: Record<string, WaterMeasurement> = {};
+      results.forEach((r) => {
+        if (r && r.data) map[r.code] = r.data;
+      });
+      setStationMeasurements(map);
+    } catch (err) {
+      console.error('Failed to load all station measurements', err);
+    }
+  }, []);
+
   // 1. Initial Load: Stations
   useEffect(() => {
     floodlensApi
@@ -33,11 +58,12 @@ export const App: React.FC = () => {
         setStations(data);
         if (data.length > 0) {
           setSelectedStation(data[0]);
+          loadAllStationMeasurements(data);
         }
       })
       .catch((err) => console.error('Failed to load stations', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadAllStationMeasurements]);
 
   // 2. Fetch Station Specific Data
   const loadStationData = useCallback(async () => {
@@ -53,6 +79,12 @@ export const App: React.FC = () => {
       setHistory(waterHistory);
       setForecast(latestForecast);
       setAlerts(recentAlerts);
+
+      // Update in dictionary
+      setStationMeasurements((prev) => ({
+        ...prev,
+        [selectedStation.station_code]: latestWater,
+      }));
     } catch (err) {
       console.error('Failed to load station telemetry', err);
     }
@@ -61,9 +93,14 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadStationData();
     // Auto-refresh interval (every 30 seconds)
-    const timer = setInterval(loadStationData, 30000);
+    const timer = setInterval(() => {
+      loadStationData();
+      if (stations.length > 0) {
+        loadAllStationMeasurements(stations);
+      }
+    }, 30000);
     return () => clearInterval(timer);
-  }, [loadStationData]);
+  }, [loadStationData, loadAllStationMeasurements, stations]);
 
   // Handle Manual Forecast Trigger
   const handleTriggerForecast = async () => {
@@ -92,7 +129,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f0f7ff] via-[#f8fbff] to-[#e6f2fc] text-slate-800 flex flex-col font-sans">
-      {/* Navigation Header */}
+      {/* Navigation Header (Clean Executive Layout without external dev links) */}
       <Navbar
         stations={stations}
         selectedStation={selectedStation}
@@ -104,20 +141,20 @@ export const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 space-y-10 w-full">
         
         {/* ========================================================= */}
-        {/* SECTION 1: GIS Map & Real-Time Telemetry & CCTV           */}
+        {/* SECTION 1: GIS Map & Real-Time Telemetry & CCTV Zoom      */}
         {/* ========================================================= */}
-        <section className="space-y-4">
+        <section className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-blue-200/80 gap-2">
             <div className="flex items-center space-x-3">
-              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-md shadow-blue-600/30">
+              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-md shadow-blue-600/30">
                 01
               </span>
               <div>
                 <h2 className="text-base font-extrabold text-blue-950 tracking-tight flex items-center space-x-2">
-                  <span>แผนที่ภูมิสารสนเทศ (GIS) และภาพกล้อง CCTV สดประจำสถานี</span>
+                  <span>แผนที่ภูมิสารสนเทศ (GIS) และศูนย์ตรวจการณ์กล้อง CCTV สด (AI Vision)</span>
                 </h2>
                 <p className="text-xs text-slate-500 font-medium">
-                  ตรวจวัดระดับน้ำแบบเรียลไทม์จากระบบโทรมาตรและกล้องวงจรปิดด้วย AI Computer Vision
+                  ตรวจวัดระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามแนวลุ่มน้ำคลองอู่ตะเภา พร้อมระบบซูมตรวจสอบสเกลเสาวัดน้ำ
                 </p>
               </div>
             </div>
@@ -129,29 +166,35 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* GIS Map (Left 7 Cols) */}
-            <div className="lg:col-span-7 h-[440px]">
+          {/* Strategic Telemetry Summary Ribbon */}
+          <TelemetryCard
+            station={selectedStation}
+            measurement={measurement}
+            loading={loading}
+            onRefresh={loadStationData}
+            onOpenReview={() => setIsReviewOpen(true)}
+          />
+
+          {/* Side-by-Side: GIS Map (50%) & CCTV Live Stream with Zoom (50%) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            {/* GIS Map with Accurate 'ม. รทก.' & Color-coded Risk Dots */}
+            <div className="h-[540px]">
               <StationMap
                 stations={stations}
                 selectedStation={selectedStation}
                 onSelectStation={setSelectedStation}
                 latestWater={measurement}
+                measurementsByStation={stationMeasurements}
               />
             </div>
 
-            {/* Telemetry & Camera (Right 5 Cols) */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
-              <TelemetryCard
-                station={selectedStation}
-                measurement={measurement}
-                loading={loading}
-                onRefresh={loadStationData}
-                onOpenReview={() => setIsReviewOpen(true)}
-              />
+            {/* High-Definition Zoomable CCTV Live Camera & Staff Gauge Inspector */}
+            <div className="h-[540px]">
               <CameraViewer
                 station={selectedStation}
                 measurement={measurement}
+                stations={stations}
+                onSelectStation={setSelectedStation}
                 onOpenReview={() => setIsReviewOpen(true)}
                 onOpenCalibrate={() => setIsCalibrateOpen(true)}
               />

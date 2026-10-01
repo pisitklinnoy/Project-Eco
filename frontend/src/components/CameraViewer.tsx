@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Station, WaterMeasurement } from '../types';
-import { Camera, Eye, Radio, Target } from 'lucide-react';
+import { Camera, Eye, Radio, Target, Sparkles } from 'lucide-react';
 
 interface CameraViewerProps {
   station: Station | null;
@@ -38,17 +38,24 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     : null;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg flex flex-col">
+    <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 bg-slate-800/60 border-b border-slate-700/60 flex items-center justify-between">
+      <div className="px-4 py-3 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white border-b border-blue-100 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Camera className="w-4 h-4 text-blue-400" />
-          <h3 className="text-sm font-semibold text-white">กล้อง CCTV สด ({station.camera_id || station.station_code})</h3>
+          <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+            <Camera className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              ภาพกล้อง CCTV สด ({station.camera_id || station.station_code})
+            </h3>
+            <p className="text-[11px] text-slate-500">ตรวจจับเสาวัดน้ำและคำนวณระดับผิวน้ำด้วย AI Vision</p>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="flex items-center space-x-1.5 text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-            <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-            <span>LIVE STREAM</span>
+          <span className="flex items-center space-x-1.5 text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-sm">
+            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+            <span>LIVE CCTV</span>
           </span>
         </div>
       </div>
@@ -91,29 +98,30 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           const topPercent = Math.round(82 - clampedRatio * 57);
           return (
             <div
-              className="absolute inset-x-8 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-85 shadow-[0_0_12px_rgba(56,189,248,0.8)] flex items-center justify-between transition-all duration-700 ease-out"
+              className="absolute inset-x-6 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_14px_rgba(56,189,248,0.9)] flex items-center justify-between transition-all duration-700 ease-out"
               style={{ top: `${topPercent}%` }}
             >
-              <span className="text-[10px] bg-sky-500 text-slate-950 font-bold px-1.5 py-0.5 rounded -translate-y-3 shadow">
-                AI Waterline: {currentLevel.toFixed(2)} ม.
+              <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1">
+                <Sparkles className="w-3 h-3 text-sky-200" />
+                <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม.</span>
               </span>
-              <span className="text-[10px] text-sky-300 font-mono -translate-y-3 bg-slate-900/90 border border-sky-500/30 px-1.5 py-0.5 rounded">
-                Conf: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
+              <span className="text-[10px] text-sky-200 font-mono -translate-y-3 bg-black/80 border border-sky-400/40 px-2 py-0.5 rounded shadow">
+                ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
               </span>
             </div>
           );
         })()}
 
         {/* Top-Left Station & Source Tag */}
-        <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-white text-[11px] font-mono flex items-center space-x-2">
+        <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-3 py-1 rounded-lg border border-white/20 text-white text-[11px] font-mono flex items-center space-x-2 shadow-lg">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>{station.station_code} | {station.name.split(' ')[0]}</span>
+          <span className="font-bold">{station.station_code} | {station.name.split(' ')[0]}</span>
         </div>
 
         {/* Bottom-Left AI Detected Water Level */}
-        <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-blue-500/40 text-blue-300 text-xs flex items-center space-x-1.5 font-semibold">
-          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-          <span>ระดับน้ำตรวจวัด: {currentLevel.toFixed(2)} ม.</span>
+        <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2 font-bold shadow-lg">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+          <span>ระดับน้ำตรวจวัด: <span className="text-blue-600 text-sm font-extrabold">{currentLevel.toFixed(2)}</span> ม.</span>
         </div>
 
         {/* Bottom-Right Quick Action Buttons */}
@@ -121,17 +129,17 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           {onOpenCalibrate && (
             <button
               onClick={onOpenCalibrate}
-              className="bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-xs px-2.5 py-1.5 rounded-lg backdrop-blur-md font-semibold flex items-center space-x-1.5 shadow-lg border border-slate-700 transition"
+              className="bg-white/95 hover:bg-white text-slate-800 hover:text-blue-700 text-xs px-3 py-1.5 rounded-xl backdrop-blur-md font-bold flex items-center space-x-1.5 shadow-lg border border-slate-200 transition"
               title="คลิกมาร์ก 2 จุดเพื่อปรับเทียบสเกลเสาวัดน้ำ"
             >
-              <Target className="w-3.5 h-3.5 text-sky-400" />
+              <Target className="w-3.5 h-3.5 text-blue-600" />
               <span>ปรับเทียบเสา (Calibrate)</span>
             </button>
           )}
 
           <button
             onClick={onOpenReview}
-            className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg backdrop-blur-md font-semibold flex items-center space-x-1.5 shadow-lg transition"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-xl backdrop-blur-md font-bold flex items-center space-x-1.5 shadow-lg transition"
           >
             <Eye className="w-3.5 h-3.5" />
             <span>ตรวจทานภาพ (Review)</span>

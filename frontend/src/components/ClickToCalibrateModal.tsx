@@ -92,42 +92,42 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white border-2 border-blue-200 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white border-b border-blue-100 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-              <Target className="w-5 h-5 text-blue-400" />
+            <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+              <Target className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center space-x-2">
-                <span>Click-to-Calibrate: ปรับเทียบสเกลเสาวัดน้ำ</span>
-                <span className="text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded font-mono">
+              <h2 className="text-base font-extrabold text-blue-950 flex items-center space-x-2">
+                <span>Click-to-Calibrate: สอบเทียบสเกลเสาวัดน้ำด้วยการคลิก</span>
+                <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold font-mono">
                   {station.station_code}
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
-                คลิกมาร์ก 2 จุดบนเสาในภาพ เพื่อให้ระบบคำนวณอัตราส่วนพิกเซลต่อเมตรโดยไม่ต้องรู้ความสูงเสาจริง
+              <p className="text-xs text-slate-500 font-medium">
+                คลิกมาร์ก 2 จุดบนเสาในภาพ เพื่อหาอัตราส่วนพิกเซลต่อเมตรโดยไม่ต้องรู้ความสูงของยอดเสาหรือโคนเสาจริง
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/40">
           {/* Left Canvas/Image Area (8 Cols) */}
           <div className="lg:col-span-8 flex flex-col space-y-3">
             {/* Guide Badge */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-xs flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-slate-300">
-                <Info className="w-4 h-4 text-sky-400 shrink-0" />
+            <div className="bg-white border border-blue-200/80 rounded-xl px-4 py-2.5 text-xs flex items-center justify-between shadow-sm">
+              <div className="flex items-center space-x-2 text-slate-700 font-medium">
+                <Info className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
                   {!point1
                     ? 'ขั้นตอนที่ 1: คลิกที่ขีดตัวเลขบนเสาด้านบน (เช่น ขีด 4.0 ม.)'
@@ -138,7 +138,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
               </div>
               <button
                 onClick={handleReset}
-                className="text-[11px] text-slate-400 hover:text-white flex items-center space-x-1 underline"
+                className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center space-x-1 underline"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>รีเซ็ต</span>
@@ -146,7 +146,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
             </div>
 
             {/* Clickable Camera Viewport */}
-            <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-slate-700 shadow-inner select-none cursor-crosshair">
+            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border-2 border-blue-200 shadow-md select-none cursor-crosshair">
               {station.camera_stream_url ? (
                 <img
                   ref={imgRef}
@@ -156,7 +156,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
+                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
                   ไม่พบภาพกล้อง CCTV
                 </div>
               )}
@@ -167,11 +167,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
                   style={{ left: `${point1.x}px`, top: `${point1.y}px` }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-ping absolute" />
-                  <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg relative flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg animate-ping absolute" />
+                  <div className="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg relative flex items-center justify-center">
                     <span className="text-[8px] font-bold text-white">1</span>
                   </div>
-                  <span className="bg-blue-600/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
+                  <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow">
                     จุดที่ 1 ({val1}ม.)
                   </span>
                 </div>
@@ -183,11 +183,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
                   style={{ left: `${point2.x}px`, top: `${point2.y}px` }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg animate-ping absolute" />
-                  <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg relative flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg animate-ping absolute" />
+                  <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg relative flex items-center justify-center">
                     <span className="text-[8px] font-bold text-white">2</span>
                   </div>
-                  <span className="bg-emerald-600/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
+                  <span className="bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow">
                     จุดที่ 2 ({val2}ม.)
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   <span className="text-[10px] font-bold bg-yellow-400 text-slate-950 px-1.5 py-0.5 rounded -translate-y-3">
                     ผิวน้ำที่ทดสอบคลิก
                   </span>
-                  <span className="text-xs font-mono font-bold bg-slate-900/90 text-yellow-300 px-2 py-0.5 rounded border border-yellow-500/40 -translate-y-3">
+                  <span className="text-xs font-mono font-bold bg-white text-yellow-800 px-2 py-0.5 rounded border border-yellow-400 -translate-y-3 shadow">
                     {testMeasuredLevel} เมตร
                   </span>
                 </div>
@@ -227,16 +227,16 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 
           {/* Right Parameters & Readout Area (4 Cols) */}
           <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
-            <div className="space-y-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                กำหนดค่าความสูงจุดอ้างอิง
+            <div className="space-y-4 bg-white p-5 rounded-2xl border border-blue-200/80 shadow-sm">
+              <h3 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
+                กำหนดค่าความสูงจุดอ้างอิงบนเสา
               </h3>
 
               {/* Value 1 Input */}
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 flex items-center justify-between">
+                <label className="text-xs text-slate-600 font-semibold flex items-center justify-between">
                   <span>ระดับความสูงจุดที่ 1 (ม.)</span>
-                  <span className="text-blue-400 text-[11px] font-mono">
+                  <span className="text-blue-600 text-[11px] font-mono font-bold">
                     {point1 ? `Y: ${point1.y}px` : 'ยังไม่ได้คลิก'}
                   </span>
                 </label>
@@ -245,15 +245,15 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   step="0.1"
                   value={val1}
                   onChange={(e) => setVal1(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               {/* Value 2 Input */}
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 flex items-center justify-between">
+                <label className="text-xs text-slate-600 font-semibold flex items-center justify-between">
                   <span>ระดับความสูงจุดที่ 2 (ม.)</span>
-                  <span className="text-emerald-400 text-[11px] font-mono">
+                  <span className="text-emerald-600 text-[11px] font-mono font-bold">
                     {point2 ? `Y: ${point2.y}px` : 'ยังไม่ได้คลิก'}
                   </span>
                 </label>
@@ -262,53 +262,51 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   step="0.1"
                   value={val2}
                   onChange={(e) => setVal2(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Calibration Results Box */}
-              <div className="pt-3 border-t border-slate-800 space-y-2">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>ระยะห่างในภาพ:</span>
-                  <span className="text-white font-mono">
-                    {point1 && point2 ? `${Math.abs(point2.y - point1.y)} พิกเซล` : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>ความละเอียดสเกล:</span>
-                  <span className="text-sky-400 font-mono font-bold">
-                    {pixelsPerMeter ? `${pixelsPerMeter.toFixed(1)} px / เมตร` : '-'}
-                  </span>
-                </div>
-
-                {testMeasuredLevel !== null && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5 text-xs mt-2">
-                    <span className="text-yellow-300 font-bold block mb-0.5">ผลทดสอบคลิกผิวน้ำ:</span>
-                    <span className="text-lg font-extrabold text-yellow-400 font-mono">
-                      {testMeasuredLevel} ม.
+              {/* Calculation Result */}
+              {pixelsPerMeter && (
+                <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 space-y-1 text-xs">
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="font-semibold">อัตราส่วนมาตราส่วน:</span>
+                    <span className="font-bold text-blue-700 font-mono text-sm">
+                      {pixelsPerMeter.toFixed(2)} px/m
                     </span>
                   </div>
-                )}
-              </div>
+                  <div className="text-[11px] text-slate-500 font-mono pt-1 border-t border-blue-100">
+                    Formula: {Math.abs(val1 - val2)}m / {Math.abs(point2!.y - point1!.y)}px
+                  </div>
+                </div>
+              )}
+
+              {saveSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>บันทึกค่าปรับเทียบลงระบบเรียบร้อยแล้ว!</span>
+                </div>
+              )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-2">
-              {saveSuccess ? (
-                <div className="w-full py-2.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>บันทึกการปรับเทียบสำเร็จ!</span>
-                </div>
-              ) : (
-                <button
-                  onClick={handleSave}
-                  disabled={!pixelsPerMeter || saving}
-                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-lg shadow-blue-600/20"
-                >
-                  <Save className={`w-4 h-4 ${saving ? 'animate-spin' : ''}`} />
-                  <span>{saving ? 'กำลังบันทึก...' : 'บันทึกการปรับเทียบเข้าสู่ระบบ'}</span>
-                </button>
-              )}
+            {/* Bottom Actions */}
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-1/3 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={!point1 || !point2 || saving || saveSuccess}
+                onClick={handleSave}
+                className="w-2/3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/20 transition"
+              >
+                <Save className="w-4 h-4" />
+                <span>{saving ? 'กำลังบันทึก...' : 'บันทึกค่าปรับเทียบ'}</span>
+              </button>
             </div>
           </div>
         </div>

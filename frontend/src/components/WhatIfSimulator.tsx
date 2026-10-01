@@ -109,19 +109,19 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col space-y-5">
+    <div className="bg-white border-2 border-blue-100 rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
         <div className="flex items-center space-x-2.5">
-          <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-            <Sliders className="w-5 h-5 text-amber-400" />
+          <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+            <Sliders className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-              <span>"What-If" Flood Simulator: จำลองสถานการณ์น้ำท่วมล่วงหน้า</span>
+            <h3 className="text-sm font-extrabold text-blue-950 flex items-center space-x-2">
+              <span>"What-If" Flood Simulator: ห้องทดลองจำลองสถานการณ์น้ำท่วมล่วงหน้า</span>
             </h3>
-            <p className="text-xs text-slate-400">
-              ทดลองเลื่อนสไลเดอร์เพื่อดูผลกระทบของฝนตก มวลน้ำหลาก และน้ำทะเลหนุนต่อระดับน้ำคลอง
+            <p className="text-xs text-slate-500">
+              ปรับสไลเดอร์ฝนตกหนัก มวลน้ำต้นน้ำ ประตูระบายน้ำ ร.1 และน้ำทะเลสาบหนุน เพื่อวิเคราะห์ผลกระทบแบบเรียลไทม์
             </p>
           </div>
         </div>
@@ -130,25 +130,25 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
         <div className="flex items-center space-x-1.5 flex-wrap">
           <button
             onClick={() => applyPreset('normal')}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-300 transition"
+            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[11px] font-bold text-blue-700 border border-blue-200 transition"
           >
-            ☀️ ปกติ
+            ☀️ สภาวะปกติ
           </button>
           <button
             onClick={() => applyPreset('storm')}
-            className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-medium transition"
+            className="px-3 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-[11px] font-bold text-sky-700 border border-sky-300 transition"
           >
-            ⛈️ พายุเข้า
+            ⛈️ พายุฝนตกหนัก
           </button>
           <button
             onClick={() => applyPreset('critical')}
-            className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 text-[11px] font-medium transition"
+            className="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-[11px] font-bold text-rose-700 border border-rose-200 transition"
           >
-            🚨 วิกฤติตลิ่งแตก
+            🚨 วิกฤติน้ำล้นตลิ่ง
           </button>
           <button
             onClick={() => applyPreset('relief')}
-            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium transition"
+            className="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[11px] font-bold text-emerald-700 border border-emerald-200 transition"
           >
             🛡️ ผันน้ำเต็มสูบ
           </button>
@@ -158,15 +158,15 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
       {/* Main Grid: Sliders (7 Cols) & Real-time Outcome Card (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sliders Area (7 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-3.5">
           {/* Slider 1: Rain Surge */}
-          <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-300 font-medium">
-                <CloudRain className="w-3.5 h-3.5 text-sky-400" />
-                <span>ปริมาณฝนสะสมเพิ่มเติม (สะเดา/หาดใหญ่)</span>
+              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+                <CloudRain className="w-4 h-4 text-sky-600" />
+                <span>ปริมาณฝนสะสมเพิ่มเติม (พื้นที่ อ.สะเดา / หาดใหญ่)</span>
               </span>
-              <span className="font-mono font-bold text-sky-400">+{rainSurge} มม.</span>
+              <span className="font-mono font-extrabold text-sky-700 text-sm">+{rainSurge} มม.</span>
             </div>
             <input
               type="range"
@@ -175,23 +175,23 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               step="5"
               value={rainSurge}
               onChange={(e) => setRainSurge(Number(e.target.value))}
-              className="w-full accent-sky-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+              className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-slate-500">
+            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>0 มม. (ไม่มีฝน)</span>
-              <span>50 มม. (ฝนหนัก)</span>
+              <span>50 มม. (ฝนตกปานกลาง)</span>
               <span>150 มม. (ฝนตกชุกวิกฤติ)</span>
             </div>
           </div>
 
           {/* Slider 2: Upstream Inflow Surge */}
-          <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-300 font-medium">
-                <Waves className="w-3.5 h-3.5 text-blue-400" />
-                <span>มวลน้ำหลากจากสะพานบางศาลา (ต้นน้ำ)</span>
+              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+                <Waves className="w-4 h-4 text-blue-600" />
+                <span>มวลน้ำหลากจากสะพานบางศาลา (ตอนบน)</span>
               </span>
-              <span className="font-mono font-bold text-blue-400">+{upstreamSurge}%</span>
+              <span className="font-mono font-extrabold text-blue-700 text-sm">+{upstreamSurge}%</span>
             </div>
             <input
               type="range"
@@ -200,23 +200,23 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               step="5"
               value={upstreamSurge}
               onChange={(e) => setUpstreamSurge(Number(e.target.value))}
-              className="w-full accent-blue-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+              className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>0% (น้ำไหลปกติ)</span>
+            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+              <span>0% (ไหลตามปกติ)</span>
               <span>50% (มวลน้ำเพิ่มขึ้น)</span>
-              <span>100% (น้ำหลากเต็มคลอง)</span>
+              <span>100% (น้ำหลากเต็มพิกัด)</span>
             </div>
           </div>
 
           {/* Slider 3: Khlong R.1 Gate Open */}
-          <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-300 font-medium">
-                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
-                <span>ระดับการเปิดประตูระบายน้ำ คลอง ร.1 (ผันน้ำเลี่ยงเมือง)</span>
+              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+                <ShieldAlert className="w-4 h-4 text-emerald-600" />
+                <span>การเปิดประตูระบายน้ำ คลอง ร.1 (ผันน้ำเลี่ยงเมืองหาดใหญ่)</span>
               </span>
-              <span className="font-mono font-bold text-emerald-400">{gateR1Open}%</span>
+              <span className="font-mono font-extrabold text-emerald-700 text-sm">{gateR1Open}%</span>
             </div>
             <input
               type="range"
@@ -225,9 +225,9 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               step="5"
               value={gateR1Open}
               onChange={(e) => setGateR1Open(Number(e.target.value))}
-              className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+              className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-slate-500">
+            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>0% (ปิดบาน - ระบายช้า)</span>
               <span>50% (เปิดครึ่งบาน)</span>
               <span>100% (ยกบานสุด - ระบายเร็ว)</span>
@@ -235,13 +235,13 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
           </div>
 
           {/* Slider 4: Sea Tide Surge */}
-          <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-300 font-medium">
-                <Waves className="w-3.5 h-3.5 text-purple-400" />
+              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+                <Waves className="w-4 h-4 text-indigo-600" />
                 <span>ระดับน้ำทะเลสาบสงขลาหนุนสูง (Sea Tide)</span>
               </span>
-              <span className="font-mono font-bold text-purple-400">+{seaTideSurge.toFixed(1)} ม.</span>
+              <span className="font-mono font-extrabold text-indigo-700 text-sm">+{seaTideSurge.toFixed(1)} ม.</span>
             </div>
             <input
               type="range"
@@ -250,9 +250,9 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               step="0.1"
               value={seaTideSurge}
               onChange={(e) => setSeaTideSurge(Number(e.target.value))}
-              className="w-full accent-purple-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+              className="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
-            <div className="flex justify-between text-[10px] text-slate-500">
+            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>0.0 ม. (น้ำลงปกติ)</span>
               <span>0.8 ม. (น้ำทะเลหนุนปานกลาง)</span>
               <span>1.5 ม. (น้ำทะเลหนุนสูงสุด 15 ค่ำ)</span>
@@ -261,34 +261,34 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
         </div>
 
         {/* Real-time Outcome Card (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between space-y-4 bg-slate-950/80 p-5 rounded-xl border border-slate-800 shadow-inner">
+        <div className="lg:col-span-5 flex flex-col justify-between space-y-4 bg-gradient-to-br from-blue-50/90 via-sky-50/40 to-white p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
           <div>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
-                  ผลการจำลองระดับน้ำ
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  ผลการคำนวณระดับน้ำจำลอง
                 </span>
                 <div className="flex items-baseline space-x-2 mt-1">
                   <span
-                    className={`text-4xl font-extrabold font-mono ${
+                    className={`text-4xl font-extrabold font-mono tracking-tight ${
                       simulation.isBankBreach
-                        ? 'text-red-500 animate-pulse'
+                        ? 'text-rose-600 animate-pulse'
                         : simulation.isCritical
-                        ? 'text-red-400'
+                        ? 'text-rose-600'
                         : simulation.isWarning
-                        ? 'text-amber-400'
-                        : 'text-emerald-400'
+                        ? 'text-amber-600'
+                        : 'text-blue-700'
                     }`}
                   >
                     {simulation.simulatedLevel.toFixed(2)}
                   </span>
-                  <span className="text-sm text-slate-400">ม.</span>
+                  <span className="text-sm font-semibold text-slate-600">ม. รทก.</span>
                   {simulation.totalDelta !== 0 && (
                     <span
-                      className={`text-xs font-bold px-1.5 py-0.5 rounded font-mono ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded font-mono shadow-sm ${
                         simulation.totalDelta > 0
-                          ? 'bg-red-500/20 text-red-300'
-                          : 'bg-emerald-500/20 text-emerald-300'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       }`}
                     >
                       {simulation.totalDelta > 0 ? `+${simulation.totalDelta}` : simulation.totalDelta}ม.
@@ -299,14 +299,14 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
 
               {/* Status Badge */}
               <span
-                className={`text-xs px-2.5 py-1 rounded-full font-bold flex items-center space-x-1 ${
+                className={`text-xs px-3 py-1 rounded-full font-bold flex items-center space-x-1 shadow-sm ${
                   simulation.isBankBreach
-                    ? 'bg-red-600 text-white animate-bounce'
+                    ? 'bg-rose-600 text-white animate-bounce'
                     : simulation.isCritical
-                    ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
                     : simulation.isWarning
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                 }`}
               >
                 {simulation.isBankBreach ? (
@@ -317,7 +317,7 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
                 ) : simulation.isCritical ? (
                   <>
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>วิกฤติต้องระวัง</span>
+                    <span>ระดับวิกฤต</span>
                   </>
                 ) : simulation.isWarning ? (
                   <span>เตือนภัย</span>
@@ -328,22 +328,22 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
             </div>
 
             {/* Simulated 1h - 3h Forecast Horizon */}
-            <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-2 mt-4">
-              <span className="text-[11px] text-slate-400 font-bold block mb-1">
-                พยากรณ์ผลลัพธ์ล่วงหน้าในสภาวะนี้:
+            <div className="bg-white rounded-xl p-3.5 border border-blue-200/80 shadow-sm space-y-2 mt-4">
+              <span className="text-[11px] text-blue-950 font-bold block mb-1">
+                ผลพยากรณ์ล่วงหน้าภายใต้สภาวะจำลองนี้:
               </span>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">+1 ชม.</span>
-                  <span className="font-mono font-bold text-white text-sm">{simulation.p1} ม.</span>
+                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">+1 ชม.</span>
+                  <span className="font-mono font-extrabold text-blue-900 text-sm">{simulation.p1} ม.</span>
                 </div>
-                <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">+2 ชม.</span>
-                  <span className="font-mono font-bold text-amber-400 text-sm">{simulation.p2} ม.</span>
+                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">+2 ชม.</span>
+                  <span className="font-mono font-extrabold text-amber-700 text-sm">{simulation.p2} ม.</span>
                 </div>
-                <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">+3 ชม.</span>
-                  <span className="font-mono font-bold text-red-400 text-sm">{simulation.p3} ม.</span>
+                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">+3 ชม.</span>
+                  <span className="font-mono font-extrabold text-rose-700 text-sm">{simulation.p3} ม.</span>
                 </div>
               </div>
             </div>
@@ -353,7 +353,7 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
           <button
             onClick={handleApplyToForecast}
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-lg shadow-orange-500/20"
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-md shadow-blue-500/20"
           >
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />

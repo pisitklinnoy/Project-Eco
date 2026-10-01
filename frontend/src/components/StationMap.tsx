@@ -68,20 +68,20 @@ export const StationMap: React.FC<StationMapProps> = ({
       const waterLvl = isSelected && latestWater ? latestWater.water_level : stn.normal_level;
 
       // Color coding based on risk
-      let colorClass = 'bg-emerald-500 border-emerald-300';
+      let colorClass = 'bg-blue-600 border-white ring-2 ring-blue-400';
       let statusText = 'ปกติ';
       if (waterLvl >= stn.critical_level) {
-        colorClass = 'bg-red-500 border-red-300 animate-bounce';
+        colorClass = 'bg-rose-600 border-white ring-4 ring-rose-400 animate-bounce';
         statusText = 'วิกฤต!';
       } else if (waterLvl >= stn.warning_level) {
-        colorClass = 'bg-amber-500 border-amber-300';
+        colorClass = 'bg-amber-500 border-white ring-2 ring-amber-400';
         statusText = 'เตือนภัย';
       }
 
       const iconHtml = `
-        <div class="relative flex items-center justify-center">
-          <span class="absolute w-8 h-8 rounded-full ${waterLvl >= stn.warning_level ? 'animate-ping opacity-75' : ''} ${colorClass.split(' ')[0]}"></span>
-          <div class="w-6 h-6 rounded-full border-2 ${colorClass} text-white flex items-center justify-center shadow-lg text-[10px] font-bold">
+        <div class="relative flex items-center justify-center cursor-pointer">
+          <span class="absolute w-8 h-8 rounded-full ${waterLvl >= stn.warning_level ? 'animate-ping opacity-75' : 'opacity-40'} ${colorClass.split(' ')[0]}"></span>
+          <div class="w-7 h-7 rounded-full border-2 ${colorClass} text-white flex items-center justify-center shadow-xl text-[11px] font-extrabold font-mono">
             ${waterLvl.toFixed(1)}
           </div>
         </div>
@@ -90,24 +90,24 @@ export const StationMap: React.FC<StationMapProps> = ({
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'custom-map-marker',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
 
       const marker = L.marker([stn.latitude, stn.longitude], { icon: customIcon }).addTo(map);
 
       const popupContent = document.createElement('div');
-      popupContent.className = 'p-1 text-slate-900';
+      popupContent.className = 'p-1 text-slate-900 font-sans';
       popupContent.innerHTML = `
-        <div class="font-bold text-sm text-slate-800">${stn.name}</div>
-        <div class="text-xs text-slate-500 mb-2">${stn.location_name}</div>
-        <div class="flex justify-between items-center text-xs mb-1">
-          <span class="font-medium text-slate-600">ระดับน้ำ:</span>
-          <span class="font-bold text-blue-600 text-sm">${waterLvl.toFixed(2)} ม. (${statusText})</span>
+        <div class="font-bold text-sm text-blue-950 mb-0.5">${stn.name}</div>
+        <div class="text-xs text-slate-500 mb-2 font-medium">${stn.location_name}</div>
+        <div class="flex justify-between items-center text-xs mb-1.5 bg-blue-50/80 p-2 rounded-lg border border-blue-100">
+          <span class="font-bold text-slate-700">ระดับน้ำตรวจวัด:</span>
+          <span class="font-extrabold text-blue-700 text-sm">${waterLvl.toFixed(2)} ม. (${statusText})</span>
         </div>
-        <div class="text-[11px] text-slate-400 mb-2">เกณฑ์วิกฤต: ${stn.critical_level} ม. | ตลิ่ง: ${stn.bank_level} ม.</div>
-        <button id="btn-${stn.station_code}" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1 px-2 rounded transition">
-          ดูรายละเอียดจุดนี้
+        <div class="text-[11px] text-slate-500 mb-2 font-medium">เตือนภัย: ${stn.warning_level} ม. | วิกฤต: ${stn.critical_level} ม. | ตลิ่ง: ${stn.bank_level} ม.</div>
+        <button id="btn-${stn.station_code}" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow transition">
+          ดูข้อมูลสถานีนี้
         </button>
       `;
 
@@ -127,28 +127,33 @@ export const StationMap: React.FC<StationMapProps> = ({
   }, [stations, selectedStation, latestWater, onSelectStation]);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg flex flex-col h-full">
-      <div className="px-4 py-3 bg-slate-800/60 border-b border-slate-700/60 flex items-center justify-between">
+    <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full">
+      <div className="px-4 py-3 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white border-b border-blue-100 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <MapPin className="w-4 h-4 text-blue-400" />
-          <h2 className="text-sm font-semibold text-white">แผนที่จุดเฝ้าระวังคลองหาดใหญ่ (GIS Map)</h2>
+          <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+            <MapPin className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">แผนที่สารสนเทศภูมิศาสตร์ GIS เฝ้าระวังน้ำท่วมหาดใหญ่</h2>
+            <p className="text-[11px] text-slate-500">3 จุดยุทธศาสตร์หลักตามแนวลำน้ำคลองอู่ตะเภา</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-3 text-xs text-slate-400">
-          <span className="flex items-center space-x-1">
+        <div className="flex items-center space-x-2 text-xs">
+          <span className="flex items-center space-x-1.5 bg-white px-2.5 py-1 rounded-full border border-emerald-200 text-emerald-700 font-bold shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>ปกติ</span>
           </span>
-          <span className="flex items-center space-x-1">
+          <span className="flex items-center space-x-1.5 bg-white px-2.5 py-1 rounded-full border border-amber-200 text-amber-700 font-bold shadow-sm">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
             <span>เตือนภัย</span>
           </span>
-          <span className="flex items-center space-x-1">
-            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+          <span className="flex items-center space-x-1.5 bg-white px-2.5 py-1 rounded-full border border-rose-200 text-rose-700 font-bold shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
             <span>วิกฤต</span>
           </span>
         </div>
       </div>
-      <div ref={mapContainerRef} className="w-full h-80 lg:h-96" />
+      <div ref={mapContainerRef} className="w-full flex-1 min-h-[340px]" />
     </div>
   );
 };

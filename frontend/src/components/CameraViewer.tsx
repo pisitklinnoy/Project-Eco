@@ -19,8 +19,6 @@ import {
 interface CameraViewerProps {
   station: Station | null;
   measurement: WaterMeasurement | null;
-  stations?: Station[];
-  onSelectStation?: (stn: Station) => void;
   onOpenReview: () => void;
   onOpenCalibrate?: () => void;
 }
@@ -28,8 +26,6 @@ interface CameraViewerProps {
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
   measurement,
-  stations = [],
-  onSelectStation,
   onOpenReview,
   onOpenCalibrate,
 }) => {
@@ -89,13 +85,23 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     setIsFocusedGauge(false);
   };
 
+  // Preset Focus Staff Gauge: Centers directly on the staff gauge horizontal position
   const handleFocusGauge = () => {
     if (isFocusedGauge) {
       handleResetZoom();
     } else {
       setZoomLevel(2.4);
-      // Offset slightly to center the staff gauge
-      setPan({ x: 0, y: 20 });
+      const code = station.station_code.toUpperCase();
+      if (code.includes('HATYAINAI') || code.includes('X.44')) {
+        // Staff gauge is near right side (~68%)
+        setPan({ x: -140, y: 0 });
+      } else if (code.includes('BANGSALA') || code.includes('X.90')) {
+        // Staff gauge is at ~59%
+        setPan({ x: -90, y: 15 });
+      } else {
+        // Muang Kong ~57%
+        setPan({ x: -80, y: 15 });
+      }
       setIsFocusedGauge(true);
     }
   };
@@ -131,22 +137,35 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     });
   };
 
-  // Waterline calculations
-  const minLvl = station.normal_level * 0.5;
-  const maxLvl = station.bank_level;
-  const clampedRatio = Math.min(Math.max((currentLevel - minLvl) / Math.max(1, maxLvl - minLvl), 0.05), 0.95);
-  const topPercent = Math.round(82 - clampedRatio * 57);
+  // Physical staff gauge vertical waterline positioning along each station's pole
+  const getStaffGaugeWaterlineY = (stnCode: string, waterLvl: number): number => {
+    const code = stnCode.toUpperCase();
+    if (code.includes('MUANGKONG') || code.includes('X.173A')) {
+      // Scale: 10.0m (56% Y) to 18.0m (19% Y)
+      const ratio = Math.min(Math.max((waterLvl - 10.0) / 8.0, 0), 1);
+      return Math.round(56 - ratio * 37);
+    }
+    if (code.includes('BANGSALA') || code.includes('X.90')) {
+      // Scale: 2.0m (61% Y) to 12.0m (27% Y)
+      const ratio = Math.min(Math.max((waterLvl - 2.0) / 10.0, 0), 1);
+      return Math.round(61 - ratio * 34);
+    }
+    // HATYAINAI (X.44): Scale: 0.6m (92% Y) to 9.0m (12% Y)
+    const ratio = Math.min(Math.max((waterLvl - 0.6) / 8.4, 0), 1);
+    return Math.round(92 - ratio * 80);
+  };
 
+  const topPercent = getStaffGaugeWaterlineY(station.station_code, currentLevel);
   const zoomPercent = Math.round(zoomLevel * 100);
 
   return (
     <>
-      <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[500px]">
+      <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[480px]">
         
-        {/* Header with Camera Title & Quick Station Tabs */}
-        <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
+        {/* Header */}
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex items-center justify-between gap-2">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20 shrink-0">
               <Camera className="w-4 h-4" />
             </div>
             <div>
@@ -164,35 +183,18 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             </div>
           </div>
 
-          {/* Station Switcher Tabs (if available) */}
-          {stations.length > 0 && onSelectStation && (
-            <div className="flex items-center space-x-1 bg-white/90 p-1 rounded-xl border border-blue-200/80 shadow-sm">
-              {stations.map((stn) => {
-                const isActive = stn.station_code === station.station_code;
-                return (
-                  <button
-                    key={stn.station_code}
-                    onClick={() => onSelectStation(stn)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50'
-                    }`}
-                  >
-                    {stn.name.split(' ')[0]}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <span className="flex items-center space-x-1.5 text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-sm shrink-0">
+            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+            <span>LIVE CCTV</span>
+          </span>
         </div>
 
         {/* Toolbar: Zoom Controls & Inspector Actions */}
         <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
           {/* Zoom controls */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
             <span className="text-[11px] font-bold text-slate-500 flex items-center space-x-1 mr-1">
-              <Sliders className="w-3.5 h-3.5 text-blue-600" />
+              <Sliders className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span>ซูมสเกล:</span>
             </span>
 
@@ -205,7 +207,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
 
-            <span className="font-mono font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md min-w-[48px] text-center text-[11px]">
+            <span className="font-mono font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md min-w-[46px] text-center text-[11px]">
               {zoomPercent}%
             </span>
 
@@ -221,7 +223,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             <button
               onClick={handleResetZoom}
               className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 transition"
-              title="รีเซ็ตตำแหน่งและขนาดซูม (1x)"
+              title="รีเซ็ตขนาดซูม (1x)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -235,31 +237,31 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
-              <Search className="w-3 h-3 text-sky-400" />
+              <Search className="w-3 h-3 text-sky-400 shrink-0" />
               <span>ส่องเสาวัดน้ำ (Focus Gauge)</span>
             </button>
           </div>
 
           {/* Action buttons right */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}
                 className="bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-700 px-2.5 py-1 rounded-lg border border-slate-200 font-bold transition flex items-center space-x-1 text-[11px]"
                 title="ปรับเทียบพิกัดสเกลเสาวัดน้ำ"
               >
-                <Target className="w-3 h-3 text-blue-600" />
-                <span>ปรับเทียบ (Calibrate)</span>
+                <Target className="w-3 h-3 text-blue-600 shrink-0" />
+                <span>ปรับเทียบเสา</span>
               </button>
             )}
 
             <button
               onClick={onOpenReview}
               className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm"
-              title="ตรวจสอบภาพและยืนยันระดับน้ำ"
+              title="ตรวจทานภาพและยืนยันระดับน้ำ"
             >
-              <Eye className="w-3 h-3" />
-              <span>ตรวจทาน (Review)</span>
+              <Eye className="w-3 h-3 shrink-0" />
+              <span>ตรวจทาน</span>
             </button>
 
             <button
@@ -267,7 +269,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               className="bg-slate-800 hover:bg-slate-900 text-white p-1.5 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm"
               title="เปิดดูแบบเต็มจอเพื่อตรวจสเกลชัดเจน"
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <Maximize2 className="w-3.5 h-3.5 shrink-0" />
             </button>
           </div>
         </div>
@@ -306,13 +308,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   <line x1="0" y1="120" x2="640" y2="120" stroke="#475569" strokeWidth="4" />
                   <rect x="0" y="120" width="640" height="240" fill="#0284c7" fillOpacity="0.65" />
                   {/* Gauge Pole */}
-                  <rect x="295" y="60" width="50" height="280" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
+                  <rect x="340" y="60" width="45" height="280" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
                   {[80, 110, 140, 170, 200, 230, 260, 290, 320].map((y, idx) => (
                     <g key={y}>
-                      <line x1="295" y1={y} x2="315" y2={y} stroke="#dc2626" strokeWidth="2.5" />
-                      <line x1="315" y1={y} x2="345" y2={y} stroke="#0f172a" strokeWidth="1" />
-                      <text x="320" y={y + 4} fill="#0f172a" fontSize="10" fontWeight="bold">
-                        {(station.bank_level - idx * 1.0).toFixed(1)}
+                      <line x1="340" y1={y} x2="358" y2={y} stroke="#dc2626" strokeWidth="2" />
+                      <line x1="358" y1={y} x2="385" y2={y} stroke="#0f172a" strokeWidth="1" />
+                      <text x="362" y={y + 4} fill="#0f172a" fontSize="9" fontWeight="bold">
+                        {(station.bank_level - idx * ((station.bank_level - station.normal_level) / 8)).toFixed(1)}
                       </text>
                     </g>
                   ))}
@@ -322,17 +324,17 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </div>
             )}
 
-            {/* AI Waterline Overlay that moves with zoom */}
+            {/* AI Waterline Overlay along the Staff Gauge */}
             <div
-              className="absolute inset-x-8 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_16px_rgba(56,189,248,0.9)] flex items-center justify-between"
+              className="absolute inset-x-6 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-90 shadow-[0_0_16px_rgba(56,189,248,0.9)] flex items-center justify-between"
               style={{ top: `${topPercent}%` }}
             >
-              <span className="text-[10px] bg-gradient-to-r from-blue-600 to-sky-600 text-white font-black px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1 border border-white/20">
-                <Sparkles className="w-3 h-3 text-sky-200" />
+              <span className="text-[10px] bg-gradient-to-r from-blue-600 to-sky-600 text-white font-extrabold px-2 py-0.5 rounded shadow -translate-y-3 flex items-center space-x-1 border border-white/20">
+                <Sparkles className="w-3 h-3 text-sky-200 shrink-0" />
                 <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
               </span>
               <span className="text-[10px] text-sky-200 font-mono -translate-y-3 bg-black/80 border border-sky-400/40 px-2 py-0.5 rounded shadow">
-                ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 92).toFixed(0)}%
+                ความเชื่อมั่น: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
               </span>
             </div>
           </div>
@@ -340,8 +342,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           {/* Top-Left Live Status Badge */}
           <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
             <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
-              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>LIVE 30 FPS</span>
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+              <span>LIVE</span>
             </span>
             <span className="text-[11px] text-white font-bold bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20 shadow">
               {station.name.split(' ')[0]}
@@ -349,22 +351,24 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           </div>
 
           {/* Bottom-Left Real Water Level Readout */}
-          <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2.5 font-bold shadow-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+          <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2 font-bold shadow-xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
             <div>
               <span className="text-slate-500 font-medium text-[10px] block leading-none">ระดับน้ำตรวจวัดล่าสุด:</span>
-              <span className="text-blue-700 text-base font-black font-mono leading-tight">
-                {currentLevel.toFixed(2)}
-              </span>
-              <span className="text-xs text-slate-700 ml-1">ม. รทก.</span>
+              <div className="flex items-baseline space-x-1">
+                <span className="text-blue-700 text-base font-black font-mono leading-tight">
+                  {currentLevel.toFixed(2)}
+                </span>
+                <span className="text-[11px] text-slate-700 font-bold">ม. รทก.</span>
+              </div>
             </div>
           </div>
 
           {/* Zoom & Pan Guide Hint */}
           {zoomLevel > 1.0 && (
             <div className="absolute bottom-3 right-3 z-10 bg-black/75 backdrop-blur-md text-sky-200 text-[10px] px-2.5 py-1 rounded-lg border border-white/20 shadow flex items-center space-x-1 font-medium">
-              <Move className="w-3 h-3 text-sky-300 animate-bounce" />
-              <span>คลิกลากเพื่อเลื่อนตำแหน่งภาพ ({zoomPercent}%)</span>
+              <Move className="w-3 h-3 text-sky-300 animate-bounce shrink-0" />
+              <span>คลิกลากเพื่อเลื่อนดูตำแหน่ง ({zoomPercent}%)</span>
             </div>
           )}
         </div>
@@ -375,25 +379,25 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       {isFullscreen && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-4 sm:p-6 animate-fade-in">
           {/* Modal Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/20 text-white mb-2">
+          <div className="flex items-center justify-between pb-3 border-b border-white/20 text-white mb-2 gap-2">
             <div className="flex items-center space-x-3">
-              <div className="p-2 rounded-xl bg-blue-600 text-white">
+              <div className="p-2 rounded-xl bg-blue-600 text-white shrink-0">
                 <Camera className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-extrabold text-base tracking-tight text-white flex items-center space-x-2">
-                  <span>ตรวจสเกลเสาวัดน้ำ CCTV ความละเอียดสูง (HD Inspection)</span>
+                  <span>ตรวจสเกลเสาวัดน้ำ CCTV (HD Inspection)</span>
                   <span className="text-xs bg-sky-500/30 text-sky-200 border border-sky-400/40 px-2 py-0.5 rounded-full">
-                    {station.name} ({station.station_code})
+                    {station.name.split(' ')[0]} ({station.station_code})
                   </span>
                 </h3>
                 <p className="text-xs text-sky-200/80">
-                  สามารถซูมและลากเลื่อนเพื่อตรวจสอบรอยคราบน้ำและตัวเลขบนเสาวัดน้ำ (ม. รทก.) อย่างละเอียด
+                  ซูมและลากเลื่อนเพื่อตรวจสอบรอยคราบน้ำและตัวเลขบนเสาวัดน้ำ (ม. รทก.) อย่างละเอียด
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= 1.0}
@@ -460,7 +464,9 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <span className="font-bold text-sky-300">ระดับน้ำตรวจวัด:</span>
               <span className="font-extrabold text-base font-mono text-white">{currentLevel.toFixed(2)} ม. รทก.</span>
               <span className="text-slate-400">|</span>
-              <span className="text-slate-300">เกณฑ์วิกฤต: {station.critical_level} ม. รทก.</span>
+              <span className="text-slate-300">เตือนภัย: {station.warning_level} ม. รทก.</span>
+              <span className="text-slate-400">|</span>
+              <span className="text-rose-400 font-bold">วิกฤต: {station.critical_level} ม. รทก.</span>
             </div>
           </div>
         </div>

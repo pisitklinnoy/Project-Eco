@@ -193,8 +193,6 @@ export const App: React.FC = () => {
               <CameraViewer
                 station={selectedStation}
                 measurement={measurement}
-                stations={stations}
-                onSelectStation={setSelectedStation}
                 onOpenReview={() => setIsReviewOpen(true)}
                 onOpenCalibrate={() => setIsCalibrateOpen(true)}
               />

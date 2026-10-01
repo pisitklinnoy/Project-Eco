@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Station, WaterMeasurement } from '../types';
-import { MapPin, Navigation, Compass } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
 
 interface StationMapProps {
   stations: Station[];
@@ -39,7 +39,6 @@ export const StationMap: React.FC<StationMapProps> = ({
       scrollWheelZoom: true,
     });
 
-    // Clean OpenStreetMap CartoDB / OSM tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors &bull; กรมชลประทาน &bull; เทศบาลนครหาดใหญ่',
       maxZoom: 18,
@@ -60,7 +59,7 @@ export const StationMap: React.FC<StationMapProps> = ({
     };
   }, []);
 
-  // 2. Render Markers, Risk Colors, and River Flow Route
+  // 2. Render Circular Dot Markers (แสดงในแผนที่เป็นจุดเหมือนเดิม)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || stations.length === 0) return;
@@ -74,36 +73,35 @@ export const StationMap: React.FC<StationMapProps> = ({
       polylineRef.current = null;
     }
 
-    // Connect stations along Khlong U-Taphao (South to North: Muang Kong -> Bang Sala -> Hat Yai Nai)
+    // Connect stations along Khlong U-Taphao (Muang Kong -> Bang Sala -> Hat Yai Nai)
     const sortedStations = [...stations].sort((a, b) => a.latitude - b.latitude);
     const riverCoords: [number, number][] = sortedStations.map((s) => [s.latitude, s.longitude]);
 
     if (riverCoords.length >= 2) {
       polylineRef.current = L.polyline(riverCoords, {
         color: '#0284c7',
-        weight: 4,
+        weight: 3.5,
         opacity: 0.7,
-        dashArray: '8, 8',
+        dashArray: '6, 6',
         lineCap: 'round',
       }).addTo(map);
     }
 
-    // Add each station marker with individual accurate thresholds and "ม. รทก." values
+    // Add each station as a clean circular dot marker
     stations.forEach((stn) => {
       const isSelected = selectedStation?.station_code === stn.station_code;
       
-      // Determine true water level
       const meas = measurementsByStation[stn.station_code] || 
         (isSelected && latestWater ? latestWater : null);
       const waterLvl = meas ? meas.water_level : stn.normal_level;
 
       // Color coding based on real station-specific thresholds
       let statusText = 'ปกติ';
-      let themeColor = '#10b981'; // Emerald
+      let themeColor = '#10b981'; // Emerald Green
       let bgBadge = '#d1fae5';
       let textBadge = '#065f46';
       let borderBadge = '#34d399';
-      let ringPingClass = 'bg-emerald-400';
+      let pingClass = 'bg-emerald-400 opacity-40';
 
       if (waterLvl >= stn.critical_level) {
         statusText = 'วิกฤต';
@@ -111,98 +109,63 @@ export const StationMap: React.FC<StationMapProps> = ({
         bgBadge = '#fee2e2';
         textBadge = '#991b1b';
         borderBadge = '#f87171';
-        ringPingClass = 'bg-rose-500 animate-ping';
+        pingClass = 'bg-rose-500 animate-ping opacity-75';
       } else if (waterLvl >= stn.warning_level) {
         statusText = 'เตือนภัย';
         themeColor = '#f59e0b'; // Amber
         bgBadge = '#fef3c7';
         textBadge = '#92400e';
         borderBadge = '#fbbf24';
-        ringPingClass = 'bg-amber-400 animate-ping';
+        pingClass = 'bg-amber-400 animate-ping opacity-75';
       }
 
-      // Format station short code
-      const shortCode = stn.station_code.replace('STN-', '');
+      const shortName = stn.name.split(' ')[0];
       const distanceToBank = (stn.bank_level - waterLvl).toFixed(2);
 
-      // Custom HTML Marker with explicit "ม. รทก." and distinct level color
-      const markerHtml = `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -100%);">
+      // Clean circular dot marker (จุดวงกลมพร้อมเรดาร์กะพริบ)
+      const iconHtml = `
+        <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <!-- Radar Pulse Ring -->
-          <div style="position: absolute; bottom: 8px; width: 34px; height: 34px; border-radius: 9999px; background-color: ${themeColor}; opacity: ${waterLvl >= stn.warning_level ? '0.75' : '0.25'}; pointer-events: none;" class="${ringPingClass}"></div>
+          <span style="position: absolute; width: 34px; height: 34px; border-radius: 9999px; background-color: ${themeColor}; pointer-events: none;" class="${pingClass}"></span>
 
-          <!-- Pin Head Box -->
+          <!-- Circular Dot -->
           <div style="
-            background: #ffffff;
-            border: 2px solid ${isSelected ? '#0284c7' : themeColor};
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
-            padding: 5px 8px;
-            min-width: 110px;
-            text-align: center;
             position: relative;
-            z-index: 20;
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            background-color: ${themeColor};
+            border: 2.5px solid #ffffff;
+            box-shadow: ${isSelected ? '0 0 0 3px #0284c7, 0 4px 10px rgba(0,0,0,0.35)' : '0 2px 6px rgba(0,0,0,0.25)'};
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: monospace;
             transition: all 0.2s ease;
-            ${isSelected ? 'transform: scale(1.08); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.4);' : ''}
+            ${isSelected ? 'transform: scale(1.15);' : ''}
           ">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 2px;">
-              <span style="font-size: 10px; font-weight: 800; color: #1e293b; letter-spacing: -0.02em;">${shortCode}</span>
-              <span style="
-                font-size: 9px;
-                font-weight: 800;
-                background-color: ${bgBadge};
-                color: ${textBadge};
-                border: 1px solid ${borderBadge};
-                border-radius: 9999px;
-                padding: 1px 5px;
-                line-height: 1.1;
-              ">${statusText}</span>
-            </div>
-
-            <!-- Water Level Value in ม. รทก. -->
-            <div style="display: flex; align-items: baseline; justify-content: center; gap: 3px;">
-              <span style="font-size: 14px; font-weight: 900; color: ${themeColor}; font-family: monospace;">
-                ${waterLvl.toFixed(2)}
-              </span>
-              <span style="font-size: 9px; font-weight: 700; color: #475569;">
-                ม. รทก.
-              </span>
-            </div>
+            ${waterLvl.toFixed(1)}
           </div>
-
-          <!-- Bottom Arrow Pin Pointer -->
-          <div style="
-            width: 0; 
-            height: 0; 
-            border-left: 7px solid transparent;
-            border-right: 7px solid transparent;
-            border-top: 8px solid ${isSelected ? '#0284c7' : themeColor};
-            margin-top: -1px;
-            z-index: 21;
-          "></div>
-          
-          <!-- Bottom Anchor Dot -->
-          <div style="
-            width: 8px; 
-            height: 8px; 
-            border-radius: 9999px; 
-            background: ${themeColor}; 
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            margin-top: -3px;
-            z-index: 19;
-          "></div>
         </div>
       `;
 
       const customIcon = L.divIcon({
-        html: markerHtml,
-        className: 'custom-station-pin',
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
+        html: iconHtml,
+        className: 'custom-map-dot-marker',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
       });
 
       const marker = L.marker([stn.latitude, stn.longitude], { icon: customIcon }).addTo(map);
+
+      // Compact, non-overlapping hover tooltip
+      marker.bindTooltip(
+        `<strong>${shortName}</strong>: ${waterLvl.toFixed(2)} ม. รทก. (${statusText})`,
+        { direction: 'top', offset: [0, -18], className: 'font-sans text-xs' }
+      );
 
       // Popup Content with detailed elevation criteria and "ม. รทก."
       const popupContent = document.createElement('div');
@@ -264,11 +227,11 @@ export const StationMap: React.FC<StationMapProps> = ({
         marker.closePopup();
       });
 
-      marker.bindPopup(popupContent, { offset: [0, -32] });
+      marker.bindPopup(popupContent, { offset: [0, -14] });
       markersRef.current[stn.station_code] = marker;
     });
 
-    // Pan smoothly to selected station
+    // Pan to selected station
     if (selectedStation) {
       map.panTo([selectedStation.latitude, selectedStation.longitude], {
         animate: true,
@@ -278,58 +241,50 @@ export const StationMap: React.FC<StationMapProps> = ({
   }, [stations, selectedStation, latestWater, measurementsByStation, onSelectStation]);
 
   return (
-    <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[500px]">
+    <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[480px]">
       
-      {/* Map Header with Real Threshold Legends */}
+      {/* Map Header with Threshold Legend */}
       <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5">
           <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20">
             <MapPin className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center space-x-2">
-              <span>แผนที่ภูมิสารสนเทศ (GIS) ลุ่มน้ำคลองอู่ตะเภา</span>
+            <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">
+              แผนที่ภูมิสารสนเทศ (GIS) ลุ่มน้ำคลองอู่ตะเภา
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
-              แสดงระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามจุดยุทธศาสตร์ 3 สถานีหลัก
+              แสดงจุดตรวจวัดและระดับน้ำเรียลไทม์ (ม. รทก.)
             </p>
           </div>
         </div>
 
-        {/* Legend Pill Bar matching exact colors */}
+        {/* Legend Pills strictly matching dot colors */}
         <div className="flex items-center space-x-1.5 text-xs bg-white/90 p-1 rounded-xl border border-blue-200/80 shadow-sm">
           <span className="flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 text-emerald-800 font-bold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>ปกติ</span>
           </span>
           <span className="flex items-center space-x-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 text-amber-800 font-bold text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
             <span>เตือนภัย</span>
           </span>
           <span className="flex items-center space-x-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 text-rose-800 font-bold text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
             <span>วิกฤต</span>
           </span>
         </div>
       </div>
 
       {/* Map Canvas */}
-      <div className="relative flex-1 w-full min-h-[440px]">
+      <div className="relative flex-1 w-full min-h-[420px]">
         <div ref={mapContainerRef} className="w-full h-full" />
         
         {/* River Flow Direction Tag */}
-        <div className="absolute bottom-3 left-3 z-[400] bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-200 shadow-md text-[11px] text-slate-700 flex items-center space-x-2 font-medium">
-          <Navigation className="w-3.5 h-3.5 text-sky-600 rotate-45" />
-          <span>ทิศทางการไหล: ต้นน้ำสะเดา &rarr; บางศาลา &rarr; เข้าเมืองหาดใหญ่</span>
+        <div className="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-200 shadow-md text-[11px] text-slate-700 flex items-center space-x-2 font-medium">
+          <Navigation className="w-3.5 h-3.5 text-sky-600 rotate-45 shrink-0" />
+          <span>ทิศทางการไหล: สะเดา &rarr; บางศาลา &rarr; เข้าเมืองหาดใหญ่</span>
         </div>
-
-        {/* Active Selection Indicator */}
-        {selectedStation && (
-          <div className="absolute top-3 right-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 shadow-lg text-[11px] text-blue-950 flex items-center space-x-1.5 font-bold">
-            <Compass className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-            <span>พิกัดปัจจุบัน: {selectedStation.name.split(' ')[0]}</span>
-          </div>
-        )}
       </div>
 
     </div>

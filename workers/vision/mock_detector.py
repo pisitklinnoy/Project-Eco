@@ -124,13 +124,24 @@ class WaterlineDetector:
                     mgr_data = v
                     break
 
-        # Decode image
+        # Decode image (OpenCV with robust Pillow fallback for Axis truncated JPEGs)
+        frame = None
         try:
             nparr = np.frombuffer(image_bytes, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        except Exception as e:
-            print(f"[WaterlineDetector] Image decoding error: {e}")
-            frame = None
+        except Exception:
+            pass
+
+        if frame is None:
+            try:
+                import io
+                from PIL import Image, ImageFile
+                ImageFile.LOAD_TRUNCATED_IMAGES = True
+                pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            except Exception as e:
+                print(f"[WaterlineDetector] Image decoding error: {e}")
+                frame = None
 
         if frame is not None and mgr_data is not None:
             try:

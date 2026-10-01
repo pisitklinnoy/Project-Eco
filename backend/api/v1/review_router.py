@@ -8,7 +8,7 @@ from services.review_service import review_service
 router = APIRouter(prefix="/review", tags=["Human-in-the-Loop & Review Agent"])
 
 @router.get("/package/{measurement_id}", response_model=ReviewPackageResponse)
-def get_review_package(measurement_id: int, station_code: str = "STN-HY01", db: Session = Depends(get_db)):
+def get_review_package(measurement_id: int, station_code: str = "STN-BANGSALA", db: Session = Depends(get_db)):
     """รวบรวมหลักฐานและภาพย้อนหลัง 1 ชม. โดย Review Agent ให้มนุษย์ตรวจทานได้ง่าย"""
     return review_service.compile_review_package(db, station_code, measurement_id)
 

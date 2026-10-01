@@ -13,9 +13,11 @@ class ForecastService:
         ).order_by(desc(ForecastRecord.forecast_time)).first()
         
         if not record:
-            # Seed mock initial forecast
+            # Seed initial forecast based on station benchmark
+            from models.station import Station
+            stn = db.query(Station).filter(Station.station_code == station_code).first()
+            base = stn.normal_level if stn else 3.2
             now = datetime.utcnow()
-            base = 3.2
             record = ForecastRecord(
                 station_code=station_code,
                 forecast_time=now,

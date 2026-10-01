@@ -162,20 +162,35 @@ python non_time_series/pipelines/run_all_stations.py
 ```
 *ระบบจะอ่านภาพตัวอย่างของทั้ง 3 สถานี, ตรวจวัดระดับน้ำ, สร้างภาพผลลัพธ์ใน `output/`, และบันทึกค่าลง `water_levels.xlsx` โดยอัตโนมัติ*
 
-### 4. รันประมวลผลแยกรายสถานี
+### 4. รันประมวลผลแยกรายสถานี (รองรับทั้งกลางวัน/กลางคืน/น้ำท่วม)
 ```bash
 # สะพานบ้านม่วงก็อง (X.173A)
-python non_time_series/pipelines/run_station1_muangkong.py
+python non_time_series/pipelines/run_station1_muangkong.py          # กลางวัน -> 9.96 m
+python non_time_series/pipelines/run_station1_muangkong.py --night  # กลางคืน IR -> 9.91 m
 
 # สะพานบางศาลา (X.90)
-python non_time_series/pipelines/run_station2_bangsala.py
+python non_time_series/pipelines/run_station2_bangsala.py           # กลางวัน -> 2.75 m
+python non_time_series/pipelines/run_station2_bangsala.py --night   # กลางคืน -> 2.75 m
 
-# สะพานหาดใหญ่นอก (X.44) - สภาวะปกติ
-python non_time_series/pipelines/run_station3_hatyainai.py
-
-# สะพานหาดใหญ่นอก (X.44) - สภาวะน้ำท่วม
-python non_time_series/pipelines/run_station3_hatyainai.py --image non_time_series/sample_images/station3_hatyainai_flood.png
+# สะพานหาดใหญ่นอก (X.44)
+python non_time_series/pipelines/run_station3_hatyainai.py          # พลบค่ำ/ปกติ -> 0.60 m
+python non_time_series/pipelines/run_station3_hatyainai.py --flood  # สภาวะน้ำท่วมวิกฤต -> 6.47 m
 ```
+
+---
+
+## 🎯 มาตรฐานภาพผลลัพธ์ Benchmark ทั้ง 6 รูปแบบ (6 Verified Standards)
+
+ระบบผ่านการตรวจสอบผลลัพธ์และทดสอบเทียบเคียง (Benchmark Verification) กับภาพ Ground Truth ครบทั้ง 6 รูปแบบ:
+
+| ลำดับ | สถานีตรวจวัด | สภาวะแวดล้อม | ไฟล์ภาพผลลัพธ์ใน `output/` | ระดับน้ำ (m R.T.K.) | Anchor Y (px) | สถานะเตือนภัย |
+| :---: | :--- | :---: | :--- | :---: | :---: | :---: |
+| 1 | **สะพานม่วงก็อง (X.173A)** | กลางวันปกติ | `result_muang_kong_daytime_normal.jpg` | **9.96 ม.** | 1973 px | `NORMAL LEVEL` (Conf 92.0%) |
+| 2 | **สะพานม่วงก็อง (X.173A)** | กลางคืน IR | `result_muang_kong_nighttime_normal.jpg` | **9.91 ม.** | 1985 px | `NORMAL LEVEL` (Conf 92.0%) |
+| 3 | **สะพานบางศาลา (X.90)** | กลางวันปกติ | `result_bangsala_daytime_normal.jpg` | **2.75 ม.** | 1730 px | `NORMAL LEVEL` (Conf 92.0%) |
+| 4 | **สะพานบางศาลา (X.90)** | กลางคืน | `result_bangsala_nighttime.jpg` | **2.75 ม.** | 1730 px | `NORMAL LEVEL` (Conf 93.0%) |
+| 5 | **สะพานหาดใหญ่นอก (X.44)** | กลางคืน/พลบค่ำ | `result_hatyai_nighttime_normal.jpg` | **0.60 ม.** | 1070 px | `NORMAL LEVEL` (Conf 92.0%) |
+| 6 | **สะพานหาดใหญ่นอก (X.44)** | จำลองน้ำท่วมสูง | `result_hatayi_daytime_generate_flood.jpg` | **6.47 ม.** | 270 px | `CRITICAL FLOOD` (Conf 89.6%) |
 
 ---
 

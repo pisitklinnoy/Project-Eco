@@ -48,11 +48,14 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
     water_level = water_info["water_level"]
     confidence = water_info["confidence"]
 
-    # 1. เรนเดอร์เสาพร้อมสเกลละเอียด Dark Theme
+    station_code = cfg.get("station_code", "Unknown")
+    bank_lvl = cfg.get("warning_thresholds", {}).get("critical_flood_m") if station_code == "X.90" else None
     gauge_overlay = calibrator.render_calibrated_overlay(
         enhanced_gauge,
         water_surface_y=water_y,
-        water_surface_level=water_level
+        water_surface_level=water_level,
+        draw_boxes=(station_code == "X.173A"),
+        bank_level=bank_lvl
     )
     gh, gw = gauge_overlay.shape[:2]
 
@@ -67,48 +70,63 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
     station_code = cfg.get("station_code", "Unknown")
 
     # 3. วาดกรอบเสาสีเขียวและเส้นระดับน้ำสีส้มบนภาพ CCTV
-    if pole_mgr.has_polygon:
-        poly_scaled = pole_mgr.last_pts_src.copy()
-        poly_scaled[:, 0] *= scale_x
-        poly_scaled[:, 1] *= scale_y
-        poly_int = poly_scaled.astype(np.int32).reshape((-1, 1, 2))
-        cv2.polylines(frame_resized, [poly_int], isClosed=True, color=(0, 255, 0), thickness=2)
-
-        tl_x, tl_y = int(poly_scaled[0, 0]), int(poly_scaled[0, 1])
-        cv2.putText(frame_resized, f"Staff Gauge {station_code}", (tl_x - 10, max(25, tl_y - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 0), 2, cv2.LINE_AA)
-
-        # ใช้ Inverse Homography (M^-1) เพื่อแปลงพิกัดเส้นผิวน้ำบนแม่น้ำอย่างแม่นยำ
-        fx_left, fy_left = pole_mgr.transform_gauge_to_cctv(0, water_y)
-        fx_right, fy_right = pole_mgr.transform_gauge_to_cctv(enhanced_gauge.shape[1], water_y)
-
-        # แปลงสู่ frame_resized
-        fx_l_scaled, fy_l_scaled = fx_left * scale_x, fy_left * scale_y
-        fx_r_scaled, fy_r_scaled = fx_right * scale_x, fy_right * scale_y
-
-        extend_w = 40.0
-        dx = fx_r_scaled - fx_l_scaled
-        dy = fy_r_scaled - fy_l_scaled
-        length = max(1e-3, np.hypot(dx, dy))
-        ux, uy = dx / length, dy / length
-
-        p1 = (int(round(fx_l_scaled - extend_w * ux)), int(round(fy_l_scaled - extend_w * uy)))
-        p2 = (int(round(fx_r_scaled + extend_w * ux)), int(round(fy_r_scaled + extend_w * uy)))
-        cv2.line(frame_resized, p1, p2, (0, 140, 255), 3, cv2.LINE_AA)
-    else:
-        pts = pole_mgr.last_pts_src
-        fx1, fy1 = int(pts[0][0] * scale_x), int(pts[0][1] * scale_y)
-        fx2, fy2 = int(pts[2][0] * scale_x), int(pts[2][1] * scale_y)
+    # 3. วาดกรอบเสาสีเขียวและเส้นระดับน้ำสีส้มบนภาพ CCTV
+    if station_code == "X.44" and pole_mgr.has_polygon:
+        # สไตล์สถานีสะพานหาดใหญ่นอก (X.44) ตามแบบฉบับ result_hatyai_nighttime_normal.jpg / result_hatayi_daytime_generate_flood.jpg
+        pts_src = pole_mgr.last_pts_src.copy()
+        fx1 = int(round(pts_src[:, 0].min() * scale_x))
+        fy1 = int(round(pts_src[:, 1].min() * scale_y))
+        fx2 = int(round(pts_src[:, 0].max() * scale_x))
+        fy2 = int(round(pts_src[:, 1].max() * scale_y))
         cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
-        cv2.putText(frame_resized, f"Staff Gauge {station_code}", (fx1 - 10, max(25, fy1 - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(frame_resized, "Staff Gauge", (fx1 - 10, max(30, fy1 - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
 
+        # แปลงพิกัด water_y จาก Enhanced ROI เข้าสู่ระนาบมุมกล้อง CCTV
+        rect_h = cfg.get("rectified_roi", {}).get("height", 1120)
+        enh_h = cfg.get("enhanced_roi", {}).get("height", 2240)
+        rect_w = cfg.get("rectified_roi", {}).get("width", 40)
+        poly = cfg.get("staff_gauge_polygon", {})
+        p_src = np.float32([poly["top_left"], poly["top_right"], poly["bottom_right"], poly["bottom_left"]])
+        p_dst = np.float32([[0, 0], [rect_w, 0], [rect_w, rect_h], [0, rect_h]])
+        M_inv = np.linalg.inv(cv2.getPerspectiveTransform(p_src, p_dst))
+        y_rect = float(water_y) * (float(rect_h) / float(enh_h))
+        pt_rect_center = np.array([[[float(rect_w) / 2.0, y_rect]]], dtype=np.float32)
+        frame_pt = cv2.perspectiveTransform(pt_rect_center, M_inv)[0][0]
+        water_x_frame = int(round(frame_pt[0] * scale_x))
+        water_y_frame = int(round(frame_pt[1] * scale_y))
+
+        line_x1 = max(0, water_x_frame - 160)
+        line_x2 = min(target_frame_w, water_x_frame + 200)
+        cv2.line(frame_resized, (line_x1, water_y_frame), (line_x2, water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
+        cv2.putText(frame_resized, f"Water: {water_level:.2f} m", (line_x2 + 8, water_y_frame + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 140, 255), 2, cv2.LINE_AA)
+    elif station_code == "X.90":
+        # สไตล์สถานีสะพานบางศาลา (X.90) ตามแบบฉบับ result_bangsala_daytime_normal.jpg / result_bangsala_nighttime.jpg
+        pts = pole_mgr.last_pts_src
+        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
+        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
+        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+        cv2.putText(frame_resized, "Staff Gauge X.90", (fx1 - 10, max(25, fy1 - 8)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
         norm_y = water_y / float(gh)
-        water_y_frame = int(fy1 + norm_y * (fy2 - fy1))
+        water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
+        cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
+                 (min(target_frame_w, fx2 + 70), water_y_frame), (0, 140, 255), 3, cv2.LINE_AA)
+    else:
+        # สไตล์สถานีบ้านม่วงก็อง (X.173A) ตามแบบฉบับ result_muang_kong_daytime_normal.jpg / result_muang_kong_nighttime_normal.jpg
+        pts = pole_mgr.last_pts_src
+        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
+        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
+        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+        cv2.putText(frame_resized, "Staff Gauge", (fx1 - 10, max(25, fy1 - 8)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+        norm_y = water_y / float(gh)
+        water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
         cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
                  (min(target_frame_w, fx2 + 70), water_y_frame), (0, 140, 255), 3, cv2.LINE_AA)
 
-    # 4. แถบ Header Banner สีดำด้านบน (สไตล์ verify_daytime_normal.jpg)
+    # 4. แถบ Header Banner สีดำด้านบน
     banner_h = 100
     canvas = np.zeros((gh + banner_h, gw + target_frame_w, 3), dtype=np.uint8)
     canvas[:] = (24, 24, 24)
@@ -131,16 +149,31 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
         status_color = (0, 255, 120)
         status_text = "NORMAL LEVEL"
 
-    # ข้อความ Header แถวบน: ชื่อระบบ และ Confidence
-    camera_name = cfg.get("camera_name", station_code)
-    header_title = f"AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM ({camera_name} {station_code})"
-    cv2.putText(canvas, header_title, (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.70, (220, 220, 220), 2, cv2.LINE_AA)
-    cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {water_y} px",
-                (canvas.shape[1] - 460, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 215, 255), 1, cv2.LINE_AA)
-
-    # ข้อความ Header แถวล่าง: ระดับน้ำ และสถานะเตือนภัย
-    cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
-                (25, 80), cv2.FONT_HERSHEY_DUPLEX, 0.85, status_color, 2, cv2.LINE_AA)
+    if station_code == "X.44":
+        # Station 3: Hatyainai Benchmark Format
+        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (STATION X.44 HATYAINAI)",
+                    (25, 40), cv2.FONT_HERSHEY_DUPLEX, 0.85, (220, 220, 220), 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
+                    (25, 82), cv2.FONT_HERSHEY_DUPLEX, 1.05, status_color, 2, cv2.LINE_AA)
+        disp_y = int(round(water_y / 2.0))
+        cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {disp_y} px",
+                    (1100, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (180, 180, 180), 2, cv2.LINE_AA)
+    elif station_code == "X.90":
+        # Station 2: Bangsala Benchmark Format
+        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (X.90)",
+                    (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.70, (220, 220, 220), 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {water_y} px",
+                    (canvas.shape[1] - 460, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 215, 255), 1, cv2.LINE_AA)
+        cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
+                    (25, 80), cv2.FONT_HERSHEY_DUPLEX, 0.85, status_color, 2, cv2.LINE_AA)
+    else:
+        # Station 1: Muangkong Benchmark Format
+        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (SCCRN MUANGKONG)",
+                    (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.75, (220, 220, 220), 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
+                    (25, 78), cv2.FONT_HERSHEY_DUPLEX, 0.95, status_color, 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {water_y} px",
+                    (gw + 30, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (180, 180, 180), 2, cv2.LINE_AA)
 
     return canvas
 

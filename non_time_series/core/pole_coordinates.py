@@ -97,8 +97,18 @@ class PoleCoordinateManager:
 
         if self.has_polygon:
             rectified = cv2.warpPerspective(frame, self.M, (self.rect_w, self.rect_h))
+            upscaled = cv2.resize(rectified, (self.enh_w, self.enh_h), interpolation=cv2.INTER_LANCZOS4)
+            lab = cv2.cvtColor(upscaled, cv2.COLOR_BGR2LAB)
+            l, a, b_ch = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+            l_enh = clahe.apply(l)
+            enhanced_lab = cv2.merge([l_enh, a, b_ch])
+            enhanced_bgr = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+            gaussian = cv2.GaussianBlur(enhanced_bgr, (0, 0), sigmaX=1.5)
+            sharpened = cv2.addWeighted(enhanced_bgr, 1.35, gaussian, -0.35, 0)
+            return rectified, sharpened, self.last_pts_src
         else:
-            # กรณี BBox สี่เหลี่ยมมุมฉากตรง
+            # กรณี BBox สี่เหลี่ยมมุมฉากตรง (Muangkong & Bangsala)
             pts = self.last_pts_src
             x1, y1 = int(round(pts[0][0])), int(round(pts[0][1]))
             x2, y2 = int(round(pts[2][0])), int(round(pts[2][1]))
@@ -106,20 +116,9 @@ class PoleCoordinateManager:
             x2 = max(x1 + 1, min(x2, frame.shape[1]))
             y1 = max(0, min(y1, frame.shape[0] - 1))
             y2 = max(y1 + 1, min(y2, frame.shape[0]))
-            rectified = cv2.resize(frame[y1:y2, x1:x2], (self.rect_w, self.rect_h))
-
-        # Super-Resolution Upscaling & Contrast Enhancement
-        upscaled = cv2.resize(rectified, (self.enh_w, self.enh_h), interpolation=cv2.INTER_LANCZOS4)
-        lab = cv2.cvtColor(upscaled, cv2.COLOR_BGR2LAB)
-        l, a, b_ch = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-        l_enh = clahe.apply(l)
-        enhanced_lab = cv2.merge([l_enh, a, b_ch])
-        enhanced_bgr = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
-        gaussian = cv2.GaussianBlur(enhanced_bgr, (0, 0), sigmaX=1.5)
-        sharpened = cv2.addWeighted(enhanced_bgr, 1.35, gaussian, -0.35, 0)
-
-        return rectified, sharpened, self.last_pts_src
+            crop = frame[y1:y2, x1:x2].copy()
+            enhanced = cv2.resize(crop, (self.enh_w, self.enh_h), interpolation=cv2.INTER_LANCZOS4)
+            return crop, enhanced, self.last_pts_src
 
     def transform_gauge_to_cctv(self, x_enhanced, y_enhanced):
         """

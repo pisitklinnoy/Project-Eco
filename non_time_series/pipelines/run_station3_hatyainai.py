@@ -29,7 +29,9 @@ DEFAULT_IMG = os.path.join(BASE_DIR, "sample_images", "station3_hatyainai_daytim
 
 def main():
     parser = argparse.ArgumentParser(description="Run Station 3: Hatyainai Bridge (X.44)")
-    parser.add_argument("--image", type=str, default=DEFAULT_IMG, help="Path to input image")
+    parser.add_argument("--image", type=str, default=None, help="Path to input image")
+    parser.add_argument("--flood", action="store_true", help="Use flood simulation sample image")
+    parser.add_argument("--night", action="store_true", help="Use nighttime sample image")
     parser.add_argument("--output", type=str, default=None, help="Path to save output dashboard")
     parser.add_argument("--no_excel", action="store_true", help="Skip logging to Excel")
     args = parser.parse_args()
@@ -37,11 +39,20 @@ def main():
     with open(CFG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
-    if not os.path.exists(args.image):
-        print(f"❌ Input image not found: {args.image}")
+    if args.image:
+        img_input = args.image
+    elif args.flood:
+        img_input = os.path.join(BASE_DIR, "sample_images", "station3_hatyainai_flood.png")
+    elif args.night:
+        img_input = os.path.join(BASE_DIR, "sample_images", "station3_hatyainai_nighttime.jpg")
+    else:
+        img_input = DEFAULT_IMG
+
+    if not os.path.exists(img_input):
+        print(f"❌ Input image not found: {img_input}")
         return
-    frame = cv2.imread(args.image)
-    img_src_name = os.path.basename(args.image)
+    frame = cv2.imread(img_input)
+    img_src_name = os.path.basename(img_input)
 
     pole_mgr = PoleCoordinateManager(cfg)
     rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
@@ -57,9 +68,20 @@ def main():
         logger.log_water_level("Hatyainai_X44", water_info["water_level"], timestamp)
 
     dashboard = build_dashboard(frame, enhanced, water_info, pole_mgr, calibrator, cfg, img_src_name)
-    out_path = args.output if args.output else os.path.join(BASE_DIR, "output", "hatyainai_result_dashboard.jpg")
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    cv2.imwrite(out_path, dashboard)
+    os.makedirs(os.path.join(BASE_DIR, "output"), exist_ok=True)
+    if args.output:
+        out_path = args.output
+        cv2.imwrite(out_path, dashboard)
+    else:
+        out_path = os.path.join(BASE_DIR, "output", "hatyainai_result_dashboard.jpg")
+        cv2.imwrite(out_path, dashboard)
+        if args.flood or "flood" in img_src_name.lower():
+            bench_out = os.path.join(BASE_DIR, "output", "result_hatayi_daytime_generate_flood.jpg")
+        elif args.night or "night" in img_src_name.lower():
+            bench_out = os.path.join(BASE_DIR, "output", "result_hatyai_nighttime_normal.jpg")
+        else:
+            bench_out = os.path.join(BASE_DIR, "output", "result_hatyai_nighttime_normal.jpg")
+        cv2.imwrite(bench_out, dashboard)
 
     print("=" * 70)
     print(f"🌊 [Station 3] สะพานหาดใหญ่นอก (X.44)")

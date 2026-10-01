@@ -27,7 +27,8 @@ DEFAULT_IMG = os.path.join(BASE_DIR, "sample_images", "station1_muangkong.jpg")
 
 def main():
     parser = argparse.ArgumentParser(description="Run Station 1: Ban Muangkong (X.173A)")
-    parser.add_argument("--image", type=str, default=DEFAULT_IMG, help="Path to input image")
+    parser.add_argument("--image", type=str, default=None, help="Path to input image")
+    parser.add_argument("--night", action="store_true", help="Use nighttime sample image")
     parser.add_argument("--output", type=str, default=None, help="Path to save output dashboard")
     parser.add_argument("--live", action="store_true", help="Grab frame from live CCTV stream")
     parser.add_argument("--no_excel", action="store_true", help="Skip logging to Excel")
@@ -36,6 +37,13 @@ def main():
     import json
     with open(CFG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
+
+    if args.image:
+        img_input = args.image
+    elif args.night:
+        img_input = os.path.join(BASE_DIR, "sample_images", "station1_muangkong_nighttime.jpg")
+    else:
+        img_input = DEFAULT_IMG
 
     if args.live:
         url = cfg.get("stream_url")
@@ -48,11 +56,11 @@ def main():
             return
         img_src_name = "live_cctv_stream.jpg"
     else:
-        if not os.path.exists(args.image):
-            print(f"❌ Input image not found: {args.image}")
+        if not os.path.exists(img_input):
+            print(f"❌ Input image not found: {img_input}")
             return
-        frame = cv2.imread(args.image)
-        img_src_name = os.path.basename(args.image)
+        frame = cv2.imread(img_input)
+        img_src_name = os.path.basename(img_input)
 
     pole_mgr = PoleCoordinateManager(cfg)
     rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
@@ -68,9 +76,20 @@ def main():
         logger.log_water_level("Muangkong", water_info["water_level"], timestamp)
 
     dashboard = build_dashboard(frame, enhanced, water_info, pole_mgr, calibrator, cfg, img_src_name)
-    out_path = args.output if args.output else os.path.join(BASE_DIR, "output", "muangkong_result_dashboard.jpg")
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    cv2.imwrite(out_path, dashboard)
+    
+    # บันทึกทั้งชื่อมาตรฐานและชื่อ Benchmark
+    os.makedirs(os.path.join(BASE_DIR, "output"), exist_ok=True)
+    if args.output:
+        out_path = args.output
+        cv2.imwrite(out_path, dashboard)
+    else:
+        out_path = os.path.join(BASE_DIR, "output", "muangkong_result_dashboard.jpg")
+        cv2.imwrite(out_path, dashboard)
+        if args.night or "night" in img_src_name.lower():
+            bench_out = os.path.join(BASE_DIR, "output", "result_muang_kong_nighttime_normal.jpg")
+        else:
+            bench_out = os.path.join(BASE_DIR, "output", "result_muang_kong_daytime_normal.jpg")
+        cv2.imwrite(bench_out, dashboard)
 
     print("=" * 70)
     print(f"🌊 [Station 1] สะพานบ้านม่วงก็อง (X.173A)")

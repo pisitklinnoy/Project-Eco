@@ -84,14 +84,25 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
         )}
 
         {/* AI Waterline Overlay Line */}
-        <div className="absolute inset-x-8 top-[55%] pointer-events-none border-b-2 border-dashed border-sky-400 opacity-80 shadow-[0_0_12px_rgba(56,189,248,0.8)] flex items-center justify-between">
-          <span className="text-[10px] bg-sky-500 text-slate-950 font-bold px-1.5 py-0.5 rounded -translate-y-3">
-            AI Waterline Target
-          </span>
-          <span className="text-[10px] text-sky-300 font-mono -translate-y-3 bg-slate-900/80 px-1 rounded">
-            Conf: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 92).toFixed(0)}%
-          </span>
-        </div>
+        {(() => {
+          const minLvl = station.normal_level * 0.5;
+          const maxLvl = station.bank_level;
+          const clampedRatio = Math.min(Math.max((currentLevel - minLvl) / Math.max(1, maxLvl - minLvl), 0.05), 0.95);
+          const topPercent = Math.round(82 - clampedRatio * 57);
+          return (
+            <div
+              className="absolute inset-x-8 pointer-events-none border-b-2 border-dashed border-sky-400 opacity-85 shadow-[0_0_12px_rgba(56,189,248,0.8)] flex items-center justify-between transition-all duration-700 ease-out"
+              style={{ top: `${topPercent}%` }}
+            >
+              <span className="text-[10px] bg-sky-500 text-slate-950 font-bold px-1.5 py-0.5 rounded -translate-y-3 shadow">
+                AI Waterline: {currentLevel.toFixed(2)} ม.
+              </span>
+              <span className="text-[10px] text-sky-300 font-mono -translate-y-3 bg-slate-900/90 border border-sky-500/30 px-1.5 py-0.5 rounded">
+                Conf: {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 90).toFixed(0)}%
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Top-Left Station & Source Tag */}
         <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-white text-[11px] font-mono flex items-center space-x-2">

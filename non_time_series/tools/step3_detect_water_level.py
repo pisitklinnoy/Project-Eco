@@ -38,82 +38,111 @@ DEFAULT_IMAGES = {
 
 
 def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg, image_path):
-    """ประกอบภาพ Dashboard แบบ 3 แผงตามมาตรฐานระบบ"""
-    h_orig, w_orig = frame.shape[:2]
-    cctv_panel = frame.copy()
-
-    # 1. วาดกรอบเสาบนภาพ CCTV
-    src_pts = pole_mgr.last_pts_src.astype(np.int32)
-    cv2.polylines(cctv_panel, [src_pts], isClosed=True, color=(0, 255, 255), thickness=2)
-
-    # 2. วาดเส้นผิวน้ำบนภาพ CCTV ด้วย Inverse Homography (M^-1)
+    """
+    เรนเดอร์ภาพ Dashboard แบบ 100% ตามมาตรฐาน verify_daytime_normal.jpg
+    - ซ้าย: เสา Enhanced พร้อมสเกลไม้บรรทัด Dark Theme (พื้นหลังดำ 26, 26, 26 ขีดระดับเมตรสีเหลืองทอง)
+    - ขวา: ภาพ CCTV ความละเอียดเต็ม คมชัด ไม่แตก ตีกรอบเสาสีเขียว พร้อมเส้นระดับน้ำสีส้มบนผิวน้ำ
+    - บน: Header Banner ดำเข้ม (24, 24, 24) ตัวหนังสือภาษาอังกฤษคมชัด ไม่เป็น ????
+    """
     water_y = water_info["water_y"]
-    w_enh = enhanced_gauge.shape[1]
+    water_level = water_info["water_level"]
+    confidence = water_info["confidence"]
 
-    # คำนวณพิกัดเส้นผิวน้ำบนแม่น้ำ
-    fx_left, fy_left = pole_mgr.transform_gauge_to_cctv(0, water_y)
-    fx_right, fy_right = pole_mgr.transform_gauge_to_cctv(w_enh, water_y)
+    # 1. เรนเดอร์เสาพร้อมสเกลละเอียด Dark Theme
+    gauge_overlay = calibrator.render_calibrated_overlay(
+        enhanced_gauge,
+        water_surface_y=water_y,
+        water_surface_level=water_level
+    )
+    gh, gw = gauge_overlay.shape[:2]
 
-    # ขยายเส้นแนวนอนผิวน้ำบนแม่น้ำให้เห็นชัดเจน
-    extend_w = 40.0
-    dx = fx_right - fx_left
-    dy = fy_right - fy_left
-    length = max(1e-3, np.hypot(dx, dy))
-    ux, uy = dx / length, dy / length
+    # 2. ปรับขนาดภาพมุมกล้องรวม CCTV ให้ความสูงเท่ากับเสาพอดี
+    fh, fw = frame.shape[:2]
+    target_frame_h = gh
+    target_frame_w = int(fw * (target_frame_h / float(fh)))
+    frame_resized = cv2.resize(frame, (target_frame_w, target_frame_h), interpolation=cv2.INTER_AREA)
 
-    p1 = (int(round(fx_left - extend_w * ux)), int(round(fy_left - extend_w * uy)))
-    p2 = (int(round(fx_right + extend_w * ux)), int(round(fy_right + extend_w * uy)))
+    scale_x = target_frame_w / float(fw)
+    scale_y = target_frame_h / float(fh)
+    station_code = cfg.get("station_code", "Unknown")
 
-    cv2.line(cctv_panel, p1, p2, (0, 140, 255), 3, cv2.LINE_AA)
-    cv2.circle(cctv_panel, (int(round(fx_right)), int(round(fy_right))), 5, (0, 0, 255), -1)
+    # 3. วาดกรอบเสาสีเขียวและเส้นระดับน้ำสีส้มบนภาพ CCTV
+    if pole_mgr.has_polygon:
+        poly_scaled = pole_mgr.last_pts_src.copy()
+        poly_scaled[:, 0] *= scale_x
+        poly_scaled[:, 1] *= scale_y
+        poly_int = poly_scaled.astype(np.int32).reshape((-1, 1, 2))
+        cv2.polylines(frame_resized, [poly_int], isClosed=True, color=(0, 255, 0), thickness=2)
 
-    # 3. วาดเสาขยายพร้อมไม้บรรทัดดิจิทัล
-    gauge_with_water = enhanced_gauge.copy()
-    h_enh = gauge_with_water.shape[0]
-    cv2.line(gauge_with_water, (0, water_y), (w_enh - 1, water_y), (0, 140, 255), 3)
+        tl_x, tl_y = int(poly_scaled[0, 0]), int(poly_scaled[0, 1])
+        cv2.putText(frame_resized, f"Staff Gauge {station_code}", (tl_x - 10, max(25, tl_y - 8)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 0), 2, cv2.LINE_AA)
 
-    warn_m = cfg.get("warning_thresholds", {}).get("warning_m")
-    crit_m = cfg.get("warning_thresholds", {}).get("critical_flood_m")
-    ruler = calibrator.render_digital_ruler(height=h_enh, width=140,
-                                           current_level=water_info["water_level"],
-                                           warning_lvl=warn_m, critical_lvl=crit_m)
+        # ใช้ Inverse Homography (M^-1) เพื่อแปลงพิกัดเส้นผิวน้ำบนแม่น้ำอย่างแม่นยำ
+        fx_left, fy_left = pole_mgr.transform_gauge_to_cctv(0, water_y)
+        fx_right, fy_right = pole_mgr.transform_gauge_to_cctv(enhanced_gauge.shape[1], water_y)
 
-    left_panel = np.hstack([gauge_with_water, ruler])
+        # แปลงสู่ frame_resized
+        fx_l_scaled, fy_l_scaled = fx_left * scale_x, fy_left * scale_y
+        fx_r_scaled, fy_r_scaled = fx_right * scale_x, fy_right * scale_y
 
-    # 4. ปรับขนาด Panel ให้เข้ากัน (สเกลความสูง Dashboard มาตรฐาน 720px)
-    target_dashboard_h = 720
-    aspect_left = left_panel.shape[1] / float(left_panel.shape[0])
-    w_left_target = int(round(target_dashboard_h * aspect_left))
-    left_resized = cv2.resize(left_panel, (w_left_target, target_dashboard_h), interpolation=cv2.INTER_AREA)
+        extend_w = 40.0
+        dx = fx_r_scaled - fx_l_scaled
+        dy = fy_r_scaled - fy_l_scaled
+        length = max(1e-3, np.hypot(dx, dy))
+        ux, uy = dx / length, dy / length
 
-    aspect_cctv = cctv_panel.shape[1] / float(cctv_panel.shape[0])
-    w_cctv_target = int(round(target_dashboard_h * aspect_cctv))
-    cctv_resized = cv2.resize(cctv_panel, (w_cctv_target, target_dashboard_h), interpolation=cv2.INTER_AREA)
-
-    content_panel = np.hstack([left_resized, cctv_resized])
-
-    # 5. สร้าง Header Banner
-    header_h = 70
-    total_w = content_panel.shape[1]
-    header = np.full((header_h, total_w, 3), (25, 35, 45), dtype=np.uint8)
-
-    # สีสถานะ
-    status = water_info["status"]
-    if status == "CRITICAL_FLOOD":
-        status_color = (40, 40, 230)
-    elif status == "WARNING_LEVEL":
-        status_color = (30, 160, 255)
+        p1 = (int(round(fx_l_scaled - extend_w * ux)), int(round(fy_l_scaled - extend_w * uy)))
+        p2 = (int(round(fx_r_scaled + extend_w * ux)), int(round(fy_r_scaled + extend_w * uy)))
+        cv2.line(frame_resized, p1, p2, (0, 140, 255), 3, cv2.LINE_AA)
     else:
-        status_color = (60, 180, 75)
+        pts = pole_mgr.last_pts_src
+        fx1, fy1 = int(pts[0][0] * scale_x), int(pts[0][1] * scale_y)
+        fx2, fy2 = int(pts[2][0] * scale_x), int(pts[2][1] * scale_y)
+        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+        cv2.putText(frame_resized, f"Staff Gauge {station_code}", (fx1 - 10, max(25, fy1 - 8)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 0), 2, cv2.LINE_AA)
 
-    title_text = f"HATYAI FLOOD CAMERA - {cfg.get('thai_name')} [{cfg.get('station_code')}]"
-    cv2.putText(header, title_text, (20, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2, cv2.LINE_AA)
+        norm_y = water_y / float(gh)
+        water_y_frame = int(fy1 + norm_y * (fy2 - fy1))
+        cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
+                 (min(target_frame_w, fx2 + 70), water_y_frame), (0, 140, 255), 3, cv2.LINE_AA)
 
-    level_text = f"WATER LEVEL: {water_info['water_level']:.2f} m R.T.K. [{status}]  (CONF: {water_info['confidence']*100:.1f}%)"
-    cv2.putText(header, level_text, (20, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.60, status_color, 2, cv2.LINE_AA)
+    # 4. แถบ Header Banner สีดำด้านบน (สไตล์ verify_daytime_normal.jpg)
+    banner_h = 100
+    canvas = np.zeros((gh + banner_h, gw + target_frame_w, 3), dtype=np.uint8)
+    canvas[:] = (24, 24, 24)
 
-    dashboard = np.vstack([header, content_panel])
-    return dashboard
+    canvas[banner_h:, :gw] = gauge_overlay
+    canvas[banner_h:, gw:] = frame_resized
+
+    # สีสถานะเตือนภัย
+    thresholds = cfg.get("warning_thresholds", {"normal_m": 14.0, "warning_m": 16.0, "critical_flood_m": 16.4})
+    crit_m = thresholds.get("critical_flood_m", 999.0)
+    warn_m = thresholds.get("warning_m", 999.0)
+
+    if water_level >= crit_m:
+        status_color = (0, 0, 255)
+        status_text = "CRITICAL FLOOD"
+    elif water_level >= warn_m:
+        status_color = (0, 215, 255)
+        status_text = "WARNING LEVEL"
+    else:
+        status_color = (0, 255, 120)
+        status_text = "NORMAL LEVEL"
+
+    # ข้อความ Header แถวบน: ชื่อระบบ และ Confidence
+    camera_name = cfg.get("camera_name", station_code)
+    header_title = f"AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM ({camera_name} {station_code})"
+    cv2.putText(canvas, header_title, (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.70, (220, 220, 220), 2, cv2.LINE_AA)
+    cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {water_y} px",
+                (canvas.shape[1] - 460, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 215, 255), 1, cv2.LINE_AA)
+
+    # ข้อความ Header แถวล่าง: ระดับน้ำ และสถานะเตือนภัย
+    cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
+                (25, 80), cv2.FONT_HERSHEY_DUPLEX, 0.85, status_color, 2, cv2.LINE_AA)
+
+    return canvas
 
 
 def main():

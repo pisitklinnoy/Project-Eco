@@ -68,45 +68,97 @@ class PiecewiseScaleCalibrator:
             curr -= step
         return ticks
 
+    def render_calibrated_overlay(
+        self,
+        image: np.ndarray,
+        water_surface_y: float = None,
+        water_surface_level: float = None
+    ) -> np.ndarray:
+        """
+        วาดสเกลไม้บรรทัดละเอียดสไตล์ Professional Dark Theme ตามรูปแบบ verify_daytime_normal.jpg
+        - พื้นหลังดำเข้มกลืนกับภาพ (26, 26, 26)
+        - ขีดระดับเต็มเมตรยาวสีเหลืองทอง (0, 215, 255) พร้อมตัวเลขชัดเจน
+        - ขีดกลาง 50 ซม. (255, 200, 0) และขีดย่อย 10 ซม.
+        - เส้นระดับน้ำสีส้มสะท้อนแสง (0, 140, 255)
+        """
+        h, w = image.shape[:2]
+        overlay_w = w + 160
+        canvas = np.zeros((h, overlay_w, 3), dtype=np.uint8)
+        canvas[:] = (26, 26, 26)
+        canvas[:, :w] = image
+
+        # วาดเส้นสเกลทุก 10 ซม. (0.1m) ตามช่วงของ Anchors
+        min_lvl = min(a[0] for a in self.anchors)
+        max_lvl = max(a[0] for a in self.anchors)
+
+        # ไม่แสดงต่ำกว่า min_lvl (เช่น ไม่แสดง 0.0 ม.)
+        curr_lvl = round(min_lvl, 1)
+        end_lvl = round(max_lvl, 1)
+
+        curr = curr_lvl
+        while curr <= end_lvl + 1e-4:
+            y_pos = self.level_to_pixel(curr, target_h=h)
+            if 0 <= y_pos < h:
+                is_meter = (abs(curr - round(curr)) < 0.01)
+                is_half = (abs(curr - (int(curr) + 0.5)) < 0.01)
+
+                if is_meter:
+                    # ขีดใหญ่ระดับเต็มเมตร (สีเหลืองทอง)
+                    cv2.line(canvas, (0, y_pos), (w + 40, y_pos), (0, 215, 255), 2)
+                    cv2.putText(
+                        canvas,
+                        f"{curr:.1f} m",
+                        (w + 45, y_pos + 6),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.65,
+                        (0, 215, 255),
+                        2,
+                        cv2.LINE_AA
+                    )
+                    # จุด Anchor สีเขียวตรงกลางตัวเลข
+                    cv2.circle(canvas, (int(w * 0.58), y_pos), 4, (0, 255, 0), -1)
+                elif is_half:
+                    # ขีดกลาง 50 ซม. (สีฟ้าอ่อน)
+                    cv2.line(canvas, (w, y_pos), (w + 25, y_pos), (255, 200, 0), 1)
+                    cv2.putText(
+                        canvas,
+                        f"{curr:.1f}",
+                        (w + 30, y_pos + 4),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.45,
+                        (200, 200, 200),
+                        1,
+                        cv2.LINE_AA
+                    )
+                else:
+                    # ขีดย่อย 10 ซม. (สีเทา)
+                    cv2.line(canvas, (w, y_pos), (w + 12, y_pos), (120, 120, 120), 1)
+
+            curr = round(curr + 0.1, 2)
+
+        # วาดเส้นระดับน้ำสีส้มสะท้อนแสง
+        if water_surface_y is not None:
+            calc_lvl = water_surface_level if water_surface_level is not None else self.pixel_to_level(water_surface_y, target_h=h)
+            y_int = int(round(water_surface_y))
+            if 0 <= y_int < h:
+                cv2.line(canvas, (0, y_int), (overlay_w, y_int), (0, 140, 255), 3, cv2.LINE_AA)
+                cv2.putText(
+                    canvas,
+                    f"Water: {calc_lvl:.2f} m",
+                    (15, max(30, y_int - 12)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65,
+                    (0, 140, 255),
+                    2,
+                    cv2.LINE_AA
+                )
+
+        return canvas
+
     def render_digital_ruler(self, height: int, width: int = 140, current_level: float = None, warning_lvl: float = None, critical_lvl: float = None):
-        """
-        วาดแถบไม้บรรทัดดิจิทัลสเกลละเอียด พร้อมขีดสเกลทุก 10 ซม. และตัวเลขทุกเต็มเมตร
-        """
-        ruler = np.full((height, width, 3), 245, dtype=np.uint8)
+        """Wrapper เข้ากันได้กับโค้ดเดิม"""
+        blank = np.zeros((height, 80, 3), dtype=np.uint8)
+        blank[:] = (26, 26, 26)
+        overlay = self.render_calibrated_overlay(blank, water_surface_level=current_level)
+        return overlay[:, 80:]
 
-        # เส้นขอบขวาของแถบไม้บรรทัด
-        cv2.line(ruler, (width - 1, 0), (width - 1, height), (180, 180, 180), 2)
-
-        # ขีดระดับทุก 10 ซม. (0.10 m)
-        ticks = self.generate_meter_ticks(step=0.1, target_h=height)
-
-        for tick in ticks:
-            lvl = tick["level"]
-            y = tick["y"]
-            if y < 0 or y >= height:
-                continue
-
-            if tick["is_full_meter"]:
-                # ขีดยาวเต็มเมตร + ตัวเลข
-                # สีเส้นแบ่งระดับ: วิกฤต (แดง), เตือนภัย (ส้ม), ปกติ (น้ำเงินเข้ม)
-                color = (40, 40, 140)
-                if critical_lvl and lvl >= critical_lvl:
-                    color = (40, 40, 220)
-                elif warning_lvl and lvl >= warning_lvl:
-                    color = (30, 140, 240)
-
-                cv2.line(ruler, (width - 32, y), (width - 2, y), color, 2)
-                text = f"{lvl:.1f}m"
-                cv2.putText(ruler, text, (8, y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 1, cv2.LINE_AA)
-            else:
-                # ขีดสั้น 10 ซม.
-                cv2.line(ruler, (width - 15, y), (width - 2, y), (140, 140, 140), 1)
-
-        # ขีดบอกระดับน้ำปัจจุบัน (ถ้ามีระบุ)
-        if current_level is not None:
-            cur_y = self.level_to_pixel(current_level, target_h=height)
-            if 0 <= cur_y < height:
-                cv2.line(ruler, (0, cur_y), (width - 1, cur_y), (0, 140, 255), 3)
-                cv2.circle(ruler, (width - 10, cur_y), 5, (0, 140, 255), -1)
-
-        return ruler

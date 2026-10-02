@@ -15,7 +15,6 @@ import {
   Move,
   Sliders,
   CheckCircle,
-  Crop,
   Sun,
   Moon,
   Waves,
@@ -27,16 +26,6 @@ interface CameraViewerProps {
   onOpenReview: () => void;
   onOpenCalibrate?: () => void;
 }
-
-// Bounding Box coordinates (% of frame) extracted directly from station vision calibrations
-const STATION_BBOX: Record<string, { left: number; top: number; width: number; height: number; focusPan: { x: number; y: number } }> = {
-  'STN-MUANGKONG': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
-  'X.173A': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
-  'STN-BANGSALA': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
-  'X.90': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
-  'STN-HATYAINAI': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
-  'X.44': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
-};
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
@@ -64,7 +53,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [isFocusedGauge, setIsFocusedGauge] = useState<boolean>(false);
   
   // Toggle overlay badges to ensure NOTHING blocks the camera stream / timestamp when zooming
   const [showOverlays, setShowOverlays] = useState<boolean>(true);
@@ -79,7 +67,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     // Reset zoom when switching station
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
-    setIsFocusedGauge(false);
     if (aiScenario === 'flood' && !station?.station_code.toUpperCase().includes('HATYAI') && !station?.station_code.toUpperCase().includes('X.44')) {
       setAiScenario('daytime');
     }
@@ -172,18 +159,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     ? getBenchmarkLevel(station.station_code, aiScenario, currentLevel)
     : currentLevel;
 
-  // Get Bounding Box config for current station
-  const getStationBBox = (code: string) => {
-    const upper = code.toUpperCase();
-    for (const [key, val] of Object.entries(STATION_BBOX)) {
-      if (upper.includes(key)) return val;
-    }
-    return { left: 56.5, top: 20.0, width: 2.5, height: 40.0, focusPan: { x: -80, y: 15 } };
-  };
-
-  const bbox = getStationBBox(station.station_code);
-  const confidencePercent = measurement?.vision_confidence ? Math.round(measurement.vision_confidence * 100) : 92;
-
   // Zoom Handlers
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(Number((prev + 0.3).toFixed(1)), 3.5));
@@ -195,24 +170,11 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       if (next === 1.0) setPan({ x: 0, y: 0 });
       return next;
     });
-    setIsFocusedGauge(false);
   };
 
   const handleResetZoom = () => {
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
-    setIsFocusedGauge(false);
-  };
-
-  // Preset Focus & Auto-Crop Gauge: Smoothly crops and centers directly on the staff gauge bounding box
-  const handleFocusGauge = () => {
-    if (isFocusedGauge) {
-      handleResetZoom();
-    } else {
-      setZoomLevel(2.8);
-      setPan(bbox.focusPan);
-      setIsFocusedGauge(true);
-    }
   };
 
   // Mouse Drag Panning
@@ -246,22 +208,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     });
   };
 
-  // Physical staff gauge vertical waterline positioning along each station's pole
-  const getStaffGaugeWaterlineY = (stnCode: string, waterLvl: number): number => {
-    const code = stnCode.toUpperCase();
-    if (code.includes('MUANGKONG') || code.includes('X.173A')) {
-      const ratio = Math.min(Math.max((waterLvl - 10.0) / 8.0, 0), 1);
-      return Math.round(56 - ratio * 37);
-    }
-    if (code.includes('BANGSALA') || code.includes('X.90')) {
-      const ratio = Math.min(Math.max((waterLvl - 2.0) / 10.0, 0), 1);
-      return Math.round(61 - ratio * 34);
-    }
-    const ratio = Math.min(Math.max((waterLvl - 0.6) / 8.4, 0), 1);
-    return Math.round(92 - ratio * 80);
-  };
-
-  const topPercent = getStaffGaugeWaterlineY(station.station_code, currentLevel);
   const zoomPercent = Math.round(zoomLevel * 100);
 
   return (
@@ -289,7 +235,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
                 {viewMode === 'live'
-                  ? (isHatyai ? 'สตรีมสด Axis Camera (ที่ว่าการ อ.หาดใหญ่) พร้อมวาดกรอบตรวจจับ AI' : 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE) พร้อมวาดกรอบตรวจจับ AI')
+                  ? (isHatyai ? 'สตรีมสด Axis Camera (ที่ว่าการ อ.หาดใหญ่)' : 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE CCTV)')
                   : 'การวิเคราะห์ AI Realtime: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
               </p>
             </div>
@@ -323,8 +269,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           </div>
         </div>
 
-        {/* Hatyai Axis Camera Dedicated Ribbon */}
-        {isHatyai && (
+        {/* Hatyai Axis Camera Dedicated Ribbon - Only in Live Mode */}
+        {isHatyai && viewMode === 'live' && (
           <div className="px-5 py-2 bg-gradient-to-r from-sky-50/90 via-blue-50/40 to-white border-b border-sky-100 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -336,51 +282,43 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </span>
             </div>
 
-            {viewMode === 'live' ? (
-              <div className="flex items-center space-x-1 bg-white p-0.5 rounded-xl border border-slate-200 text-[10px]">
-                <button
-                  onClick={() => { setHatyaiSource('backend_proxy'); setImgError(false); }}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    hatyaiSource === 'backend_proxy'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="สตรีมสดผ่าน Backend Proxy (Auto Basic Auth & Fast Response)"
-                >
-                  <Sparkles className="w-3 h-3 text-sky-400" />
-                  <span>Proxy สด</span>
-                </button>
-                <button
-                  onClick={() => { setHatyaiSource('axis_stream'); setImgError(false); }}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    hatyaiSource === 'axis_stream'
-                      ? 'bg-sky-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="เชื่อมต่อสตรีมตรง http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi"
-                >
-                  <Radio className="w-3 h-3 text-white" />
-                  <span>Axis Direct</span>
-                </button>
-                <button
-                  onClick={() => { setHatyaiSource('climate_snapshot'); setImgError(false); }}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    hatyaiSource === 'climate_snapshot'
-                      ? 'bg-slate-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="ภาพสำรองจาก HatyaiCity Climate"
-                >
-                  <span>ภาพสำรอง</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-1 text-[11px] text-sky-800 font-medium">
-                <span className="bg-sky-100 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold text-sky-900">
-                  AI Model: {aiScenario === 'live' ? 'Axis Camera Live API' : aiScenario.toUpperCase()}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center space-x-1 bg-white p-0.5 rounded-xl border border-slate-200 text-[10px]">
+              <button
+                onClick={() => { setHatyaiSource('backend_proxy'); setImgError(false); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                  hatyaiSource === 'backend_proxy'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="สตรีมสดผ่าน Backend Proxy (Auto Basic Auth & Fast Response)"
+              >
+                <Sparkles className="w-3 h-3 text-sky-400" />
+                <span>Proxy สด</span>
+              </button>
+              <button
+                onClick={() => { setHatyaiSource('axis_stream'); setImgError(false); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                  hatyaiSource === 'axis_stream'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="เชื่อมต่อสตรีมตรง http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi"
+              >
+                <Radio className="w-3 h-3 text-white" />
+                <span>Axis Direct</span>
+              </button>
+              <button
+                onClick={() => { setHatyaiSource('climate_snapshot'); setImgError(false); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                  hatyaiSource === 'climate_snapshot'
+                    ? 'bg-slate-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="ภาพสำรองจาก HatyaiCity Climate"
+              >
+                <span>ภาพสำรอง</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -422,22 +360,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
-
-            {/* Quick Focus & Auto-Crop Gauge Preset */}
-            {viewMode === 'live' && (
-              <button
-                onClick={handleFocusGauge}
-                className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] ${
-                  isFocusedGauge
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-                title="Crop และซูมเจาะจงเฉพาะตำแหน่งเสาวัดน้ำในภาพสด"
-              >
-                <Crop className="w-3 h-3 text-sky-400 shrink-0" />
-                <span>Crop ส่องเสา AI</span>
-              </button>
-            )}
 
             {/* Toggle Overlay Visibility (ไม่บังเวลาซูมกล้องสด) */}
             <button
@@ -486,92 +408,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           </div>
         </div>
 
-        {/* Scenario Sub-Bar: Visible when in AI Staff Gauge Inspection mode */}
-        {viewMode === 'ai_dashboard' && (
-          <div className="px-4 py-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-b border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-              <span className="text-[11px] font-extrabold text-sky-300 flex items-center space-x-1.5 uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
-                <span>ชุดผลการตรวจ AI:</span>
-              </span>
-              <div className="flex items-center space-x-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-700">
-                <button
-                  onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'daytime'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="ผลลัพธ์ Benchmark สภาพแสงกลางวัน (ความแม่นยำ 92-95%)"
-                >
-                  <Sun className="w-3 h-3 text-amber-200 shrink-0" />
-                  <span>☀️ กลางวัน (Daytime)</span>
-                </button>
 
-                <button
-                  onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'nighttime'
-                      ? 'bg-indigo-600 text-white shadow-sm font-black'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="ผลลัพธ์ Benchmark สภาพแสงกลางคืน / อินฟราเรด"
-                >
-                  <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
-                  <span>🌙 กลางคืน (Nighttime)</span>
-                </button>
-
-                {isHatyai && (
-                  <button
-                    onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 ${
-                      aiScenario === 'flood'
-                        ? 'bg-rose-600 text-white shadow-sm font-black'
-                        : 'text-rose-300 hover:text-white hover:bg-rose-950/60'
-                    }`}
-                    title="ผลลัพธ์จำลองสถานการณ์น้ำท่วมสูง (Flood Simulation)"
-                  >
-                    <Waves className="w-3 h-3 text-rose-200 shrink-0" />
-                    <span>🌊 จำลองน้ำท่วม (Flood)</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer ${
-                    aiScenario === 'live'
-                      ? 'bg-emerald-600 text-white shadow-sm font-black'
-                      : 'text-emerald-300 hover:text-white hover:bg-emerald-950/60'
-                  }`}
-                  title={isHatyai ? "ประมวลผลโมเดล AI สดจากกล้อง Axis Camera (ta200304.dyndns.info:5001)" : "ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"}
-                >
-                  <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
-                  <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (API)' : '🔴 ประมวลผลสด (Live AI)'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2 text-[10px]">
-              <span className="bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center space-x-1">
-                <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
-                <span>Verified Benchmark Dashboard</span>
-              </span>
-            </div>
-
-            {/* Live Axis Stream AI Detection Information Banner */}
-            {isHatyai && aiScenario === 'live' && (
-              <div className="w-full mt-2 pt-2 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-1 text-[11px] text-emerald-300">
-                <span className="flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                  <span>โมเดล AI กำลังประมวลผลดึงภาพสดจากกล้อง Axis Camera: ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi</span>
-                </span>
-                <span className="bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] text-emerald-200 font-mono">
-                  Station: X.44 Hatyainai
-                </span>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Video / Dashboard Canvas Container */}
         <div
@@ -608,7 +445,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 className="w-full h-full object-contain pointer-events-none"
               />
             ) : (
-              /* VIEW MODE 2: LIVE STREAM WITH REALTIME BOUNDING BOX & WATERLINE */
+              /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Video Feed) */
               streamUrl && !imgError ? (
                 <div className="relative w-full h-full flex items-center justify-center">
                   <img
@@ -617,50 +454,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                     onError={handleImageError}
                     className="w-full h-full object-cover object-center pointer-events-none"
                   />
-
-                  {/* Realtime AI Bounding Box & Target Brackets directly over Staff Gauge */}
-                  {showOverlays && (
-                    <>
-                      {/* 1. Green Staff Gauge Bounding Box (วาดกรอบแบบภาพที่ส่งไป) */}
-                      <div
-                        className="absolute pointer-events-none border-2 border-emerald-400 bg-emerald-500/15 shadow-[0_0_15px_rgba(52,211,153,0.7)] transition-all"
-                        style={{
-                          left: `${bbox.left}%`,
-                          top: `${bbox.top}%`,
-                          width: `${bbox.width}%`,
-                          height: `${bbox.height}%`,
-                        }}
-                      >
-                        {/* Label Badge on top of bounding box */}
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-emerald-700/90 backdrop-blur-md text-emerald-100 text-[9px] font-black px-1.5 py-0.5 rounded shadow border border-emerald-400/50 whitespace-nowrap flex items-center space-x-1">
-                          <Target className="w-2.5 h-2.5 text-emerald-300 shrink-0" />
-                          <span>Staff Gauge: {confidencePercent}%</span>
-                        </div>
-
-                        {/* Corner Accents */}
-                        <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white"></div>
-                        <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white"></div>
-                        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-white"></div>
-                        <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-white"></div>
-                      </div>
-
-                      {/* 2. Orange Waterline Contact Line cutting across the staff gauge */}
-                      <div
-                        className="absolute pointer-events-none border-b-2 border-dashed border-orange-500 opacity-95 shadow-[0_0_16px_rgba(249,115,22,0.95)] flex items-center justify-between"
-                        style={{
-                          top: `${topPercent}%`,
-                          left: `${Math.max(2, bbox.left - 12)}%`,
-                          width: `${bbox.width + 24}%`,
-                        }}
-                      >
-                        <span className="text-[10px] bg-gradient-to-r from-orange-600 to-amber-600 text-white font-black px-2 py-0.5 rounded shadow -translate-y-3.5 flex items-center space-x-1 border border-white/20 whitespace-nowrap">
-                          <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
-                          <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
-                        </span>
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white shadow-md -translate-y-1.5 animate-ping"></span>
-                      </div>
-                    </>
-                  )}
                 </div>
               ) : (
                 /* Fallback SVG Canal & Gauge */
@@ -686,49 +479,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             )}
           </div>
 
-          {/* Top-Left Live / AI Status Badge (Hideable via showOverlays) */}
-          {showOverlays && (
+          {/* Top-Left Live Status Badge (Only in Live mode) */}
+          {showOverlays && viewMode === 'live' && (
             <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
-              {viewMode === 'live' ? (
-                <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
-                  <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-                  <span>LIVE 30 FPS</span>
-                </span>
-              ) : (
-                <span className="flex items-center space-x-1.5 text-[11px] text-teal-200 font-extrabold bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-teal-400/40 shadow-lg">
-                  <CheckCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                  <span>AI REALTIME INSPECTION</span>
-                </span>
-              )}
-              <span className="text-[11px] text-white font-bold bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20 shadow">
-                {station.name.split(' ')[0]}
+              <span className="flex items-center space-x-2 text-xs text-white font-bold bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg">
+                <Camera className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{station.name}</span>
               </span>
-            </div>
-          )}
-
-          {/* Bottom-Left Real Water Level Readout (Minimized when zoomed in or when showOverlays is false) */}
-          {showOverlays && zoomLevel <= 1.0 && (
-            <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-blue-200 text-blue-950 text-xs flex items-center space-x-2 font-bold shadow-xl">
-              <span className={`w-2.5 h-2.5 rounded-full animate-pulse shrink-0 ${
-                displayLevel >= station.critical_level ? 'bg-red-600' :
-                displayLevel >= station.warning_level ? 'bg-amber-500' : 'bg-blue-600'
-              }`}></span>
-              <div>
-                <span className="text-slate-500 font-medium text-[10px] block leading-none">
-                  {viewMode === 'ai_dashboard'
-                    ? `ระดับน้ำตรวจวัด AI (${aiScenario === 'daytime' ? 'กลางวัน' : aiScenario === 'nighttime' ? 'กลางคืน' : aiScenario === 'flood' ? 'วิกฤตน้ำท่วม' : 'สด Live'}):`
-                    : 'ระดับน้ำตรวจวัดล่าสุด:'}
-                </span>
-                <div className="flex items-baseline space-x-1">
-                  <span className={`text-base font-black font-mono leading-tight ${
-                    displayLevel >= station.critical_level ? 'text-red-600' :
-                    displayLevel >= station.warning_level ? 'text-amber-600' : 'text-blue-700'
-                  }`}>
-                    {displayLevel.toFixed(2)}
-                  </span>
-                  <span className="text-[11px] text-slate-700 font-bold">ม. รทก.</span>
-                </div>
-              </div>
             </div>
           )}
 
@@ -789,45 +546,57 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
             {/* Scenario toggle in fullscreen when in ai_dashboard mode */}
             {viewMode === 'ai_dashboard' && (
-              <div className="flex items-center space-x-1 bg-white/10 p-1 rounded-xl border border-white/20 text-xs">
+              <div className="flex items-center space-x-1.5 bg-white/10 p-1 rounded-xl border border-white/20 text-xs flex-wrap">
+                <span className="text-[11px] font-bold text-sky-300 px-1.5 flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                  <span>ชุดผลการตรวจ AI:</span>
+                </span>
                 <button
                   onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'daytime' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
+                    aiScenario === 'daytime' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-300 hover:text-white'
                   }`}
+                  title="ผลลัพธ์ Benchmark สภาพแสงกลางวัน (ความแม่นยำ 92-95%)"
                 >
                   <Sun className="w-3 h-3 text-amber-200 shrink-0" />
-                  <span>☀️ กลางวัน</span>
+                  <span>☀️ กลางวัน (Daytime)</span>
                 </button>
                 <button
                   onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'nighttime' ? 'bg-indigo-600 text-white font-black' : 'text-slate-300 hover:text-white'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
+                    aiScenario === 'nighttime' ? 'bg-indigo-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
                   }`}
+                  title="ผลลัพธ์ Benchmark สภาพแสงกลางคืน / อินฟราเรด"
                 >
                   <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
-                  <span>🌙 กลางคืน</span>
+                  <span>🌙 กลางคืน (Nighttime)</span>
                 </button>
                 {isHatyai && (
                   <button
                     onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                      aiScenario === 'flood' ? 'bg-rose-600 text-white font-black' : 'text-slate-300 hover:text-white'
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
+                      aiScenario === 'flood' ? 'bg-rose-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
                     }`}
+                    title="ผลลัพธ์จำลองสถานการณ์น้ำท่วมสูง (Flood Simulation)"
                   >
                     <Waves className="w-3 h-3 text-rose-200 shrink-0" />
-                    <span>🌊 น้ำท่วม</span>
+                    <span>🌊 จำลองน้ำท่วม (Flood)</span>
                   </button>
                 )}
                 <button
                   onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'live' ? 'bg-emerald-600 text-white font-black' : 'text-slate-300 hover:text-white'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
+                    aiScenario === 'live' ? 'bg-emerald-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
                   }`}
+                  title={isHatyai ? "ประมวลผลโมเดล AI สดจากกล้อง Axis Camera (ta200304.dyndns.info:5001)" : "ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"}
                 >
                   <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
-                  <span>🔴 สด Live</span>
+                  <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (API)' : '🔴 ประมวลผลสด (Live AI)'}</span>
                 </button>
+                <span className="hidden xl:flex items-center space-x-1 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                  <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>Verified Benchmark Dashboard</span>
+                </span>
               </div>
             )}
 
@@ -904,29 +673,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 className="w-full h-full object-contain pointer-events-none"
               />
 
-              {/* Bounding box on live feed inside fullscreen */}
-              {viewMode === 'live' && showOverlays && (
-                <div
-                  className="absolute pointer-events-none border-2 border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(52,211,153,0.8)]"
-                  style={{
-                    left: `${bbox.left}%`,
-                    top: `${bbox.top}%`,
-                    width: `${bbox.width}%`,
-                    height: `${bbox.height}%`,
-                  }}
-                >
-                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-emerald-700/90 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
-                    Staff Gauge: {confidencePercent}%
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Bottom floating info (Hideable via showOverlays) */}
-            {showOverlays && (
+            {/* Bottom floating info (Only in AI dashboard mode) */}
+            {showOverlays && viewMode === 'ai_dashboard' && (
               <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs flex items-center space-x-3">
                 <span className="font-bold text-sky-300">
-                  {viewMode === 'ai_dashboard' ? `ระดับน้ำตรวจวัด AI (${aiScenario.toUpperCase()}):` : 'ระดับน้ำตรวจวัด:'}
+                  ระดับน้ำตรวจวัด AI ({aiScenario.toUpperCase()}):
                 </span>
                 <span className={`font-extrabold text-base font-mono ${
                   displayLevel >= station.critical_level ? 'text-rose-400' :

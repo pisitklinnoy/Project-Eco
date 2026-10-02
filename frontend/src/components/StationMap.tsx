@@ -59,7 +59,7 @@ export const StationMap: React.FC<StationMapProps> = ({
     };
   }, []);
 
-  // 2. Render Circular Dot Markers (แสดงในแผนที่เป็นจุดเหมือนเดิม)
+  // 2. Render Circular Dot Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || stations.length === 0) return;
@@ -81,7 +81,7 @@ export const StationMap: React.FC<StationMapProps> = ({
       polylineRef.current = L.polyline(riverCoords, {
         color: '#0284c7',
         weight: 3.5,
-        opacity: 0.7,
+        opacity: 0.75,
         dashArray: '6, 6',
         lineCap: 'round',
       }).addTo(map);
@@ -122,21 +122,21 @@ export const StationMap: React.FC<StationMapProps> = ({
       const shortName = stn.name.split(' ')[0];
       const distanceToBank = (stn.bank_level - waterLvl).toFixed(2);
 
-      // Clean circular dot marker (จุดวงกลมพร้อมเรดาร์กะพริบ)
+      // Clean circular dot marker
       const iconHtml = `
-        <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
           <!-- Radar Pulse Ring -->
-          <span style="position: absolute; width: 34px; height: 34px; border-radius: 9999px; background-color: ${themeColor}; pointer-events: none;" class="${pingClass}"></span>
+          <span style="position: absolute; width: 36px; height: 36px; border-radius: 9999px; background-color: ${themeColor}; pointer-events: none;" class="${pingClass}"></span>
 
           <!-- Circular Dot -->
           <div style="
             position: relative;
-            width: 28px;
-            height: 28px;
+            width: 30px;
+            height: 30px;
             border-radius: 9999px;
             background-color: ${themeColor};
             border: 2.5px solid #ffffff;
-            box-shadow: ${isSelected ? '0 0 0 3px #0284c7, 0 4px 10px rgba(0,0,0,0.35)' : '0 2px 6px rgba(0,0,0,0.25)'};
+            box-shadow: ${isSelected ? '0 0 0 3px #0284c7, 0 8px 16px rgba(0,0,0,0.3)' : '0 4px 10px rgba(0,0,0,0.2)'};
             color: #ffffff;
             display: flex;
             align-items: center;
@@ -145,7 +145,7 @@ export const StationMap: React.FC<StationMapProps> = ({
             font-weight: 800;
             font-family: monospace;
             transition: all 0.2s ease;
-            ${isSelected ? 'transform: scale(1.15);' : ''}
+            ${isSelected ? 'transform: scale(1.18);' : ''}
           ">
             ${waterLvl.toFixed(1)}
           </div>
@@ -155,8 +155,8 @@ export const StationMap: React.FC<StationMapProps> = ({
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'custom-map-dot-marker',
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
       });
 
       const marker = L.marker([stn.latitude, stn.longitude], { icon: customIcon }).addTo(map);
@@ -169,14 +169,14 @@ export const StationMap: React.FC<StationMapProps> = ({
 
       // Popup Content with detailed elevation criteria and "ม. รทก."
       const popupContent = document.createElement('div');
-      popupContent.className = 'p-1 text-slate-900 font-sans min-w-[240px]';
+      popupContent.className = 'p-1 text-slate-900 font-sans min-w-[250px]';
       popupContent.innerHTML = `
         <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
           <div>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">${stn.station_code}</span>
-            <div class="font-extrabold text-sm text-blue-950 mt-1">${stn.name}</div>
+            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-white">${stn.station_code}</span>
+            <div class="font-extrabold text-sm text-slate-900 mt-1">${stn.name}</div>
           </div>
-          <span class="text-xs px-2 py-0.5 rounded-full font-bold" style="background:${bgBadge}; color:${textBadge}; border:1px solid ${borderBadge}">
+          <span class="text-xs px-2.5 py-0.5 rounded-full font-bold" style="background:${bgBadge}; color:${textBadge}; border:1px solid ${borderBadge}">
             ${statusText}
           </span>
         </div>
@@ -184,21 +184,21 @@ export const StationMap: React.FC<StationMapProps> = ({
         <div class="text-[11px] text-slate-500 mb-2 font-medium">${stn.location_name}</div>
 
         <!-- Live Water Level Box -->
-        <div class="bg-gradient-to-r from-blue-50 to-sky-50 p-2.5 rounded-xl border border-blue-200 mb-2.5">
+        <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80 mb-2.5">
           <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-slate-700">ระดับน้ำตรวจวัดล่าสุด:</span>
+            <span class="font-semibold text-slate-700">ระดับน้ำตรวจวัดล่าสุด:</span>
             <span class="font-extrabold text-base font-mono" style="color: ${themeColor}">
               ${waterLvl.toFixed(2)} ม. รทก.
             </span>
           </div>
-          <div class="text-[10px] text-slate-500 flex justify-between mt-1 pt-1 border-t border-blue-200/60 font-medium">
+          <div class="text-[10px] text-slate-500 flex justify-between mt-1 pt-1 border-t border-slate-200/60 font-medium">
             <span>ระยะห่างก่อนล้นตลิ่ง:</span>
             <span class="font-bold text-slate-800">${distanceToBank} ม.</span>
           </div>
         </div>
 
         <!-- Criteria Table -->
-        <div class="space-y-1 text-[11px] text-slate-600 mb-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+        <div class="space-y-1 text-[11px] text-slate-600 mb-3 bg-slate-50/60 p-2 rounded-xl border border-slate-200/60">
           <div class="flex justify-between">
             <span class="text-slate-500">ระดับตลิ่ง:</span>
             <span class="font-bold text-slate-800">${stn.bank_level.toFixed(2)} ม. รทก.</span>
@@ -217,7 +217,7 @@ export const StationMap: React.FC<StationMapProps> = ({
           </div>
         </div>
 
-        <button id="btn-${stn.station_code}" class="w-full bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white text-xs font-bold py-2 px-3 rounded-xl shadow-md transition flex items-center justify-center space-x-1">
+        <button id="btn-${stn.station_code}" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2 px-3 rounded-xl shadow-md transition flex items-center justify-center space-x-1 cursor-pointer">
           <span>เลือกสถานีนี้ & ดูกล้อง CCTV</span>
         </button>
       `;
@@ -241,22 +241,22 @@ export const StationMap: React.FC<StationMapProps> = ({
   }, [stations, selectedStation, latestWater, measurementsByStation, onSelectStation]);
 
   return (
-    <div className="bg-white border-2 border-blue-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col h-full min-h-[480px]">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[36px] bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] transition-all hover:shadow-[0_25px_60px_-15px_rgba(2,132,199,0.08)] flex flex-col h-full min-h-[480px]">
       
       {/* Map Header with Threshold Legend & Flow Direction */}
-      <div className="px-4 py-3 bg-gradient-to-r from-blue-50/95 via-sky-50/60 to-white border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-md shadow-blue-500/20">
+      <div className="px-5 py-4 bg-white/60 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-sm">
             <MapPin className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-sm font-bold text-slate-900 font-display tracking-tight">
               แผนที่ภูมิสารสนเทศ (GIS) ลุ่มน้ำคลองอู่ตะเภา
             </h2>
-            <div className="flex items-center space-x-2 text-[11px] text-slate-500 font-medium">
+            <div className="flex items-center space-x-2 text-[11px] text-slate-500 font-medium mt-0.5">
               <span>จุดตรวจวัด 3 สถานีหลัก (ม. รทก.)</span>
               <span className="text-slate-300">•</span>
-              <span className="inline-flex items-center space-x-1 text-sky-800 bg-sky-100/80 px-2 py-0.5 rounded-md border border-sky-200 text-[10px] font-extrabold">
+              <span className="inline-flex items-center space-x-1 text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200/60 text-[10px] font-semibold">
                 <Navigation className="w-3 h-3 text-sky-600 rotate-45 shrink-0" />
                 <span>การไหล: สะเดา &rarr; บางศาลา &rarr; หาดใหญ่</span>
               </span>
@@ -265,23 +265,23 @@ export const StationMap: React.FC<StationMapProps> = ({
         </div>
 
         {/* Legend Pills strictly matching dot colors */}
-        <div className="flex items-center space-x-1.5 text-xs bg-white/90 p-1 rounded-xl border border-blue-200/80 shadow-sm">
-          <span className="flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 text-emerald-800 font-bold text-[11px]">
+        <div className="flex items-center space-x-1.5 text-xs bg-slate-50/90 p-1 rounded-2xl border border-slate-200/60 shadow-sm">
+          <span className="flex items-center space-x-1.5 bg-emerald-50/80 px-2.5 py-1 rounded-xl border border-emerald-200 text-emerald-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>ปกติ</span>
           </span>
-          <span className="flex items-center space-x-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 text-amber-800 font-bold text-[11px]">
+          <span className="flex items-center space-x-1.5 bg-amber-50/80 px-2.5 py-1 rounded-xl border border-amber-200 text-amber-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
             <span>เตือนภัย</span>
           </span>
-          <span className="flex items-center space-x-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 text-rose-800 font-bold text-[11px]">
+          <span className="flex items-center space-x-1.5 bg-rose-50/80 px-2.5 py-1 rounded-xl border border-rose-200 text-rose-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-rose-500"></span>
             <span>วิกฤต</span>
           </span>
         </div>
       </div>
 
-      {/* Map Canvas - Completely clean and unobstructed */}
+      {/* Map Canvas - Clean and unobstructed */}
       <div className="relative flex-1 w-full min-h-[420px]">
         <div ref={mapContainerRef} className="w-full h-full" />
       </div>

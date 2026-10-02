@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import type { Station, CalibrationPoint } from '../types';
 import { Target, CheckCircle2, RotateCcw, Save, X, Info } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
+import { PillButton } from './ui/PillButton';
+import { IconButton } from './ui/IconButton';
 
 interface ClickToCalibrateModalProps {
   isOpen: boolean;
@@ -92,42 +94,39 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white border-2 border-blue-200 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xl animate-fade-in">
+      <div className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[32px] sm:rounded-[36px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white border-b border-blue-100 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+        <div className="px-6 py-5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-sm">
               <Target className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-blue-950 flex items-center space-x-2">
+              <h2 className="text-base font-bold font-display text-slate-900 flex items-center space-x-2">
                 <span>Click-to-Calibrate: สอบเทียบสเกลเสาวัดน้ำด้วยการคลิก</span>
-                <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold font-mono">
+                <span className="text-xs bg-slate-900 text-white px-2.5 py-0.5 rounded-full font-bold font-mono">
                   {station.station_code}
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
                 คลิกมาร์ก 2 จุดบนเสาในภาพ เพื่อหาอัตราส่วนพิกเซลต่อเมตรโดยไม่ต้องรู้ความสูงของยอดเสาหรือโคนเสาจริง
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <IconButton onClick={onClose} variant="ghost" size="sm" tooltip="ปิดหน้าต่าง">
+            <X className="w-5 h-5 text-slate-400 hover:text-slate-700" />
+          </IconButton>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/40">
+        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-transparent">
           {/* Left Canvas/Image Area (8 Cols) */}
           <div className="lg:col-span-8 flex flex-col space-y-3">
             {/* Guide Badge */}
-            <div className="bg-white border border-blue-200/80 rounded-xl px-4 py-2.5 text-xs flex items-center justify-between shadow-sm">
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
               <div className="flex items-center space-x-2 text-slate-700 font-medium">
-                <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                <Info className="w-4 h-4 text-sky-600 shrink-0" />
                 <span>
                   {!point1
                     ? 'ขั้นตอนที่ 1: คลิกที่ขีดตัวเลขบนเสาด้านบน (เช่น ขีด 4.0 ม.)'
@@ -138,15 +137,15 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
               </div>
               <button
                 onClick={handleReset}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center space-x-1 underline"
+                className="text-xs text-sky-700 hover:text-sky-900 font-bold flex items-center space-x-1 cursor-pointer"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span>รีเซ็ต</span>
               </button>
             </div>
 
             {/* Clickable Camera Viewport */}
-            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border-2 border-blue-200 shadow-md select-none cursor-crosshair">
+            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 shadow-md select-none cursor-crosshair">
               {station.camera_stream_url ? (
                 <img
                   ref={imgRef}
@@ -167,11 +166,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
                   style={{ left: `${point1.x}px`, top: `${point1.y}px` }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg animate-ping absolute" />
-                  <div className="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg relative flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white shadow-lg animate-ping absolute" />
+                  <div className="w-4 h-4 rounded-full bg-sky-600 border-2 border-white shadow-lg relative flex items-center justify-center">
                     <span className="text-[8px] font-bold text-white">1</span>
                   </div>
-                  <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow">
+                  <span className="bg-sky-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
                     จุดที่ 1 ({val1}ม.)
                   </span>
                 </div>
@@ -183,11 +182,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
                   style={{ left: `${point2.x}px`, top: `${point2.y}px` }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg animate-ping absolute" />
+                  <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg animate-ping absolute" />
                   <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg relative flex items-center justify-center">
                     <span className="text-[8px] font-bold text-white">2</span>
                   </div>
-                  <span className="bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow">
+                  <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
                     จุดที่ 2 ({val2}ม.)
                   </span>
                 </div>
@@ -211,13 +210,13 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
               {/* Test Click Water Measurement Line */}
               {testClickY !== null && (
                 <div
-                  className="absolute inset-x-0 pointer-events-none border-b-2 border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)] flex items-center justify-between px-4"
+                  className="absolute inset-x-0 pointer-events-none border-b-2 border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex items-center justify-between px-4"
                   style={{ top: `${testClickY}px` }}
                 >
-                  <span className="text-[10px] font-bold bg-yellow-400 text-slate-950 px-1.5 py-0.5 rounded -translate-y-3">
+                  <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full -translate-y-3">
                     ผิวน้ำที่ทดสอบคลิก
                   </span>
-                  <span className="text-xs font-mono font-bold bg-white text-yellow-800 px-2 py-0.5 rounded border border-yellow-400 -translate-y-3 shadow">
+                  <span className="text-xs font-mono font-bold bg-white text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400 -translate-y-3 shadow">
                     {testMeasuredLevel} เมตร
                   </span>
                 </div>
@@ -227,16 +226,16 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 
           {/* Right Parameters & Readout Area (4 Cols) */}
           <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
-            <div className="space-y-4 bg-white p-5 rounded-2xl border border-blue-200/80 shadow-sm">
-              <h3 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
+            <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+              <h3 className="text-xs font-bold font-display text-slate-900 uppercase tracking-wider">
                 กำหนดค่าความสูงจุดอ้างอิงบนเสา
               </h3>
 
               {/* Value 1 Input */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <label className="text-xs text-slate-600 font-semibold flex items-center justify-between">
                   <span>ระดับความสูงจุดที่ 1 (ม.)</span>
-                  <span className="text-blue-600 text-[11px] font-mono font-bold">
+                  <span className="text-sky-600 text-[11px] font-mono font-bold">
                     {point1 ? `Y: ${point1.y}px` : 'ยังไม่ได้คลิก'}
                   </span>
                 </label>
@@ -245,12 +244,12 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   step="0.1"
                   value={val1}
                   onChange={(e) => setVal1(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
 
               {/* Value 2 Input */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <label className="text-xs text-slate-600 font-semibold flex items-center justify-between">
                   <span>ระดับความสูงจุดที่ 2 (ม.)</span>
                   <span className="text-emerald-600 text-[11px] font-mono font-bold">
@@ -262,20 +261,20 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   step="0.1"
                   value={val2}
                   onChange={(e) => setVal2(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
 
               {/* Calculation Result */}
               {pixelsPerMeter && (
-                <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 space-y-1 text-xs">
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
                   <div className="flex justify-between items-center text-slate-700">
                     <span className="font-semibold">อัตราส่วนมาตราส่วน:</span>
-                    <span className="font-bold text-blue-700 font-mono text-sm">
+                    <span className="font-bold text-sky-700 font-display text-sm">
                       {pixelsPerMeter.toFixed(2)} px/m
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono pt-1 border-t border-blue-100">
+                  <div className="text-[11px] text-slate-500 font-mono pt-1 border-t border-slate-200/60">
                     Formula: {Math.abs(val1 - val2)}m / {Math.abs(point2!.y - point1!.y)}px
                   </div>
                 </div>
@@ -291,22 +290,27 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 
             {/* Bottom Actions */}
             <div className="flex items-center space-x-3">
-              <button
+              <PillButton
                 type="button"
                 onClick={onClose}
-                className="w-1/3 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition"
+                variant="secondary"
+                size="md"
+                className="w-1/3 justify-center text-xs font-semibold"
               >
                 ยกเลิก
-              </button>
-              <button
+              </PillButton>
+              <PillButton
                 type="button"
                 disabled={!point1 || !point2 || saving || saveSuccess}
                 onClick={handleSave}
-                className="w-2/3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/20 transition"
+                variant="primary"
+                size="md"
+                loading={saving}
+                icon={<Save className="w-4 h-4" />}
+                className="w-2/3 justify-center text-xs font-semibold shadow-md"
               >
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'กำลังบันทึก...' : 'บันทึกค่าปรับเทียบ'}</span>
-              </button>
+                {saving ? 'กำลังบันทึก...' : 'บันทึกค่าปรับเทียบ'}
+              </PillButton>
             </div>
           </div>
         </div>
@@ -314,3 +318,5 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     </div>
   );
 };
+
+export default ClickToCalibrateModal;

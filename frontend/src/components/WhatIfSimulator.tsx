@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import type { Station, ForecastRecord } from '../types';
-import { Sliders, CloudRain, Waves, ShieldAlert, RefreshCw, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Sliders, CloudRain, Waves, ShieldAlert, AlertTriangle, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
+import { PillButton } from './ui/PillButton';
 
 interface WhatIfSimulatorProps {
   station: Station | null;
@@ -20,7 +21,9 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
   const [gateR1Open, setGateR1Open] = useState<number>(50); // 0 to 100 %
   const [seaTideSurge, setSeaTideSurge] = useState<number>(0.0); // 0.0 to 1.5 m
 
+  const [activePreset, setActivePreset] = useState<'normal' | 'storm' | 'critical' | 'relief' | 'custom'>('normal');
   const [loading, setLoading] = useState<boolean>(false);
+  const [appliedSuccess, setAppliedSuccess] = useState<boolean>(false);
 
   // Hydrological simulation calculation in real-time
   const simulation = useMemo(() => {
@@ -61,6 +64,8 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
 
   // Preset Handlers
   const applyPreset = (preset: 'normal' | 'storm' | 'critical' | 'relief') => {
+    setActivePreset(preset);
+    setAppliedSuccess(false);
     switch (preset) {
       case 'normal':
         setRainSurge(0);
@@ -101,6 +106,8 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
       if (onApplySimulation) {
         onApplySimulation(res);
       }
+      setAppliedSuccess(true);
+      setTimeout(() => setAppliedSuccess(false), 3000);
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการส่งค่าจำลอง');
     } finally {
@@ -109,46 +116,62 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
   };
 
   return (
-    <div className="bg-white border-2 border-blue-100 rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(2,132,199,0.08)] hover:shadow-[0_8px_30px_-4px_rgba(2,132,199,0.12)] transition-all flex flex-col space-y-5">
+    <div className="relative overflow-hidden rounded-[32px] sm:rounded-[36px] bg-white/85 backdrop-blur-2xl border border-white/80 p-6 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] transition-all flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-sm">
             <Sliders className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-extrabold text-blue-950 flex items-center space-x-2">
-              <span>"What-If" Flood Simulator: ห้องทดลองจำลองสถานการณ์น้ำท่วมล่วงหน้า</span>
+            <h3 className="text-base font-bold font-display text-slate-900 flex items-center space-x-2">
+              <span>"What-If" Flood Simulator: ห้องทดลองจำลองสถานการณ์น้ำท่วม</span>
             </h3>
-            <p className="text-xs text-slate-500">
-              ปรับสไลเดอร์ฝนตกหนัก มวลน้ำต้นน้ำ ประตูระบายน้ำ ร.1 และน้ำทะเลสาบหนุน เพื่อวิเคราะห์ผลกระทบแบบเรียลไทม์
+            <p className="text-xs text-slate-500 mt-0.5">
+              ปรับสไลเดอร์ฝนตกหนัก มวลน้ำหลาก ประตูระบายน้ำ คลอง ร.1 และน้ำทะเลสาบหนุน เพื่อวิเคราะห์ผลกระทบแบบเรียลไทม์
             </p>
           </div>
         </div>
 
         {/* Quick Presets */}
-        <div className="flex items-center space-x-1.5 flex-wrap">
+        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
           <button
             onClick={() => applyPreset('normal')}
-            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[11px] font-bold text-blue-700 border border-blue-200 transition"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activePreset === 'normal'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100/80 hover:bg-slate-200/80 text-slate-700'
+            }`}
           >
             ☀️ สภาวะปกติ
           </button>
           <button
             onClick={() => applyPreset('storm')}
-            className="px-3 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-[11px] font-bold text-sky-700 border border-sky-300 transition"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activePreset === 'storm'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'bg-sky-50 hover:bg-sky-100 text-sky-800'
+            }`}
           >
             ⛈️ พายุฝนตกหนัก
           </button>
           <button
             onClick={() => applyPreset('critical')}
-            className="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-[11px] font-bold text-rose-700 border border-rose-200 transition"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activePreset === 'critical'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-800'
+            }`}
           >
             🚨 วิกฤติน้ำล้นตลิ่ง
           </button>
           <button
             onClick={() => applyPreset('relief')}
-            className="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[11px] font-bold text-emerald-700 border border-emerald-200 transition"
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activePreset === 'relief'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+            }`}
           >
             🛡️ ผันน้ำเต็มสูบ
           </button>
@@ -158,15 +181,15 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
       {/* Main Grid: Sliders (7 Cols) & Real-time Outcome Card (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sliders Area (7 Cols) */}
-        <div className="lg:col-span-7 space-y-3.5">
+        <div className="lg:col-span-7 space-y-4">
           {/* Slider 1: Rain Surge */}
-          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
+          <div className="space-y-2 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 transition-all hover:bg-slate-50">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+              <span className="flex items-center space-x-2 text-slate-800 font-semibold">
                 <CloudRain className="w-4 h-4 text-sky-600" />
                 <span>ปริมาณฝนสะสมเพิ่มเติม (พื้นที่ อ.สะเดา / หาดใหญ่)</span>
               </span>
-              <span className="font-mono font-extrabold text-sky-700 text-sm">+{rainSurge} มม.</span>
+              <span className="font-display font-extrabold text-sky-700 text-sm">+{rainSurge} มม.</span>
             </div>
             <input
               type="range"
@@ -174,8 +197,11 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               max="150"
               step="5"
               value={rainSurge}
-              onChange={(e) => setRainSurge(Number(e.target.value))}
-              className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+              onChange={(e) => {
+                setRainSurge(Number(e.target.value));
+                setActivePreset('custom');
+              }}
+              className="w-full accent-slate-900 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>0 มม. (ไม่มีฝน)</span>
@@ -185,13 +211,13 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
           </div>
 
           {/* Slider 2: Upstream Inflow Surge */}
-          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
+          <div className="space-y-2 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 transition-all hover:bg-slate-50">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
-                <Waves className="w-4 h-4 text-blue-600" />
+              <span className="flex items-center space-x-2 text-slate-800 font-semibold">
+                <Waves className="w-4 h-4 text-sky-600" />
                 <span>มวลน้ำหลากจากสะพานบางศาลา (ตอนบน)</span>
               </span>
-              <span className="font-mono font-extrabold text-blue-700 text-sm">+{upstreamSurge}%</span>
+              <span className="font-display font-extrabold text-sky-700 text-sm">+{upstreamSurge}%</span>
             </div>
             <input
               type="range"
@@ -199,8 +225,11 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               max="100"
               step="5"
               value={upstreamSurge}
-              onChange={(e) => setUpstreamSurge(Number(e.target.value))}
-              className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+              onChange={(e) => {
+                setUpstreamSurge(Number(e.target.value));
+                setActivePreset('custom');
+              }}
+              className="w-full accent-slate-900 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>0% (ไหลตามปกติ)</span>
@@ -210,13 +239,13 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
           </div>
 
           {/* Slider 3: Khlong R.1 Gate Open */}
-          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
+          <div className="space-y-2 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 transition-all hover:bg-slate-50">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+              <span className="flex items-center space-x-2 text-slate-800 font-semibold">
                 <ShieldAlert className="w-4 h-4 text-emerald-600" />
                 <span>การเปิดประตูระบายน้ำ คลอง ร.1 (ผันน้ำเลี่ยงเมืองหาดใหญ่)</span>
               </span>
-              <span className="font-mono font-extrabold text-emerald-700 text-sm">{gateR1Open}%</span>
+              <span className="font-display font-extrabold text-emerald-700 text-sm">{gateR1Open}%</span>
             </div>
             <input
               type="range"
@@ -224,7 +253,10 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               max="100"
               step="5"
               value={gateR1Open}
-              onChange={(e) => setGateR1Open(Number(e.target.value))}
+              onChange={(e) => {
+                setGateR1Open(Number(e.target.value));
+                setActivePreset('custom');
+              }}
               className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
@@ -235,13 +267,13 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
           </div>
 
           {/* Slider 4: Sea Tide Surge */}
-          <div className="space-y-1.5 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
+          <div className="space-y-2 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 transition-all hover:bg-slate-50">
             <div className="flex justify-between items-center text-xs">
-              <span className="flex items-center space-x-1.5 text-slate-800 font-bold">
+              <span className="flex items-center space-x-2 text-slate-800 font-semibold">
                 <Waves className="w-4 h-4 text-indigo-600" />
                 <span>ระดับน้ำทะเลสาบสงขลาหนุนสูง (Sea Tide)</span>
               </span>
-              <span className="font-mono font-extrabold text-indigo-700 text-sm">+{seaTideSurge.toFixed(1)} ม.</span>
+              <span className="font-display font-extrabold text-indigo-700 text-sm">+{seaTideSurge.toFixed(1)} ม.</span>
             </div>
             <input
               type="range"
@@ -249,7 +281,10 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
               max="1.5"
               step="0.1"
               value={seaTideSurge}
-              onChange={(e) => setSeaTideSurge(Number(e.target.value))}
+              onChange={(e) => {
+                setSeaTideSurge(Number(e.target.value));
+                setActivePreset('custom');
+              }}
               className="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
@@ -261,23 +296,23 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
         </div>
 
         {/* Real-time Outcome Card (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between space-y-4 bg-gradient-to-br from-blue-50/90 via-sky-50/40 to-white p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
+        <div className="lg:col-span-5 flex flex-col justify-between space-y-5 rounded-[28px] bg-gradient-to-br from-slate-50 via-white to-sky-50/40 p-6 border border-slate-200/80 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.04)]">
           <div>
-            <div className="flex justify-between items-start mb-3">
+            <div className="flex justify-between items-start mb-4">
               <div>
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
                   ผลการคำนวณระดับน้ำจำลอง
                 </span>
-                <div className="flex items-baseline space-x-2 mt-1">
+                <div className="flex items-baseline space-x-2.5 mt-1.5">
                   <span
-                    className={`text-4xl font-extrabold font-mono tracking-tight ${
+                    className={`text-4xl sm:text-5xl font-extrabold font-display tracking-tight ${
                       simulation.isBankBreach
                         ? 'text-rose-600 animate-pulse'
                         : simulation.isCritical
                         ? 'text-rose-600'
                         : simulation.isWarning
                         ? 'text-amber-600'
-                        : 'text-blue-700'
+                        : 'text-slate-900'
                     }`}
                   >
                     {simulation.simulatedLevel.toFixed(2)}
@@ -285,7 +320,7 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
                   <span className="text-sm font-semibold text-slate-600">ม. รทก.</span>
                   {simulation.totalDelta !== 0 && (
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded font-mono shadow-sm ${
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full font-mono shadow-sm ${
                         simulation.totalDelta > 0
                           ? 'bg-rose-100 text-rose-800 border border-rose-200'
                           : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -299,14 +334,14 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
 
               {/* Status Badge */}
               <span
-                className={`text-xs px-3 py-1 rounded-full font-bold flex items-center space-x-1 shadow-sm ${
+                className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center space-x-1.5 shadow-sm border ${
                   simulation.isBankBreach
-                    ? 'bg-rose-600 text-white animate-bounce'
+                    ? 'bg-rose-600 text-white animate-bounce border-rose-700'
                     : simulation.isCritical
-                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
                     : simulation.isWarning
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 }`}
               >
                 {simulation.isBankBreach ? (
@@ -328,42 +363,43 @@ export const WhatIfSimulator: React.FC<WhatIfSimulatorProps> = ({
             </div>
 
             {/* Simulated 1h - 3h Forecast Horizon */}
-            <div className="bg-white rounded-xl p-3.5 border border-blue-200/80 shadow-sm space-y-2 mt-4">
-              <span className="text-[11px] text-blue-950 font-bold block mb-1">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-2 mt-4">
+              <span className="text-xs text-slate-800 font-bold block mb-1">
                 ผลพยากรณ์ล่วงหน้าภายใต้สภาวะจำลองนี้:
               </span>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
                   <span className="text-[10px] text-slate-500 font-medium block">+1 ชม.</span>
-                  <span className="font-mono font-extrabold text-blue-900 text-sm">{simulation.p1} ม.</span>
+                  <span className="font-display font-bold text-slate-900 text-sm">{simulation.p1} ม.</span>
                 </div>
-                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
-                  <span className="text-[10px] text-slate-500 font-medium block">+2 ชม.</span>
-                  <span className="font-mono font-extrabold text-amber-700 text-sm">{simulation.p2} ม.</span>
+                <div className="bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/60">
+                  <span className="text-[10px] text-amber-700 font-medium block">+2 ชม.</span>
+                  <span className="font-display font-bold text-amber-700 text-sm">{simulation.p2} ม.</span>
                 </div>
-                <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
-                  <span className="text-[10px] text-slate-500 font-medium block">+3 ชม.</span>
-                  <span className="font-mono font-extrabold text-rose-700 text-sm">{simulation.p3} ม.</span>
+                <div className="bg-rose-50/50 p-2.5 rounded-xl border border-rose-200/60">
+                  <span className="text-[10px] text-rose-700 font-medium block">+3 ชม.</span>
+                  <span className="font-display font-bold text-rose-700 text-sm">{simulation.p3} ม.</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Action Trigger Button */}
-          <button
+          <PillButton
             onClick={handleApplyToForecast}
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-md shadow-blue-500/20"
+            variant="primary"
+            size="md"
+            icon={appliedSuccess ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <ArrowUpRight className="w-4 h-4" />}
+            loading={loading}
+            className="w-full justify-center !py-3 font-semibold text-xs shadow-md"
           >
-            {loading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <ArrowUpRight className="w-4 h-4" />
-            )}
-            <span>นำผลจำลองไปแสดงบนกราฟพยากรณ์หลัก</span>
-          </button>
+            {appliedSuccess ? 'อัปเดตผลสู่กราฟหลักสำเร็จ!' : 'นำผลจำลองไปแสดงบนกราฟพยากรณ์หลัก'}
+          </PillButton>
         </div>
       </div>
     </div>
   );
 };
+
+export default WhatIfSimulator;

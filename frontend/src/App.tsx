@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Station, WaterMeasurement, ForecastRecord, AlertEvent } from './types';
 import { floodlensApi } from './api/floodlensApi';
 import { Navbar } from './components/Navbar';
+import { FloatingSidebar } from './components/FloatingSidebar';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { HeroSection } from './components/HeroSection';
+import { SectionHeader } from './components/ui/SectionHeader';
 import { StationMap } from './components/StationMap';
 import { TelemetryCard } from './components/TelemetryCard';
 import { ForecastChart } from './components/ForecastChart';
@@ -10,7 +14,7 @@ import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
 import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
-import { Waves, Sliders, TrendingUp } from 'lucide-react';
+import { Waves } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
@@ -25,6 +29,9 @@ export const App: React.FC = () => {
   const [triggeringForecast, setTriggeringForecast] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
+
+  // Active section tracking for floating navbar & sidebar
+  const [activeSection, setActiveSection] = useState<string>('hero');
 
   // Fetch telemetry for all active stations
   const loadAllStationMeasurements = useCallback(async (stnList: Station[]) => {
@@ -102,6 +109,41 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [loadStationData, loadAllStationMeasurements, stations]);
 
+  // Handle section scrolling observer
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'simulation', 'forecast-alerts'];
+      const scrollPos = window.scrollY + 200;
+
+      for (const sectionId of sections) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPos >= top && scrollPos < top + height) {
+            setActiveSection(sectionId);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleNavigate = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const offsetTop = element.getBoundingClientRect().top + window.scrollY - 90;
+      window.scrollTo({
+        top: Math.max(0, offsetTop),
+        behavior: 'smooth',
+      });
+    }
+  };
+
   // Handle Manual Forecast Trigger
   const handleTriggerForecast = async () => {
     if (!selectedStation) return;
@@ -119,52 +161,73 @@ export const App: React.FC = () => {
 
   if (loading && stations.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#f0f7ff] to-[#e0effe] flex flex-col items-center justify-center text-slate-700">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg shadow-blue-500/20" />
-        <h2 className="text-lg font-extrabold text-blue-950">กำลังโหลดระบบเฝ้าระวังน้ำท่วมหาดใหญ่...</h2>
-        <p className="text-xs text-slate-500 mt-1">Connecting to Hatyai FloodLens AI Ecosystem</p>
+      <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center text-slate-800">
+        <div className="relative">
+          <div className="w-14 h-14 rounded-full border-4 border-slate-900 border-t-transparent animate-spin mb-4 shadow-xl" />
+          <Waves className="w-6 h-6 text-sky-600 absolute top-4 left-4" />
+        </div>
+        <h2 className="text-xl font-bold font-display text-slate-900 mt-2">Hatyai FloodLens AI</h2>
+        <p className="text-xs text-slate-500 mt-1">Connecting to intelligent flood telemetry ecosystem...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f0f7ff] via-[#f8fbff] to-[#e6f2fc] text-slate-800 flex flex-col font-sans">
-      {/* Navigation Header (Clean Executive Layout without external dev links) */}
+    <div className="min-h-screen bg-[#F5F7FA] text-slate-800 flex flex-col font-sans selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
+      
+      {/* Subtle Ambient Background Gradient Orbs */}
+      <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-sky-100/35 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed bottom-1/4 right-10 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[140px] pointer-events-none -z-10" />
+
+      {/* Floating Desktop Sidebar Navigation Rail */}
+      <FloatingSidebar
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        onOpenReview={() => setIsReviewOpen(true)}
+        onOpenCalibrate={() => setIsCalibrateOpen(true)}
+        onRefresh={loadStationData}
+        loading={loading}
+      />
+
+      {/* Floating Top Glass Capsule Navbar */}
       <Navbar
         stations={stations}
         selectedStation={selectedStation}
         onSelectStation={setSelectedStation}
         systemStatus="healthy"
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        alertCount={alerts.filter((a) => a.severity_level === 'CRITICAL').length}
       />
 
-      {/* Main Dashboard Workspace */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 space-y-10 w-full">
+      {/* Main Workspace with generous spacing & Bento architecture */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-16 w-full lg:pl-24">
         
+        {/* ========================================================= */}
+        {/* HERO SECTION: Editorial Luxury Spatial Overview           */}
+        {/* ========================================================= */}
+        <HeroSection
+          station={selectedStation}
+          measurement={measurement}
+          stations={stations}
+          stationMeasurements={stationMeasurements}
+          onExploreClick={() => handleNavigate('gis-cctv')}
+          onSimulateClick={() => handleNavigate('simulation')}
+          onOpenReview={() => setIsReviewOpen(true)}
+          onSelectStation={setSelectedStation}
+        />
+
         {/* ========================================================= */}
         {/* SECTION 1: GIS Map & Real-Time Telemetry & CCTV Zoom      */}
         {/* ========================================================= */}
-        <section className="space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-blue-200/80 gap-2">
-            <div className="flex items-center space-x-3">
-              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-md shadow-blue-600/30">
-                01
-              </span>
-              <div>
-                <h2 className="text-base font-extrabold text-blue-950 tracking-tight flex items-center space-x-2">
-                  <span>แผนที่ภูมิสารสนเทศ (GIS) และศูนย์ตรวจการณ์กล้อง CCTV สด (AI Vision)</span>
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  ตรวจวัดระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามแนวลุ่มน้ำคลองอู่ตะเภา พร้อมระบบซูมตรวจสอบสเกลเสาวัดน้ำ
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex items-center space-x-1.5 text-xs px-3 py-1 rounded-full bg-blue-100/80 text-blue-800 font-bold border border-blue-200 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
-                <span>อัปเดตอัตโนมัติทุก 30 วินาที</span>
-              </span>
-            </div>
-          </div>
+        <section className="space-y-6" id="gis-cctv">
+          <SectionHeader
+            number="01"
+            badge="GIS & AI Vision"
+            title="แผนที่ภูมิสารสนเทศ (GIS) และศูนย์ตรวจการณ์กล้อง AI Vision"
+            subtitle="ตรวจวัดระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามแนวลุ่มน้ำคลองอู่ตะเภา พร้อมระบบซูมตรวจสอบสเกลเสาวัดน้ำ"
+            actionLabel="อัปเดตอัตโนมัติ 30s"
+          />
 
           {/* Strategic Telemetry Summary Ribbon */}
           <TelemetryCard
@@ -175,8 +238,8 @@ export const App: React.FC = () => {
             onOpenReview={() => setIsReviewOpen(true)}
           />
 
-          {/* Side-by-Side: GIS Map (50%) & CCTV Live Stream with Zoom (50%) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          {/* Bento Row: GIS Map (50%) & CCTV Live Stream with Zoom (50%) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch" id="cctv-inspector">
             {/* GIS Map with Accurate 'ม. รทก.' & Color-coded Risk Dots */}
             <div className="h-[540px]">
               <StationMap
@@ -203,26 +266,14 @@ export const App: React.FC = () => {
         {/* ========================================================= */}
         {/* SECTION 2: What-If Flood Scenario Simulation              */}
         {/* ========================================================= */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-sky-300/80 gap-2">
-            <div className="flex items-center space-x-3">
-              <span className="w-8 h-8 rounded-xl bg-sky-600 text-white font-extrabold flex items-center justify-center text-sm shadow-md shadow-sky-600/30">
-                02
-              </span>
-              <div>
-                <h2 className="text-base font-extrabold text-blue-950 tracking-tight flex items-center space-x-2">
-                  <span>ห้องทดลองจำลองสถานการณ์น้ำท่วม (What-If Flood Scenario Simulator)</span>
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  ทดสอบผลกระทบของการเปลี่ยนแปลงสภาพอากาศ ฝนตกหนัก มวลน้ำหลาก และการบริหารจัดการประตูน้ำ
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex items-center space-x-1.5 text-xs px-3 py-1 rounded-full bg-sky-100 text-sky-800 font-bold border border-sky-200 shadow-sm">
-              <Sliders className="w-3.5 h-3.5 text-sky-700" />
-              <span>Interactive Simulator</span>
-            </span>
-          </div>
+        <section className="space-y-6" id="simulation">
+          <SectionHeader
+            number="02"
+            badge="What-If Simulator"
+            title="ห้องทดลองจำลองสถานการณ์น้ำท่วม (What-If Flood Scenario Simulator)"
+            subtitle="ทดสอบผลกระทบของการเปลี่ยนแปลงสภาพอากาศ ฝนตกหนัก มวลน้ำหลาก และการบริหารจัดการประตูน้ำ"
+            actionLabel="Interactive Modeler"
+          />
 
           <WhatIfSimulator
             station={selectedStation}
@@ -234,29 +285,17 @@ export const App: React.FC = () => {
         {/* ========================================================= */}
         {/* SECTION 3: Forecast Horizon & Emergency Alerts Feed       */}
         {/* ========================================================= */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-indigo-200/80 gap-2">
-            <div className="flex items-center space-x-3">
-              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-sm shadow-md shadow-indigo-600/30">
-                03
-              </span>
-              <div>
-                <h2 className="text-base font-extrabold text-blue-950 tracking-tight flex items-center space-x-2">
-                  <span>ระบบพยากรณ์ระดับน้ำล่วงหน้า 1–3 ชม. และศูนย์แจ้งเตือนภัยฉุกเฉิน</span>
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  ประเมินแนวโน้มมวลน้ำด้วยแบบจำลอง และระบบส่งข้อความเตือนภัยเข้าสู่ LINE Messaging Outbox
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex items-center space-x-1.5 text-xs px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-200 shadow-sm">
-              <TrendingUp className="w-3.5 h-3.5 text-indigo-700" />
-              <span>Early Warning Horizon</span>
-            </span>
-          </div>
+        <section className="space-y-6" id="forecast-alerts">
+          <SectionHeader
+            number="03"
+            badge="Early Warning Horizon"
+            title="ระบบพยากรณ์ระดับน้ำล่วงหน้า 1–3 ชม. และศูนย์แจ้งเตือนภัยฉุกเฉิน"
+            subtitle="ประเมินแนวโน้มมวลน้ำด้วยแบบจำลอง AI และระบบส่งข้อความเตือนภัยเข้าสู่ LINE Messaging Outbox"
+            actionLabel="3h Prediction"
+          />
 
+          {/* Bento Asymmetric Row: Forecast Chart (8 Cols) & Alerts Feed (4 Cols) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Forecast Chart (Left 8 Cols) */}
             <div className="lg:col-span-8">
               <ForecastChart
                 station={selectedStation}
@@ -267,7 +306,6 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Alerts Feed (Right 4 Cols) */}
             <div className="lg:col-span-4">
               <AlertsList
                 alerts={alerts}
@@ -297,17 +335,29 @@ export const App: React.FC = () => {
         onCalibrationSaved={loadStationData}
       />
 
-      {/* Footer */}
-      <footer className="border-t border-blue-200/80 bg-white py-6 text-center text-xs text-slate-600 shadow-inner">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center space-x-2">
-            <Waves className="w-4 h-4 text-blue-600" />
-            <span className="font-extrabold text-blue-950">Hatyai FloodLens Platform</span>
-            <span>&bull; ศูนย์ข้อมูลน้ำท่วมเทศบาลนครหาดใหญ่</span>
+      {/* Mobile Floating Bottom Bar */}
+      <MobileBottomNav
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        alertCount={alerts.filter((a) => a.severity_level === 'CRITICAL').length}
+      />
+
+      {/* Floating Glass Footer Capsule */}
+      <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-16 lg:mb-6 lg:pl-24">
+        <div className="rounded-[32px] bg-white/70 backdrop-blur-xl border border-white/80 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center">
+              <Waves className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold font-display text-slate-900 text-sm block">Hatyai FloodLens Platform</span>
+              <span>ศูนย์ข้อมูลน้ำท่วมเทศบาลนครหาดใหญ่ &bull; ลุ่มน้ำคลองอู่ตะเภา จ.สงขลา</span>
+            </div>
           </div>
-          <p className="text-slate-500 font-medium">
-            ระบบสนับสนุนการตัดสินใจและแจ้งเตือนภัยน้ำท่วมล่วงหน้า &bull; ลุ่มน้ำคลองอู่ตะเภา จ.สงขลา
-          </p>
+          <div className="flex items-center space-x-2 text-[11px] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-slate-700">ระบบเฝ้าระวังอัตโนมัติทำงานปกติ</span>
+          </div>
         </div>
       </footer>
     </div>

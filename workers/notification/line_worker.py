@@ -5,7 +5,7 @@ from datetime import datetime
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_TARGET_ID = os.getenv("LINE_TARGET_USER_OR_GROUP_ID", "")
 
-def send_async_line_notification(ctx, payload: dict):
+async def send_async_line_notification(ctx, payload: dict):
     """
     Task handler สำหรับส่งข้อความแจ้งเตือนภัยผ่าน LINE Messaging API
     """

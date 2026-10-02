@@ -47,20 +47,25 @@ app.add_middleware(
 )
 
 # OpenTelemetry Tracing Setup
-try:
-    resource = Resource.create({"service.name": "floodlens_backend"})
-    provider = TracerProvider(resource=resource)
-    processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.otel_exporter_endpoint, insecure=True))
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    print(f"[OpenTelemetry] Tracing initialized -> OTLP: {settings.otel_exporter_endpoint}")
-except Exception as e:
-    print(f"[OpenTelemetry] Setup note: {e}")
+# OpenTelemetry Tracing Setup (Optional in local development)
+enable_otel = os.getenv("ENABLE_OTEL", "false").lower() in ("true", "1")
+if enable_otel:
+    try:
+        resource = Resource.create({"service.name": "floodlens_backend"})
+        provider = TracerProvider(resource=resource)
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.otel_exporter_endpoint, insecure=True))
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        print(f"[OpenTelemetry] Tracing initialized -> OTLP: {settings.otel_exporter_endpoint}")
+    except Exception as e:
+        print(f"[OpenTelemetry] Setup note: {e}")
 
 tracer = trace.get_tracer("floodlens_backend")
 
 @app.middleware("http")
 async def trace_requests_middleware(request, call_next):
+    if not enable_otel:
+        return await call_next(request)
     span_name = f"{request.method} {request.url.path}"
     with tracer.start_as_current_span(span_name) as span:
         span.set_attribute("http.method", request.method)

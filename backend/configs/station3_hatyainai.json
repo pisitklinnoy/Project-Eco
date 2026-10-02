@@ -1,0 +1,48 @@
+{
+  "station_name": "Hatyainai_X44",
+  "thai_name": "สถานีสะพานหาดใหญ่นอก (คลองอู่ตะเภา)",
+  "station_code": "X.44",
+  "camera_name": "SCCCRN_Hatyainai",
+  "location": "Hatyainai Bridge, Lower Khlong U-Tapao, Hat Yai, Songkhla",
+  "station_id": 469,
+  "station_group_id": 1269,
+  "reference_frame_resolution": [1920, 1080],
+  "staff_gauge_polygon": {
+    "top_left": [1334, 80],
+    "top_right": [1367, 80],
+    "bottom_right": [1284, 1075],
+    "bottom_left": [1262, 1075]
+  },
+  "rectified_roi": {
+    "width": 40,
+    "height": 1120
+  },
+  "enhanced_roi": {
+    "upscale_factor": 2.0,
+    "width": 80,
+    "height": 2240
+  },
+  "junction_description": "รอยต่อระหว่างเลข 1 กับเลข 9 (Junction Between 1 and 9)",
+  "piecewise_anchors": [
+    [9.00, 0],
+    [8.00, 202],
+    [7.00, 422],
+    [6.00, 642],
+    [5.00, 871],
+    [4.00, 1095],
+    [3.00, 1350],
+    [2.00, 1600],
+    [1.00, 1860],
+    [0.60, 2140]
+  ],
+  "unit": "meters",
+  "datum": "R.T.K.",
+  "warning_thresholds": {
+    "normal_m": 4.5,
+    "warning_m": 5.5,
+    "critical_flood_m": 6.0
+  },
+  "baseline_water_level_m": 0.60,
+  "baseline_water_y_px": 2140,
+  "calibration_bias_m": 0.0
+}

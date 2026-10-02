@@ -12,11 +12,14 @@ class WaterService:
         ).order_by(desc(WaterMeasurement.timestamp)).first()
         
         if not meas:
-            # Seed mock current measurement
+            from models.station import Station
+            stn = db.query(Station).filter(Station.station_code == station_code).first()
+            base = stn.normal_level if stn else 3.0
+            # Seed initial current measurement
             meas = WaterMeasurement(
                 station_code=station_code,
                 timestamp=datetime.utcnow(),
-                water_level=round(random.uniform(2.8, 3.4), 2),
+                water_level=round(base + random.uniform(-0.1, 0.2), 2),
                 source_type="CAMERA_VISION",
                 vision_confidence=0.92
             )
@@ -34,12 +37,13 @@ class WaterService:
         ).order_by(WaterMeasurement.timestamp.asc()).all()
 
         if not records:
-            # Generate simulated smooth sequence
-            base_level = 2.8
+            from models.station import Station
+            stn = db.query(Station).filter(Station.station_code == station_code).first()
+            base_level = stn.normal_level if stn else 3.0
             now = datetime.utcnow()
             for i in range(hours, 0, -1):
                 t = now - timedelta(hours=i)
-                w = round(base_level + (random.uniform(-0.1, 0.2)), 2)
+                w = round(base_level + (random.uniform(-0.15, 0.15)), 2)
                 records.append(WaterMeasurement(
                     station_code=station_code,
                     timestamp=t,

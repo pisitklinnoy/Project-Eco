@@ -16,8 +16,8 @@ def get_recent_alerts(limit: int = 10, db: Session = Depends(get_db)):
 
 @router.post("/test-trigger", response_model=AlertResponse)
 def test_trigger_alert(
-    station_code: str = "STN-HY01",
-    level: float = 4.3,
+    station_code: str = "STN-BANGSALA",
+    level: float = 8.5,
     severity: str = "CRITICAL",
     db: Session = Depends(get_db)
 ):

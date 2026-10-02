@@ -14,7 +14,7 @@ DB_USER = os.getenv("POSTGRES_USER", "admin")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "password123")
 DB_NAME = os.getenv("POSTGRES_DB", "hatyai_flood_db")
 
-def process_vision_task(ctx, payload: dict):
+async def process_vision_task(ctx, payload: dict):
     """
     Task handler สำหรับประมวลผลระดับน้ำจากภาพกล้อง CCTV
     """
@@ -39,7 +39,7 @@ def process_vision_task(ctx, payload: dict):
     detect_res = mock_detector.detect_water_level(img_bytes, station_code=station_code)
     
     # ตรวจสอบผ่าน Quality Gate
-    q_eval = QualityGate.evaluate(img_bytes, detect_res)
+    q_eval = QualityGate.evaluate(img_bytes, detect_res, station_code=station_code)
     print(f"[Vision Worker] Quality Gate Status: {q_eval['status']} (Reason: {q_eval['reason']})")
 
     # บันทึกผลลัพธ์ลง PostgreSQL

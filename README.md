@@ -69,7 +69,7 @@ cd backend && uv run uvicorn main:app --reload
 
 ### 3. ตรวจสอบการทำงานผ่าน Web UIs
 | บริการ (Service) | URL | ข้อมูลการเข้าสู่ระบบ (Credentials) |
-| :--- | :--- | :--- |
+| **Web Dashboard (Frontend)** | [http://localhost:3001](http://localhost:3001) | - |
 | **FastAPI Swagger Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | - |
 | **MLflow Model Registry** | [http://localhost:5000](http://localhost:5000) | - |
 | **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `minioadmin` / `minioadmin` |

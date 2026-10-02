@@ -38,7 +38,7 @@ STATION_CONFIG_MAP = {
 STATION_STREAM_MAP = {
     "STN-MUANGKONG": "https://hatyaicityclimate.org/floodphoto/last/muangkong.jpg",
     "STN-BANGSALA": "https://hatyaicityclimate.org/floodphoto/last/bangsala.jpg",
-    "STN-HATYAINAI": "https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg",
+    "STN-HATYAINAI": "http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi",
 }
 
 
@@ -80,6 +80,37 @@ class VisionService:
                 return k
         return None
 
+    def _fetch_axis_frame(self, stream_url: str) -> Optional[np.ndarray]:
+        """ดึงภาพสดจากกล้อง Axis Camera (ta200304.dyndns.info) ด้วย Basic Auth"""
+        import base64
+        import socket
+        try:
+            # ตรวจสอบการเชื่อมต่อ Port 5001 แบบรวดเร็ว (1.5 วินาที) ไม่ให้ระบบค้าง
+            host = "ta200304.dyndns.info"
+            port = 5001
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1.5)
+            res = sock.connect_ex((host, port))
+            sock.close()
+            if res != 0:
+                print(f"[VisionService] Axis Camera {host}:{port} offline/unreachable (code {res})")
+                return None
+
+            # ดึง snapshot จาก image.cgi
+            snapshot_url = "http://ta200304.dyndns.info:5001/axis-cgi/jpg/image.cgi"
+            req = urllib.request.Request(snapshot_url)
+            creds = ('%s:%s' % ('live', 'Live2025!')).encode('ascii')
+            req.add_header('Authorization', 'Basic %s' % base64.b64encode(creds).decode('ascii'))
+            req.add_header('User-Agent', 'Mozilla/5.0 HatyaiFloodLens/1.0')
+            with urllib.request.urlopen(req, timeout=4.0) as resp:
+                if resp.status == 200:
+                    img_data = resp.read()
+                    pil_img = Image.open(io.BytesIO(img_data)).convert("RGB")
+                    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            print(f"[VisionService] Error fetching Axis frame: {e}")
+        return None
+
     def fetch_live_frame(self, station_code: str) -> Optional[np.ndarray]:
         """ดึงภาพสดจากกล้อง CCTV ของสถานีแบบเรียลไทม์"""
         norm_key = "STN-MUANGKONG" if "MUANGKONG" in station_code.upper() else \
@@ -89,6 +120,14 @@ class VisionService:
         stream_url = STATION_STREAM_MAP.get(norm_key, None)
         if not stream_url:
             return None
+
+        # กรณีเป็นกล้อง Axis สะพานหาดใหญ่นอก / ที่ว่าการ อ.หาดใหญ่
+        if "ta200304" in stream_url:
+            axis_frame = self._fetch_axis_frame(stream_url)
+            if axis_frame is not None:
+                return axis_frame
+            # Fallback ไปยัง hatyaicityclimate ถ้า Axis ออฟไลน์
+            stream_url = "https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg"
 
         try:
             req = urllib.request.Request(

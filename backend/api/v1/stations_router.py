@@ -86,6 +86,31 @@ def get_cctv_analysis_image(station_code: str, mode: str = "live", db: Session =
     })
 
 
+@router.get("/{station_code}/live-feed.jpg")
+def get_station_live_camera_feed(station_code: str):
+    """
+    ดึงภาพเฟรมสดจากกล้อง CCTV ของสถานี (รวมกล้อง Axis ta200304 และ hatyaicity)
+    ส่งกลับเป็นภาพ JPEG ผ่าน Backend Proxy เพื่อหลีกเลี่ยงปัญหา CORS/Basic Auth ใน Browser
+    """
+    from fastapi.responses import Response
+    from services.vision_service import vision_service
+    import cv2
+    
+    frame = vision_service.fetch_live_frame(station_code)
+    if frame is None:
+        raise HTTPException(status_code=503, detail="CCTV stream currently unreachable")
+    
+    success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to encode image frame")
+        
+    return Response(content=buffer.tobytes(), media_type="image/jpeg", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    })
+
+
 @router.get("/{station_code}/vision-metadata")
 def get_vision_metadata(station_code: str):
     """
@@ -97,4 +122,5 @@ def get_vision_metadata(station_code: str):
     if not meta:
         raise HTTPException(status_code=404, detail="Station vision metadata not found")
     return meta
+
 

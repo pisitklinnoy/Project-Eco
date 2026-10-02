@@ -8,7 +8,8 @@ class StationService:
         stations = db.query(Station).filter(Station.is_active == True).all()
         # Check if real stations already exist
         has_real_stations = any(s.station_code in ["STN-BANGSALA", "STN-MUANGKONG", "STN-HATYAINAI"] for s in stations)
-        if not stations or not has_real_stations:
+        hatyai_stn = next((s for s in stations if s.station_code == "STN-HATYAINAI"), None)
+        if not stations or not has_real_stations or (hatyai_stn and "ta200304" not in (hatyai_stn.camera_stream_url or "")):
             stations = StationService.seed_initial_stations(db)
         return stations
 
@@ -61,7 +62,7 @@ class StationService:
                 critical_level=6.0,
                 bank_level=9.0,
                 camera_id="CAM-HATYAINAI",
-                camera_stream_url="https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg",
+                camera_stream_url="http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi",
                 is_active=True
             )
         ]

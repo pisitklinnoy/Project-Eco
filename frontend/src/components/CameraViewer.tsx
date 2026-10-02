@@ -71,6 +71,9 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Camera feed stream source state for Hatyai (Axis vs Proxy vs Climate)
+  const [hatyaiSource, setHatyaiSource] = useState<'backend_proxy' | 'axis_stream' | 'climate_snapshot'>('backend_proxy');
+
   useEffect(() => {
     setImgError(false);
     // Reset zoom when switching station
@@ -80,7 +83,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     if (aiScenario === 'flood' && !station?.station_code.toUpperCase().includes('HATYAI') && !station?.station_code.toUpperCase().includes('X.44')) {
       setAiScenario('daytime');
     }
-  }, [station?.station_code]);
+    if (isHatyai) {
+      setHatyaiSource('backend_proxy');
+    }
+  }, [station?.station_code, isHatyai]);
 
   // Auto refresh image every 60s
   useEffect(() => {
@@ -93,9 +99,40 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   if (!station) return null;
 
   const currentLevel = measurement ? measurement.water_level : station.normal_level;
-  const streamUrl = station.camera_stream_url
-    ? `${station.camera_stream_url}?t=${refreshKey}`
-    : null;
+
+  const getActiveStreamUrl = () => {
+    if (!station) return null;
+    if (isHatyai) {
+      if (hatyaiSource === 'axis_stream') {
+        return `http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi`;
+      }
+      if (hatyaiSource === 'backend_proxy') {
+        return `/api/v1/stations/${encodeURIComponent(station.station_code)}/live-feed.jpg?t=${refreshKey}`;
+      }
+      return `https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg?t=${refreshKey}`;
+    }
+    return station.camera_stream_url
+      ? `${station.camera_stream_url}?t=${refreshKey}`
+      : null;
+  };
+
+  const streamUrl = getActiveStreamUrl();
+
+  const handleImageError = () => {
+    if (isHatyai) {
+      if (hatyaiSource === 'axis_stream') {
+        console.warn('[CameraViewer] Axis direct stream failed, switching to backend proxy');
+        setHatyaiSource('backend_proxy');
+        return;
+      }
+      if (hatyaiSource === 'backend_proxy') {
+        console.warn('[CameraViewer] Backend proxy failed, switching to climate snapshot');
+        setHatyaiSource('climate_snapshot');
+        return;
+      }
+    }
+    setImgError(true);
+  };
 
   // Dynamic vs static fallback AI dashboard URLs
   const getAiDashboardUrls = (code: string, scenario: 'daytime' | 'nighttime' | 'flood' | 'live') => {
@@ -242,13 +279,17 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 <h3 className="text-sm font-black text-slate-900 tracking-tight">
                   กล้อง CCTV สด & AI ตรวจวัดเสาน้ำ
                 </h3>
-                <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full border border-slate-200">
-                  {station.camera_id || station.station_code}
+                <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                  isHatyai
+                    ? 'bg-sky-50 text-sky-800 border-sky-300 font-extrabold shadow-xs'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
+                  {isHatyai ? 'Axis TA200304' : (station.camera_id || station.station_code)}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
                 {viewMode === 'live'
-                  ? 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE) พร้อมวาดกรอบตรวจจับ AI'
+                  ? (isHatyai ? 'สตรีมสด Axis Camera (ที่ว่าการ อ.หาดใหญ่) พร้อมวาดกรอบตรวจจับ AI' : 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE) พร้อมวาดกรอบตรวจจับ AI')
                   : 'การวิเคราะห์ AI Realtime: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
               </p>
             </div>
@@ -281,6 +322,67 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Hatyai Axis Camera Dedicated Ribbon */}
+        {isHatyai && (
+          <div className="px-5 py-2 bg-gradient-to-r from-sky-50/90 via-blue-50/40 to-white border-b border-sky-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-bold text-slate-800 text-[11px]">
+                Axis Network Camera (TA200304) &bull; ข้างที่ว่าการ อ.หาดใหญ่
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono bg-white px-2 py-0.5 rounded-md border border-slate-200 hidden md:inline">
+                ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi
+              </span>
+            </div>
+
+            {viewMode === 'live' ? (
+              <div className="flex items-center space-x-1 bg-white p-0.5 rounded-xl border border-slate-200 text-[10px]">
+                <button
+                  onClick={() => { setHatyaiSource('backend_proxy'); setImgError(false); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                    hatyaiSource === 'backend_proxy'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="สตรีมสดผ่าน Backend Proxy (Auto Basic Auth & Fast Response)"
+                >
+                  <Sparkles className="w-3 h-3 text-sky-400" />
+                  <span>Proxy สด</span>
+                </button>
+                <button
+                  onClick={() => { setHatyaiSource('axis_stream'); setImgError(false); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                    hatyaiSource === 'axis_stream'
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="เชื่อมต่อสตรีมตรง http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi"
+                >
+                  <Radio className="w-3 h-3 text-white" />
+                  <span>Axis Direct</span>
+                </button>
+                <button
+                  onClick={() => { setHatyaiSource('climate_snapshot'); setImgError(false); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
+                    hatyaiSource === 'climate_snapshot'
+                      ? 'bg-slate-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="ภาพสำรองจาก HatyaiCity Climate"
+                >
+                  <span>ภาพสำรอง</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1 text-[11px] text-sky-800 font-medium">
+                <span className="bg-sky-100 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold text-sky-900">
+                  AI Model: {aiScenario === 'live' ? 'Axis Camera Live API' : aiScenario.toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Toolbar: Zoom Controls & Inspector Actions */}
         <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -436,15 +538,15 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
                 <button
                   onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 ${
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer ${
                     aiScenario === 'live'
                       ? 'bg-emerald-600 text-white shadow-sm font-black'
                       : 'text-emerald-300 hover:text-white hover:bg-emerald-950/60'
                   }`}
-                  title="ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"
+                  title={isHatyai ? "ประมวลผลโมเดล AI สดจากกล้อง Axis Camera (ta200304.dyndns.info:5001)" : "ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"}
                 >
                   <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
-                  <span>🔴 ประมวลผลสด (Live AI)</span>
+                  <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (API)' : '🔴 ประมวลผลสด (Live AI)'}</span>
                 </button>
               </div>
             </div>
@@ -455,6 +557,19 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 <span>Verified Benchmark Dashboard</span>
               </span>
             </div>
+
+            {/* Live Axis Stream AI Detection Information Banner */}
+            {isHatyai && aiScenario === 'live' && (
+              <div className="w-full mt-2 pt-2 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-1 text-[11px] text-emerald-300">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span>โมเดล AI กำลังประมวลผลดึงภาพสดจากกล้อง Axis Camera: ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi</span>
+                </span>
+                <span className="bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] text-emerald-200 font-mono">
+                  Station: X.44 Hatyainai
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -499,7 +614,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   <img
                     src={streamUrl}
                     alt={station.name}
-                    onError={() => setImgError(true)}
+                    onError={handleImageError}
                     className="w-full h-full object-cover object-center pointer-events-none"
                   />
 

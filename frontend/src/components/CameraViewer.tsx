@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Waves,
+  Columns,
 } from 'lucide-react';
 
 interface CameraViewerProps {
@@ -40,7 +41,13 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [viewMode, setViewMode] = useState<'live' | 'ai_dashboard'>('live');
 
   // AI Scenario: 'daytime' | 'nighttime' | 'flood' | 'live'
-  const [aiScenario, setAiScenario] = useState<'daytime' | 'nighttime' | 'flood' | 'live'>('daytime');
+  const [aiScenario, setAiScenario] = useState<'daytime' | 'nighttime' | 'flood' | 'live'>('live');
+
+  // AI View Mode: 'cctv' = Full 16:9 CCTV view with Bounding Box | 'gauge' = High-Res Staff Gauge Scale Ruler | 'composite' = Stitched dual view
+  const [aiViewType, setAiViewType] = useState<'cctv' | 'gauge' | 'composite'>('cctv');
+
+  // Overlay Mode: 'bbox' = Green rectangular Bounding Box as preferred
+  const overlayMode = 'bbox';
 
   const isHatyai = Boolean(
     station?.station_code.toUpperCase().includes('HATYAI') ||
@@ -58,6 +65,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [showOverlays, setShowOverlays] = useState<boolean>(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const modalContainerRef = useRef<HTMLDivElement>(null);
 
   // Camera feed stream source state for Hatyai (Axis vs Proxy vs Climate)
   const [hatyaiSource, setHatyaiSource] = useState<'backend_proxy' | 'axis_stream' | 'climate_snapshot'>('backend_proxy');
@@ -75,13 +83,14 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     }
   }, [station?.station_code, isHatyai]);
 
-  // Auto refresh image every 60s
+  // Auto refresh image: 12s in Live AI mode, 60s otherwise
   useEffect(() => {
+    const intervalMs = (viewMode === 'ai_dashboard' && aiScenario === 'live') ? 12000 : 60000;
     const timer = setInterval(() => {
       setRefreshKey(Date.now());
-    }, 60000);
+    }, intervalMs);
     return () => clearInterval(timer);
-  }, []);
+  }, [viewMode, aiScenario]);
 
   if (!station) return null;
 
@@ -122,7 +131,12 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   };
 
   // Dynamic vs static fallback AI dashboard URLs
-  const getAiDashboardUrls = (code: string, scenario: 'daytime' | 'nighttime' | 'flood' | 'live') => {
+  const getAiDashboardUrls = (
+    code: string,
+    scenario: 'daytime' | 'nighttime' | 'flood' | 'live',
+    overlay: 'bbox' | 'polygon',
+    viewType: 'cctv' | 'gauge' | 'composite'
+  ) => {
     const upper = code.toUpperCase();
     const normCode = (upper.includes('MUANGKONG') || upper.includes('173A')) ? 'STN-MUANGKONG' :
                      (upper.includes('BANGSALA') || upper.includes('90')) ? 'STN-BANGSALA' :
@@ -132,14 +146,16 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     if (scenario === 'flood') fallbackFilename = `${normCode}_flood.jpg`;
     else if (scenario === 'nighttime') fallbackFilename = `${normCode}_night.jpg`;
 
-    const dynamicUrl = `/api/v1/stations/${encodeURIComponent(code)}/cctv-analysis.jpg?mode=${scenario}&t=${refreshKey}`;
+    const dynamicUrl = `/api/v1/stations/${encodeURIComponent(code)}/cctv-analysis.jpg?mode=${scenario}&overlay=${overlay}&view=${viewType}&t=${refreshKey}`;
     const staticUrl = `/ai_dashboards/${fallbackFilename}?t=${refreshKey}`;
     return { dynamicUrl, staticUrl };
   };
 
   const { dynamicUrl: aiDashboardUrl, staticUrl: staticFallbackUrl } = getAiDashboardUrls(
     station.station_code,
-    aiScenario
+    aiScenario,
+    overlayMode,
+    aiViewType
   );
 
   const getBenchmarkLevel = (code: string, scenario: 'daytime' | 'nighttime' | 'flood' | 'live', liveLvl: number) => {
@@ -197,16 +213,39 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     setIsDragging(false);
   };
 
-  // Mouse Wheel Zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.2 : 0.2;
-    setZoomLevel((prev) => {
-      const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), 3.5);
-      if (next === 1.0) setPan({ x: 0, y: 0 });
-      return next;
-    });
-  };
+  // Native non-passive Wheel Event Listeners to prevent browser window scrolling while zooming
+  useEffect(() => {
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.2 : 0.2;
+      const maxZoom = isFullscreen ? 4.0 : 3.5;
+      setZoomLevel((prev) => {
+        const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), maxZoom);
+        if (next === 1.0) setPan({ x: 0, y: 0 });
+        return next;
+      });
+    };
+
+    const containerEl = containerRef.current;
+    if (containerEl) {
+      containerEl.addEventListener('wheel', handleNativeWheel, { passive: false });
+    }
+
+    const modalEl = modalContainerRef.current;
+    if (modalEl) {
+      modalEl.addEventListener('wheel', handleNativeWheel, { passive: false });
+    }
+
+    return () => {
+      if (containerEl) {
+        containerEl.removeEventListener('wheel', handleNativeWheel);
+      }
+      if (modalEl) {
+        modalEl.removeEventListener('wheel', handleNativeWheel);
+      }
+    };
+  }, [isFullscreen]);
 
   const zoomPercent = Math.round(zoomLevel * 100);
 
@@ -417,8 +456,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] ${
+          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] touch-none overscroll-contain ${
             zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
           }`}
         >
@@ -429,21 +467,23 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
             }}
           >
-            {/* VIEW MODE 1: REALTIME AI MODEL DASHBOARD (Crop เสาสด + ไม้บรรทัดดิจิทัล + ตีกรอบ) */}
+            {/* VIEW MODE 1: REALTIME AI MODEL DASHBOARD */}
             {viewMode === 'ai_dashboard' ? (
-              <img
-                key={`${station.station_code}-${aiScenario}`}
-                src={aiDashboardUrl}
-                alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
-                onError={(e) => {
-                  // Fallback to static public image if dynamic endpoint is temporarily unavailable
-                  const target = e.target as HTMLImageElement;
-                  if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
-                    target.src = staticFallbackUrl;
-                  }
-                }}
-                className="w-full h-full object-contain pointer-events-none"
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  key={`${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
+                  src={aiDashboardUrl}
+                  alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
+                  onError={(e) => {
+                    // Fallback to static public image if dynamic endpoint is temporarily unavailable
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
+                      target.src = staticFallbackUrl;
+                    }
+                  }}
+                  className="w-full h-full object-cover object-center pointer-events-none"
+                />
+              </div>
             ) : (
               /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Video Feed) */
               streamUrl && !imgError ? (
@@ -479,8 +519,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             )}
           </div>
 
-          {/* Top-Left Live Status Badge (Only in Live mode) */}
-          {showOverlays && viewMode === 'live' && (
+          {/* Top-Left Station Status Badge */}
+          {showOverlays && (
             <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
               <span className="flex items-center space-x-2 text-xs text-white font-bold bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg">
                 <Camera className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -593,6 +633,47 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
                   <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (API)' : '🔴 ประมวลผลสด (Live AI)'}</span>
                 </button>
+
+                {/* Fullscreen AI View Type Toggle: CCTV Bounding Box vs Gauge Scale vs Split */}
+                <div className="flex items-center space-x-1 bg-black/50 p-1 rounded-xl border border-white/20 text-xs ml-1">
+                  <button
+                    onClick={() => { setAiViewType('cctv'); handleResetZoom(); }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                      aiViewType === 'cctv'
+                        ? 'bg-blue-600 text-white shadow-sm font-black'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                    title="แสดงภาพมุมกว้างกล้อง CCTV พร้อมกรอบ Bounding Box"
+                  >
+                    <Camera className="w-3 h-3 text-sky-200" />
+                    <span>กล้อง CCTV</span>
+                  </button>
+                  <button
+                    onClick={() => { setAiViewType('gauge'); handleResetZoom(); }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                      aiViewType === 'gauge'
+                        ? 'bg-emerald-600 text-white shadow-sm font-black'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                    title="แสดงเฉพาะสเกลเสาวัดน้ำดิจิทัล (Ruler)"
+                  >
+                    <Sliders className="w-3 h-3 text-amber-300" />
+                    <span>สเกลเสา</span>
+                  </button>
+                  <button
+                    onClick={() => { setAiViewType('composite'); handleResetZoom(); }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                      aiViewType === 'composite'
+                        ? 'bg-slate-700 text-white shadow-sm font-black'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                    title="แสดงภาพรวมคู่ (Split)"
+                  >
+                    <Columns className="w-3 h-3 text-white" />
+                    <span>ภาพรวมคู่</span>
+                  </button>
+                </div>
+
                 <span className="hidden xl:flex items-center space-x-1 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-lg text-[10px] font-bold">
                   <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
                   <span>Verified Benchmark Dashboard</span>
@@ -643,12 +724,12 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
           {/* Modal Image Viewport */}
           <div
+            ref={modalContainerRef}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
-            className={`flex-1 relative bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-white/15 ${
+            className={`flex-1 relative bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-white/15 touch-none overscroll-contain ${
               zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
             }`}
           >
@@ -659,7 +740,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               }}
             >
               <img
-                key={`fullscreen-${station.station_code}-${aiScenario}`}
+                key={`fullscreen-${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
                 src={viewMode === 'ai_dashboard' ? aiDashboardUrl : (streamUrl || '')}
                 alt={station.name}
                 onError={(e) => {

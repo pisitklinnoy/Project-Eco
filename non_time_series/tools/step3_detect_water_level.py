@@ -23,6 +23,7 @@ from core.pole_coordinates import PoleCoordinateManager
 from core.scale_calibrator import PiecewiseScaleCalibrator
 from core.water_surface_detector import WaterSurfaceDetector
 from core.excel_logger import WaterLevelExcelLogger
+from core.auto_localizer import StaffGaugeAutoLocalizer
 
 CONFIG_MAP = {
     "muangkong": os.path.join(BASE_DIR, "configs", "station1_muangkong.json"),
@@ -37,7 +38,7 @@ DEFAULT_IMAGES = {
 }
 
 
-def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg, image_path):
+def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg, image_path, yolo_info=None):
     """
     เรนเดอร์ภาพ Dashboard แบบ 100% ตามมาตรฐาน verify_daytime_normal.jpg
     - ซ้าย: เสา Enhanced พร้อมสเกลไม้บรรทัด Dark Theme (พื้นหลังดำ 26, 26, 26 ขีดระดับเมตรสีเหลืองทอง)
@@ -69,20 +70,68 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
     scale_y = target_frame_h / float(fh)
     station_code = cfg.get("station_code", "Unknown")
 
-    # 3. วาดกรอบเสาสีเขียวและเส้นระดับน้ำสีส้มบนภาพ CCTV
-    # 3. วาดกรอบเสาสีเขียวและเส้นระดับน้ำสีส้มบนภาพ CCTV
-    if station_code == "X.44" and pole_mgr.has_polygon:
-        # สไตล์สถานีสะพานหาดใหญ่นอก (X.44) ตามแบบฉบับ result_hatyai_nighttime_normal.jpg / result_hatayi_daytime_generate_flood.jpg
+    # 3. วาดการตรวจจับของ YOLO (Water-Area และ Staff Gauge) บนภาพ CCTV
+    has_yolo = (yolo_info is not None and yolo_info.get("confidence") is not None and "YOLO" in str(yolo_info.get("method", "")))
+    yolo_conf = yolo_info.get("confidence", 0.85) if has_yolo else 0.85
+
+    # 3. วาดการตรวจจับของ YOLO เฉพาะ Staff Gauge บนภาพ CCTV
+    gauge_poly = yolo_info.get("gauge_polygon") if yolo_info else None
+    if gauge_poly is not None and len(gauge_poly) >= 3:
+        g_scaled = (gauge_poly * np.array([scale_x, scale_y])).astype(np.int32)
+        overlay_g = frame_resized.copy()
+        cv2.fillPoly(overlay_g, [g_scaled], (0, 255, 0))
+        cv2.addWeighted(overlay_g, 0.22, frame_resized, 0.78, 0, frame_resized)
+        cv2.polylines(frame_resized, [g_scaled], True, (0, 255, 0), 2, cv2.LINE_AA)
+
+        min_gpt = g_scaled.reshape(-1, 2).min(axis=0)
+        label_text = f"YOLOv8-Seg: Staff Gauge ({yolo_conf*100:.1f}%)"
+        (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        g_bx = max(10, int(min_gpt[0]))
+        g_by = max(th + 14, int(min_gpt[1]))
+        cv2.rectangle(frame_resized, (g_bx - 1, g_by - th - base - 8), (g_bx + tw + 14, g_by), (0, 200, 0), -1)
+        cv2.putText(frame_resized, label_text, (g_bx + 6, g_by - base - 3),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
+
+    elif station_code == "X.44" and pole_mgr.has_polygon:
         pts_src = pole_mgr.last_pts_src.copy()
         fx1 = int(round(pts_src[:, 0].min() * scale_x))
         fy1 = int(round(pts_src[:, 1].min() * scale_y))
         fx2 = int(round(pts_src[:, 0].max() * scale_x))
         fy2 = int(round(pts_src[:, 1].max() * scale_y))
         cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
-        cv2.putText(frame_resized, "Staff Gauge", (fx1 - 10, max(30, fy1 - 10)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+        label_text = f"YOLOv8-Seg: Staff Gauge ({yolo_conf*100:.1f}%)" if has_yolo else "Staff Gauge"
+        (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        badge_y1 = max(0, fy1 - th - base - 10)
+        cv2.rectangle(frame_resized, (fx1 - 1, badge_y1), (fx1 + tw + 14, fy1), (0, 200, 0), -1)
+        cv2.putText(frame_resized, label_text, (fx1 + 6, fy1 - base - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
 
-        # แปลงพิกัด water_y จาก Enhanced ROI เข้าสู่ระนาบมุมกล้อง CCTV
+    elif station_code == "X.90":
+        pts = pole_mgr.last_pts_src
+        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
+        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
+        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+        label_text = f"YOLOv8-Seg: Staff Gauge ({yolo_conf*100:.1f}%)" if has_yolo else "Staff Gauge X.90"
+        (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        badge_y1 = max(0, fy1 - th - base - 10)
+        cv2.rectangle(frame_resized, (fx1 - 1, badge_y1), (fx1 + tw + 14, fy1), (0, 200, 0), -1)
+        cv2.putText(frame_resized, label_text, (fx1 + 6, fy1 - base - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
+
+    else:
+        pts = pole_mgr.last_pts_src
+        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
+        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
+        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+        label_text = f"YOLOv8-Seg: Staff Gauge ({yolo_conf*100:.1f}%)" if has_yolo else "Staff Gauge"
+        (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        badge_y1 = max(0, fy1 - th - base - 10)
+        cv2.rectangle(frame_resized, (fx1 - 1, badge_y1), (fx1 + tw + 14, fy1), (0, 200, 0), -1)
+        cv2.putText(frame_resized, label_text, (fx1 + 6, fy1 - base - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
+
+    # 3.3 วาดเส้นระดับน้ำสีส้มบนแม่น้ำ
+    if station_code == "X.44" and pole_mgr.has_polygon:
         rect_h = cfg.get("rectified_roi", {}).get("height", 1120)
         enh_h = cfg.get("enhanced_roi", {}).get("height", 2240)
         rect_w = cfg.get("rectified_roi", {}).get("width", 40)
@@ -101,26 +150,10 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
         cv2.line(frame_resized, (line_x1, water_y_frame), (line_x2, water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
         cv2.putText(frame_resized, f"Water: {water_level:.2f} m", (line_x2 + 8, water_y_frame + 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 140, 255), 2, cv2.LINE_AA)
-    elif station_code == "X.90":
-        # สไตล์สถานีสะพานบางศาลา (X.90) ตามแบบฉบับ result_bangsala_daytime_normal.jpg / result_bangsala_nighttime.jpg
-        pts = pole_mgr.last_pts_src
-        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
-        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
-        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
-        cv2.putText(frame_resized, "Staff Gauge X.90", (fx1 - 10, max(25, fy1 - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
-        norm_y = water_y / float(gh)
-        water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
-        cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
-                 (min(target_frame_w, fx2 + 70), water_y_frame), (0, 140, 255), 3, cv2.LINE_AA)
     else:
-        # สไตล์สถานีบ้านม่วงก็อง (X.173A) ตามแบบฉบับ result_muang_kong_daytime_normal.jpg / result_muang_kong_nighttime_normal.jpg
         pts = pole_mgr.last_pts_src
         fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
         fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
-        cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
-        cv2.putText(frame_resized, "Staff Gauge", (fx1 - 10, max(25, fy1 - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
         norm_y = water_y / float(gh)
         water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
         cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
@@ -149,10 +182,11 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
         status_color = (0, 255, 120)
         status_text = "NORMAL LEVEL"
 
+    ai_tag = " | YOLOv8-Seg AI" if has_yolo else ""
     if station_code == "X.44":
         # Station 3: Hatyainai Benchmark Format
-        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (STATION X.44 HATYAINAI)",
-                    (25, 40), cv2.FONT_HERSHEY_DUPLEX, 0.85, (220, 220, 220), 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (STATION X.44 HATYAINAI){ai_tag}",
+                    (25, 40), cv2.FONT_HERSHEY_DUPLEX, 0.78, (220, 220, 220), 2, cv2.LINE_AA)
         cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
                     (25, 82), cv2.FONT_HERSHEY_DUPLEX, 1.05, status_color, 2, cv2.LINE_AA)
         disp_y = int(round(water_y / 2.0))
@@ -160,7 +194,7 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
                     (1100, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (180, 180, 180), 2, cv2.LINE_AA)
     elif station_code == "X.90":
         # Station 2: Bangsala Benchmark Format
-        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (X.90)",
+        cv2.putText(canvas, f"AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (X.90){ai_tag}",
                     (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.70, (220, 220, 220), 2, cv2.LINE_AA)
         cv2.putText(canvas, f"Confidence: {confidence*100:.1f}% | Anchor Y: {water_y} px",
                     (canvas.shape[1] - 460, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 215, 255), 1, cv2.LINE_AA)
@@ -168,7 +202,7 @@ def build_dashboard(frame, enhanced_gauge, water_info, pole_mgr, calibrator, cfg
                     (25, 80), cv2.FONT_HERSHEY_DUPLEX, 0.85, status_color, 2, cv2.LINE_AA)
     else:
         # Station 1: Muangkong Benchmark Format
-        cv2.putText(canvas, "AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (SCCRN MUANGKONG)",
+        cv2.putText(canvas, f"AUTOMATED CCTV WATER LEVEL MONITORING SYSTEM (SCCRN MUANGKONG){ai_tag}",
                     (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.75, (220, 220, 220), 2, cv2.LINE_AA)
         cv2.putText(canvas, f"WATER LEVEL: {water_level:.2f} m R.T.K.  [{status_text}]",
                     (25, 78), cv2.FONT_HERSHEY_DUPLEX, 0.95, status_color, 2, cv2.LINE_AA)
@@ -200,6 +234,13 @@ def main():
         print(f"❌ Failed to decode image: {img_path}")
         return
 
+    localizer = StaffGaugeAutoLocalizer()
+    loc_res = localizer.localize(frame, cfg)
+    if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
+        bx1, by1, bx2, by2 = loc_res["bbox"]
+        cfg["staff_gauge_bbox"]["x1"] = bx1
+        cfg["staff_gauge_bbox"]["x2"] = bx2
+
     pole_mgr = PoleCoordinateManager(cfg)
     rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
 
@@ -218,7 +259,7 @@ def main():
         logger.log_water_level(cfg.get("station_name"), water_info["water_level"], timestamp)
 
     # ประกอบ Dashboard
-    dashboard = build_dashboard(frame, enhanced, water_info, pole_mgr, calibrator, cfg, img_path)
+    dashboard = build_dashboard(frame, enhanced, water_info, pole_mgr, calibrator, cfg, img_path, yolo_info=loc_res)
 
     out_path = args.output if args.output else os.path.join(BASE_DIR, "output", f"{args.station}_dashboard_result.jpg")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

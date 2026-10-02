@@ -13,7 +13,8 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 from core.vision.pole_coordinates import PoleCoordinateManager
 from core.vision.scale_calibrator import PiecewiseScaleCalibrator
 from core.vision.water_surface_detector import WaterSurfaceDetector
-from core.vision.dashboard_builder import build_dashboard
+from core.vision.dashboard_builder import build_dashboard, render_cctv_frame, render_gauge_overlay
+from core.vision.auto_localizer import StaffGaugeAutoLocalizer
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIGS_DIR = os.path.join(BASE_DIR, "configs")
@@ -48,6 +49,7 @@ class VisionService:
         self._cached_dashboards: Dict[str, Tuple[float, bytes]] = {}  # {code: (timestamp, jpeg_bytes)}
         self._cached_metadata: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self.cache_ttl_seconds = 15.0
+        self.localizer = StaffGaugeAutoLocalizer()
         self._load_configs()
 
     def _load_configs(self):
@@ -144,70 +146,78 @@ class VisionService:
             print(f"[VisionService] Failed to fetch live frame for {station_code}: {e}")
             return None
 
-    def get_realtime_analysis_dashboard(self, station_code: str, mode: str = "live") -> Optional[bytes]:
+    def get_realtime_analysis_dashboard(
+        self,
+        station_code: str,
+        mode: str = "live",
+        overlay: str = "bbox",
+        view: str = "cctv"
+    ) -> Optional[bytes]:
         """
         สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge
         mode: 'live' (ประมวลผลจากกล้องสด), 'daytime' (ผลลัพธ์ Benchmark กลางวัน),
               'nighttime' (ผลลัพธ์ Benchmark กลางคืน), 'flood' (จำลองสภาวะน้ำท่วม)
+        overlay: 'bbox' (กรอบสี่เหลี่ยมสีเขียว ROI/YOLO Bounding Box),
+                 'polygon' (แสดงเส้นรอบรูป Polygon จาก YOLOv8-Seg)
+        view: 'cctv' (เฉพาะมุมมองกล้อง CCTV 16:9 พร้อม Bounding Box),
+              'gauge' (เฉพาะภาพสเกลเสาวัดน้ำดิจิทัล),
+              'composite' (รวมแดชบอร์ด 2 ด้านดั้งเดิม)
         """
         stn_key = self._resolve_station_key(station_code)
         if not stn_key:
             return None
 
-        # 1. จัดการโหมดที่เป็นภาพ Benchmark โดยตรง
-        cache_key = f"{stn_key}_{mode}"
+        cache_key = f"{stn_key}_{mode}_{overlay}_{view}"
         now = time.time()
+        ttl = 6.0 if mode == "live" else self.cache_ttl_seconds
         if cache_key in self._cached_dashboards:
             cached_time, cached_bytes = self._cached_dashboards[cache_key]
-            if now - cached_time < self.cache_ttl_seconds:
+            if now - cached_time < ttl:
                 return cached_bytes
 
         mgr = self.station_components[stn_key]
-        cfg = mgr["config"]
+        cfg = json.loads(json.dumps(mgr["config"]))
         station_num = "station1_muangkong" if "MUANGKONG" in stn_key or "173A" in stn_key else \
                       "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
                       "station3_hatyainai"
 
-        # ตรวจสอบการเรียกดูภาพ Benchmark ที่ยืนยันผลแล้วโดยตรง
-        if mode in ("daytime", "nighttime", "flood"):
-            benchmark_filename = None
-            if "MUANGKONG" in stn_key or "173A" in stn_key:
-                benchmark_filename = "result_muang_kong_daytime_normal.jpg" if mode == "daytime" else "result_muang_kong_nighttime_normal.jpg"
-            elif "BANGSALA" in stn_key or "90" in stn_key:
-                benchmark_filename = "result_bangsala_daytime_normal.jpg" if mode == "daytime" else "result_bangsala_nighttime.jpg"
-            else:
-                if mode == "flood":
-                    benchmark_filename = "result_hatayi_daytime_generate_flood.jpg"
-                elif mode == "nighttime":
-                    benchmark_filename = "result_hatyai_nighttime_normal.jpg"
-                else:
-                    benchmark_filename = "result_hatyai_nighttime_normal.jpg"
-
-            if benchmark_filename:
-                candidate_paths = [
-                    os.path.join(BASE_DIR, "..", "non_time_series", "output", benchmark_filename),
-                    os.path.join(BASE_DIR, "..", "frontend", "public", "ai_dashboards", benchmark_filename),
-                    os.path.join(r"C:\Project\hatyai_flood\output_scale", benchmark_filename)
+        frame = None
+        if mode == "live":
+            frame = self.fetch_live_frame(station_code)
+            if frame is None:
+                # Fallback to sample if camera is offline
+                sample_candidates = [
+                    os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
+                    os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}.jpg"),
                 ]
-                for p in candidate_paths:
-                    if os.path.exists(p):
-                        with open(p, "rb") as f:
-                            data = f.read()
-                            self._cached_dashboards[cache_key] = (now, data)
-                            return data
-
-        # 2. โหมด Live: ดึงภาพสดจากกล้องและประมวลผลด้วย Pipeline จริง
-        pole_mgr: PoleCoordinateManager = mgr["pole_mgr"]
-        calibrator: PiecewiseScaleCalibrator = mgr["calibrator"]
-        detector: WaterSurfaceDetector = mgr["detector"]
-
-        frame = self.fetch_live_frame(station_code)
-        if frame is None:
-            # Fallback to sample image if stream is unreachable
+                for p in sample_candidates:
+                    if p and os.path.exists(p):
+                        frame = cv2.imread(p)
+                        if frame is not None:
+                            break
+        elif mode == "nighttime":
+            sample_candidates = [
+                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_nighttime.jpg"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p)
+                    if frame is not None:
+                        break
+        elif mode == "flood":
+            sample_candidates = [
+                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_flood.png"),
+                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p)
+                    if frame is not None:
+                        break
+        else:  # daytime
             sample_candidates = [
                 os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
                 os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}.jpg"),
-                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}.jpg")
             ]
             for p in sample_candidates:
                 if os.path.exists(p):
@@ -224,24 +234,53 @@ class VisionService:
             return None
 
         try:
-            # 1. ดัดภาพเสาให้ตรง (Homography Rectification + Contrast Enhancement)
-            rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
+            # 1. Stage 1: YOLO Segmentation & Auto-Localizer
+            loc_res = self.localizer.localize(frame, cfg)
+            if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
+                bx1, by1, bx2, by2 = loc_res["bbox"]
+                cfg["staff_gauge_bbox"]["x1"] = bx1
+                cfg["staff_gauge_bbox"]["x2"] = bx2
 
-            # 2. ตรวจหาจุดสัมผัสผิวน้ำ
+            pole_mgr = PoleCoordinateManager(cfg)
+            rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
+            calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
+            detector = WaterSurfaceDetector(calibrator, cfg)
+
+            # 2. Stage 2: Sub-pixel Waterline Analysis
             water_info = detector.detect_waterline(enhanced)
 
-            # 3. เรนเดอร์แดชบอร์ดตามมาตรฐาน Benchmark ที่ตรวจสอบแล้ว 100%
-            dashboard = build_dashboard(
-                frame=frame,
-                enhanced_gauge=enhanced,
-                water_info=water_info,
-                pole_mgr=pole_mgr,
-                calibrator=calibrator,
-                cfg=cfg
-            )
+            # 3. เรนเดอร์ภาพตามโหมดมุมมอง (view: 'cctv' | 'gauge' | 'composite')
+            if view == "gauge":
+                img_out = render_gauge_overlay(
+                    enhanced_gauge=enhanced,
+                    water_info=water_info,
+                    calibrator=calibrator,
+                    cfg=cfg
+                )
+            elif view == "composite":
+                img_out = build_dashboard(
+                    frame=frame,
+                    enhanced_gauge=enhanced,
+                    water_info=water_info,
+                    pole_mgr=pole_mgr,
+                    calibrator=calibrator,
+                    cfg=cfg,
+                    yolo_info=loc_res,
+                    overlay_mode=overlay
+                )
+            else:  # view == "cctv" (default: 16:9 CCTV Feed with Bounding Box)
+                img_out = render_cctv_frame(
+                    frame=frame,
+                    water_info=water_info,
+                    pole_mgr=pole_mgr,
+                    calibrator=calibrator,
+                    cfg=cfg,
+                    yolo_info=loc_res,
+                    overlay_mode=overlay
+                )
 
             # Encode JPEG
-            ret, buf = cv2.imencode(".jpg", dashboard, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            ret, buf = cv2.imencode(".jpg", img_out, [cv2.IMWRITE_JPEG_QUALITY, 85])
             if ret:
                 jpeg_bytes = buf.tobytes()
                 self._cached_dashboards[cache_key] = (now, jpeg_bytes)
@@ -249,7 +288,6 @@ class VisionService:
 
         except Exception as e:
             print(f"[VisionService] Dashboard processing error: {e}")
-            # Fallback to pre-rendered benchmark
             bench_path = os.path.join(BASE_DIR, "..", "frontend", "public", "ai_dashboards", f"{station_code}.jpg")
             if os.path.exists(bench_path):
                 with open(bench_path, "rb") as f:

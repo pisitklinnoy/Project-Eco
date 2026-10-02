@@ -7,9 +7,13 @@ Water Level Excel Logger Module
 import os
 import re
 from datetime import datetime
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
 
 
 class WaterLevelExcelLogger:
@@ -45,6 +49,8 @@ class WaterLevelExcelLogger:
 
     def _ensure_file_exists(self):
         """ตรวจสอบและสร้างไฟล์ Excel พร้อมโครงสร้างคอลัมน์มาตรฐาน"""
+        if not HAS_OPENPYXL:
+            return
         if not os.path.exists(self.excel_path):
             wb = openpyxl.Workbook()
             ws = wb.active
@@ -89,6 +95,9 @@ class WaterLevelExcelLogger:
         - water_level_m: ค่าระดับน้ำ (เมตร รทก.)
         - timestamp: วัน-เวลา (เช่น '2026-10-01 12:25:36') ถ้าไม่ระบุจะใช้วันเวลาปัจจุบัน
         """
+        if not HAS_OPENPYXL:
+            return False
+
         self._ensure_file_exists()
 
         if timestamp is None:

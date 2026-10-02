@@ -19,7 +19,11 @@ if BASE_DIR not in sys.path:
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-import openpyxl
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
 
 
 def main():
@@ -45,7 +49,7 @@ def main():
 
     # อ่านและแสดงสรุปผลล่าสุดจาก Excel
     excel_path = os.path.join(BASE_DIR, "water_levels.xlsx")
-    if os.path.exists(excel_path):
+    if HAS_OPENPYXL and os.path.exists(excel_path):
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
         print("\n" + "=" * 80)

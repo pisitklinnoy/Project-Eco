@@ -42,5 +42,5 @@
   },
   "baseline_y": 1730,
   "flood_threshold_score": 20.0,
-  "calibration_bias_m": 0.0
+  "calibration_bias_m": 0.04
 }

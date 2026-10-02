@@ -52,15 +52,17 @@ def save_station_calibration(
 
 
 @router.get("/{station_code}/cctv-analysis.jpg")
-def get_cctv_analysis_image(station_code: str, mode: str = "live", db: Session = Depends(get_db)):
+def get_cctv_analysis_image(station_code: str, mode: str = "live", overlay: str = "bbox", view: str = "cctv", db: Session = Depends(get_db)):
     """
     สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime หรือ Benchmark
     mode: 'live', 'daytime', 'nighttime', 'flood'
+    overlay: 'bbox' (กรอบเขียว Bounding Box), 'polygon' (YOLOv8-Seg polygon mask)
+    view: 'cctv' (เฉพาะภาพกล้อง CCTV 16:9), 'gauge' (เฉพาะสเกลเสาวัดน้ำดิจิทัล), 'composite' (รวมแดชบอร์ด)
     """
     from fastapi.responses import Response
     from services.vision_service import vision_service
     
-    jpeg_bytes = vision_service.get_realtime_analysis_dashboard(station_code, mode=mode)
+    jpeg_bytes = vision_service.get_realtime_analysis_dashboard(station_code, mode=mode, overlay=overlay, view=view)
     if not jpeg_bytes:
         # Fallback to static public image if available
         import os

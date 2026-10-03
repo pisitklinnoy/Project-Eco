@@ -161,7 +161,8 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
         {error ? <p className="text-amber-700">{error}</p> : !forecast ? <p>ยังไม่มีผลพยากรณ์จากโมเดลที่มีข้อมูลล่าสุดเพียงพอ</p> : (
           <p>{isSimulation ? 'ผลจากสูตรสถานการณ์จำลอง' : forecast.context_json?.mode === 'replay' ? 'คำนวณย้อนหลังจากข้อมูลล่าสุดที่มี (Replay) · ไม่ใช่พยากรณ์ ณ เวลาปัจจุบัน' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
             {!isSimulation && forecast.context_json?.missing_features?.length ? ` · ข้อมูลเข้าขาด ${forecast.context_json.missing_features.length} ตัวแปร` : ''}
-            {!isSimulation && forecast.context_json?.rain_available === false ? ' · ฝนไม่ครบ' : ''}
+            {!isSimulation && forecast.context_json?.rain_available === false ? ` · ใช้ฝนจริง ${forecast.context_json.rain_input_summary?.used_count ?? 0}/${forecast.context_json.rain_input_summary?.total_count ?? '—'} ตัวแปร · ฝนบางชั่วโมงขาด` : ''}
+            {!isSimulation && forecast.context_json?.rain_available === true ? ' · ใช้ฝน HII รายชั่วโมงจริงครบ' : ''}
           </p>
         )}
       </div>

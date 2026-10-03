@@ -1,4 +1,4 @@
-import type { Station, WaterMeasurement, ForecastRecord, ForecastComparison, AlertEvent, ReviewPackage } from '../types';
+import type { Station, WaterMeasurement, RainfallMeasurement, ForecastRecord, ForecastComparison, AlertEvent, ReviewPackage } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -36,6 +36,13 @@ export const floodlensApi = {
   },
 
   // 3. Forecast
+  getLatestRain: async (stationCode: string): Promise<RainfallMeasurement | null> => {
+    const res = await fetch(`${API_BASE}/water/rain/latest?station_code=${encodeURIComponent(stationCode)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw await apiError(res);
+    return res.json();
+  },
+
   getLatestForecast: async (stationCode: string): Promise<ForecastRecord | null> => {
     const res = await fetch(`${API_BASE}/forecast/latest?station_code=${encodeURIComponent(stationCode)}`);
     if (res.status === 404) {

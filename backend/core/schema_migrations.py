@@ -5,7 +5,8 @@ from sqlalchemy import inspect, text
 def upgrade_timeseries_schema(engine):
     additions = {
         "forecast_records": {"context_json": "JSON", "forecast_key": "VARCHAR(64)"},
-        "rainfall_measurements": {"source_type": "VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN'"},
+        "rainfall_measurements": {"source_type": "VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN'",
+                                  "source_url": "VARCHAR(500)", "source_station_id": "INTEGER", "source_sha256": "VARCHAR(64)"},
     }
     with engine.begin() as connection:
         inspector = inspect(connection)

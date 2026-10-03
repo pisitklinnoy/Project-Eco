@@ -4,9 +4,15 @@
 
 ## เส้นทางข้อมูล
 
+ฝนจริงเชื่อมกับ ThaiWater/HII Public API แล้ว: [หน้าแสดงฝนของ ThaiWater](https://www.thaiwater.net/weather/rainfall) ใช้ `/public/rain_24h` สำหรับ metadata/ค่าล่าสุด และ `/public/rain_24h_graph?station_id=...` สำหรับค่าฝนรายชั่วโมงย้อนหลัง รหัส SLA001/002/003 ตรวจจาก `tele_station_oldcode`, agency HII และพิกัดเดิมก่อนใช้ station ID ไม่ใช้สถานีใกล้เคียงแทนเอง
+
+`POST /api/v1/water/ingest-telemetry` ดึง RID และ HII แยกกัน (แหล่งหนึ่งล่มยังดึงอีกแหล่งได้) worker เรียกทุก 15 นาที และหน้าเว็บเรียกผ่าน refresh-all ทุก 5 นาที บันทึกฝนหน่วยมิลลิเมตรที่ timestamp Asia/Bangkok ของแหล่งข้อมูลแปลงเป็น UTC; ตรวจค่ารายชั่วโมง/ผลรวม 24 ชม. เทียบรายงานสรุปเมื่อมีครบ ไม่ใช้ยอดสะสมรายวันแทนค่ารายชั่วโมง ไม่ round/interpolate ชั่วโมงหรือใช้ข้อมูลอนาคต ค่า null/ค่าติดลบ/sentinel เป็น missing; ค่า 0 จริงเก็บเป็น 0 เก็บ source URL, station ID และ SHA-256 ใน DB/forecast references และเก็บ revision เมื่อค่าถูกแก้
+
+โมเดลใช้ `rain_SLA00*_lag1/2/3/6/12/24h` ตาม feature contract เดิม ระบบดึงข้อมูลทั้ง 3 สถานีสำหรับฝนต้นน้ำด้วย ฝนหลัง issue time ไม่ถูกใช้ แม้ API จะมีค่าที่ใหม่กว่าระดับน้ำ ผลบันทึก `rain_input_summary` จำนวนตัวแปรที่ใช้/ที่ขาด และหน้าเว็บแสดงฝนล่าสุดแยกจากเวลาที่โมเดลใช้ หากต้นทางขาดบางชั่วโมง โมเดลยังใช้ฝนจริงที่มีร่วมกับ imputer เดิม และคง PARTIAL_INPUTS; ไม่แสดงว่าฝนครบ `GET /api/v1/water/rain/latest?station_code=STN-*` ดูค่าฝนและเวลาจากแหล่งข้อมูลได้
+
 ```text
 ARQ ingestion (ทุก 15 นาที)
-  → POST /api/v1/water/ingest-rid
+  → POST /api/v1/water/ingest-telemetry (RID + HII)
   → ตรวจ station mapping จาก RID metadata + อ่านรายงานย้อนหลัง 3 วัน
   → PostgreSQL water_measurements (RID_API_VERIFIED, timestamp UTC)
 
@@ -109,9 +115,9 @@ Replay ต้องส่งข้อมูลเองและระบุเ�
 
 Shadow ใช้เฉพาะระดับน้ำ `source_type=RID_API_VERIFIED` และฝน `HII_API_VERIFIED` อ่าน exact-hour lag จาก t−24h ถึง t ไม่ forward-fill ไม่ interpolate และไม่อ่านค่าจริงในอนาคต timestamp ใน DB เป็น UTC แบบไม่มี timezone ตาม schema เดิม แต่ API ส่ง timezone +00:00 เสมอ library แปลงเป็น Asia/Bangkok
 
-ฝนสดยังไม่มี verified feed ในชุดนี้ worker จึงไม่เขียนค่าคงที่ 4.2/28.5 อีก ฝน UNKNOWN/ค่าติดลบ/sentinel ถูกละไว้เป็น missing พร้อมคืน `PARTIAL_INPUTS`, `missing_features` และ `rain_available=False` ใช้ imputer ที่ฝึกไว้แล้ว หากระดับน้ำปัจจุบันหายหรือเก่าเกิน policy ตอบ 503 และ worker บันทึกสถานะ unavailable โดยไม่ออก prediction fallback
+ฝนสดจาก HII ผ่าน QC ถูก ingest อัตโนมัติแล้ว worker ไม่เขียนค่าฝนคงที่ ฝน UNKNOWN/ค่าติดลบ/sentinel และชั่วโมงที่ต้นทางไม่ส่งข้อมูลถูกละไว้เป็น missing พร้อมคืน `PARTIAL_INPUTS`, `missing_features` และ `rain_available=False` ใช้ imputer ที่ฝึกไว้แล้ว หากระดับน้ำปัจจุบันหายหรือเก่าเกิน policy ตอบ 503 และ worker บันทึกสถานะ unavailable โดยไม่ออก prediction fallback
 
-ระบบที่มี HII feed แล้วให้เขียน `rainfall_measurements.station_code` เป็น SLA001/002/003 หรือ STN-* ที่จับคู่ในตาราง พร้อม `source_type=HII_API_VERIFIED`, timestamp ชั่วโมงรายงาน UTC, ค่าฝนที่วัดแล้วผ่าน QC และ `created_at` เวลาได้รับข้อมูลจริง อย่าเปลี่ยนฝนเก่า UNKNOWN เป็น VERIFIED โดยไม่มีหลักฐาน เวลาเผยแพร่และความหมายชั่วโมงสะสมฝนยังต้องตรวจจากแหล่งข้อมูล
+ตัวดึง HII เขียน `rainfall_measurements.station_code` เป็น SLA001/002/003 พร้อม `source_type=HII_API_VERIFIED`, timestamp ชั่วโมงรายงาน UTC, ค่าฝนที่วัดแล้วผ่าน QC และ `created_at` เวลาได้รับข้อมูลจริง ไม่เปลี่ยนฝนเก่า UNKNOWN เป็น VERIFIED โดยไม่มีหลักฐาน หากหน่วยงานเปลี่ยนความหมาย timestamp หรือหน่วย ต้องตรวจและปรับ adapter ก่อนรับข้อมูล
 
 รันซ้ำด้วยสถานี/issue_time/mode/family/features/model hashes เดิมจะคืน record เดิม ผ่าน unique `forecast_key` หาก input หรือโมเดลเปลี่ยนจะเก็บรอบใหม่ `context_json` เก็บ exact input_features และ observation_refs เพื่อย้อนตรวจค่าที่ใช้จริง ส่วน `generated_at`/`created_at` คือเวลารัน ไม่ใช่เวลารายงานต้นทาง
 
@@ -139,3 +145,7 @@ uv run pytest tests -q
 fixture สร้าง/ลบตารางใน DB ทดสอบนี้ทุก test ไม่ใช้ DB หลัก ตรวจ RID สดแบบ read-only ได้ด้วย `uv run python scripts/check_timeseries_live.py` โดยกำหนด DATABASE_URL สำหรับ environment local ให้เรียบร้อย คำสั่งนี้ไม่เขียนฐานข้อมูล ไม่แจ้งเตือน และไม่ทำนาย
 
 ผลตรวจรับวันที่ 3 ตุลาคม 2026: integration tests ผ่าน 14 รายการทั้ง SQLite และ PostgreSQL 15, ชุดทดสอบ portable models ผ่าน 6 รายการ, frontend production build และ lint ผ่าน (มี warnings ของโค้ด UI เดิม), Docker backend/worker build ผ่าน และอ่าน RID จริงได้ทั้ง 3 สถานี การทดสอบทั้งหมดใช้ฐานข้อมูลทดสอบแยก ไม่แก้ข้อมูลใน deployment เดิม
+
+อัปเดตการเชื่อมฝน 3 ตุลาคม 2026: อ่าน HII ของทั้ง 3 สถานีจริงและคำนวณ RF ได้ใน shadow mode หน้าเว็บแสดงฝนล่าสุด/ยอดสะสม/เวลาข้อมูลและจำนวนตัวแปรฝนที่ใช้ รอบที่ตรวจข้อมูลต้นทางขาด 04:00–07:00 น. จึงใช้ฝนจริง 5/6 ตัวแปรที่ม่วงก็อง, 10/12 ที่บางศาลา, 15/18 ที่หาดใหญ่ และคง PARTIAL_INPUTS ตามจริง ยอดสะสม 24 ชม. บนการ์ดใช้ค่ารายงาน HII เมื่อมี ไม่ใช้ยอดนี้แทน hourly lag ของโมเดล
+
+ตรวจรับส่วนฝน: SQLite suite ผ่าน 29 รายการ; PostgreSQL 15 suite เดิมพร้อมการเชื่อมฝนผ่าน 27 รายการ และชุดฝนฉบับสุดท้ายผ่านครบ 11 รายการ (รวมข้อมูลขาด/ยอดสะสมจาก summary และ RID_HII_PARTIAL); frontend build/lint และ Docker backend/workers build ผ่าน ตัวเปิดบริการในเครื่องใช้ pythonw.exe เมื่อมี เพื่อให้ API ไม่ปิดตาม console ที่ใช้เริ่มงาน

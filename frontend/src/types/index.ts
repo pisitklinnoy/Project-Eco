@@ -25,6 +25,18 @@ export interface WaterMeasurement {
   is_reviewed_by_human: boolean;
 }
 
+export interface RainfallMeasurement {
+  station_code: string;
+  rain_station_code: string;
+  timestamp: string;
+  rain_amount_1h: number;
+  rain_amount_24h: number | null;
+  unit: 'mm';
+  age_minutes: number;
+  source_type: string;
+  source_url: string;
+}
+
 export interface ForecastRecord {
   id: number;
   station_code: string;
@@ -44,6 +56,7 @@ export interface ForecastRecord {
     input_quality?: string;
     missing_features?: string[];
     rain_available?: boolean;
+    rain_input_summary?: { used_count: number; total_count: number; missing_features: string[] };
     operational_ready: boolean;
     predictions?: { horizon_h: number; target_time: string; level_m: number }[];
   };

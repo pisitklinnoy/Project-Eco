@@ -7,6 +7,8 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
     $pythonPath = Join-Path $projectRoot '.venv\Scripts\python.exe'
 }
 if (-not (Test-Path -LiteralPath $pythonPath)) { throw 'Install the project Python dependencies into .venv first.' }
+$pythonWindowless = Join-Path (Split-Path -Parent $pythonPath) 'pythonw.exe'
+if (Test-Path -LiteralPath $pythonWindowless) { $pythonPath = $pythonWindowless }
 $vitePath = Join-Path $projectRoot 'frontend\node_modules\vite\bin\vite.js'
 if (-not (Test-Path -LiteralPath $vitePath)) { throw 'Run npm ci in frontend first.' }
 $env:DATABASE_URL = 'sqlite:///' + ((Join-Path $dataDir 'local-preview.db') -replace '\\', '/')

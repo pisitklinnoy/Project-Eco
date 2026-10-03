@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Station, WaterMeasurement, ForecastRecord } from '../types';
+import type { Station, WaterMeasurement, RainfallMeasurement, ForecastRecord } from '../types';
 
 function CameraSnapshot({ station, stamp }: { station: Station; stamp: number }) {
   const [failed, setFailed] = useState(false);
@@ -12,9 +12,10 @@ function CameraSnapshot({ station, stamp }: { station: Station; stamp: number })
   </div>;
 }
 
-export function StationOverview({ stations, measurements, forecasts, errors, refreshing, onRefresh, onSelect }: {
+export function StationOverview({ stations, measurements, rain, forecasts, errors, refreshing, onRefresh, onSelect }: {
   stations: Station[]; measurements: Record<string, WaterMeasurement>;
   forecasts: Record<string, ForecastRecord>; errors: Record<string, string>;
+  rain: Record<string, RainfallMeasurement>;
   refreshing: boolean; onRefresh: () => void; onSelect: (station: Station) => void;
 }) {
   const [stamp, setStamp] = useState(() => Date.now());
@@ -31,11 +32,19 @@ export function StationOverview({ stations, measurements, forecasts, errors, ref
     <div className="grid md:grid-cols-3 gap-4">{stations.map(station => {
       const measurement = measurements[station.station_code];
       const forecast = forecasts[station.station_code];
+      const rainfall = rain[station.station_code];
       return <article key={station.station_code} className="bg-white border border-slate-200 rounded-3xl p-4">
         <h3 className="font-bold text-sm mb-3">{station.name}</h3>
         <CameraSnapshot key={`${station.station_code}-${stamp}`} station={station} stamp={stamp} />
         <p className="text-sm">ระดับน้ำ RID: <strong>{measurement?.water_level.toFixed(2) ?? '—'} ม.</strong></p>
         <p className="text-xs text-slate-500 mb-3">{measurement ? new Date(measurement.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'รอข้อมูลตรวจวัด'}</p>
+        <div className="bg-sky-50 rounded-xl p-3 mb-3 text-sm">
+          <p>ฝน HII {rainfall?.rain_station_code ?? ''}: <strong>{rainfall?.rain_amount_1h.toFixed(1) ?? '—'} มม./1 ชม.</strong></p>
+          <p className="text-xs text-slate-500">สะสม 24 ชม.: {rainfall?.rain_amount_24h?.toFixed(1) ?? '—'} มม.</p>
+          <p className={`text-xs ${rainfall && rainfall.age_minutes > 120 ? 'text-amber-700' : 'text-slate-500'}`}>
+            {rainfall ? `เวลา ${new Date(rainfall.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}${rainfall.age_minutes > 120 ? ' · ข้อมูลล่าช้า' : ''}` : 'รอข้อมูลฝนที่ตรวจสอบแล้ว'}
+          </p>
+        </div>
         {forecast ? <>
           <p className={`text-xs mb-2 ${forecast.context_json?.mode === 'replay' ? 'text-amber-700' : 'text-sky-700'}`}>
             {forecast.context_json?.mode === 'replay' ? 'Replay · ข้อมูลล่าช้า ไม่ใช่พยากรณ์เวลาปัจจุบัน' : 'RF v2 · พยากรณ์จากข้อมูลล่าสุด'}
@@ -45,7 +54,10 @@ export function StationOverview({ stations, measurements, forecasts, errors, ref
             <div key={index} className="bg-sky-50 rounded-xl p-2"><div className="text-xs text-slate-500">+{index + 1} ชม.</div><strong>{value.toFixed(2)} ม.</strong>
               <div className="text-xs text-slate-500">{new Date(new Date(forecast.forecast_time).getTime() + (index + 1) * 3600000).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })}</div>
             </div>)}</div>
-          {forecast.context_json?.rain_available === false && <p className="text-xs text-amber-700 mt-2">ไม่มีข้อมูลฝนครบ · ผลเพื่อทดลอง</p>}
+          {forecast.context_json?.rain_available === false && <p className="text-xs text-amber-700 mt-2">
+            {forecast.context_json.rain_input_summary?.used_count ? `ใช้ฝนจริง ${forecast.context_json.rain_input_summary.used_count}/${forecast.context_json.rain_input_summary.total_count} ตัวแปร · ฝนบางชั่วโมงขาด` : 'ไม่มีข้อมูลฝนครบ'} · ผลเพื่อทดลอง
+          </p>}
+          {forecast.context_json?.rain_available === true && <p className="text-xs text-emerald-700 mt-2">ใช้ฝนรายชั่วโมงจริงครบตามตัวแปรของโมเดล</p>}
         </> : <p role="status" className="text-sm text-amber-700">{errors[station.station_code] || (refreshing ? 'กำลังคำนวณโมเดล…' : 'ยังไม่มีข้อมูลพอสำหรับพยากรณ์')}</p>}
         <button className="mt-3 text-sm text-sky-700 font-semibold" onClick={() => onSelect(station)}>ดูกราฟและกล้องสถานีนี้</button>
       </article>;

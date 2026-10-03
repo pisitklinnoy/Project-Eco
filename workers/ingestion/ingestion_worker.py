@@ -25,7 +25,7 @@ REAL_STATIONS = [
 def ingest_rid_telemetry():
     base = os.getenv("BACKEND_API_URL", "http://backend:8000").rstrip("/")
     try:
-        response = requests.post(base + "/api/v1/water/ingest-rid", timeout=(5, 120))
+        response = requests.post(base + "/api/v1/water/ingest-telemetry", timeout=(5, 180))
         response.raise_for_status()
         return response.json()
     except (requests.RequestException, ValueError) as exc:
@@ -75,7 +75,7 @@ async def run_ingestion_cycle(ctx, station_code: str = None):
         except Exception as e:
             print(f"[Ingestion Worker] MinIO upload error for {stn_code}: {e}")
 
-        # Rain is missing until a verified HII feed is connected; never write fixed demo rain.
+        # Verified HII hourly rain was ingested above, independently of camera processing.
 
         # 4. ส่งต่อให้ Vision Worker ประมวลผลภาพทันที
         from vision.vision_worker import process_vision_task

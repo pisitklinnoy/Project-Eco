@@ -68,6 +68,7 @@ def test_no_seeded_forecasts_or_water_when_data_unavailable(client, db):
 def test_refresh_all_uses_verified_data_and_labels_delayed_inputs(client, db, monkeypatch, age_hours, expected_mode):
     from services.telemetry_service import telemetry_service
     monkeypatch.setattr(telemetry_service, "ingest_rid", lambda db: {"status": "ingested"})
+    monkeypatch.setattr(telemetry_service, "ingest_hii", lambda db: {"status": "ingested"})
     add_live_inputs(db, age_hours=age_hours)
     response = client.post("/api/v1/forecast/refresh-all")
     assert response.status_code == 200, response.text
@@ -88,6 +89,7 @@ def test_refresh_all_uses_verified_data_and_labels_delayed_inputs(client, db, mo
 def test_refresh_all_does_not_invent_predictions_without_inputs(client, db, monkeypatch):
     from services.telemetry_service import telemetry_service
     monkeypatch.setattr(telemetry_service, "ingest_rid", lambda db: {"status": "ingested"})
+    monkeypatch.setattr(telemetry_service, "ingest_hii", lambda db: {"status": "ingested"})
     rows = client.post("/api/v1/forecast/refresh-all").json()["stations"]
     assert len(rows) == 3
     assert all(row["forecast"] is None and row["error"] for row in rows)

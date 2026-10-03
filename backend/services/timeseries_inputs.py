@@ -74,7 +74,9 @@ def load_observations(db, station_code, max_age_minutes=120, now=None):
         value = float(record.rain_amount_1h) if record.rain_amount_1h is not None else np.nan
         value = value if np.isfinite(value) and value >= 0 and value not in (9999, 999999) else None
         rows.setdefault(timestamp, {})[column] = value
-        refs[(timestamp, column)] = {"table": "rainfall_measurements", "id": record.id, "source": record.source_type}
+        refs[(timestamp, column)] = {"table": "rainfall_measurements", "id": record.id, "source": record.source_type,
+            "value": value, "unit": "mm", "source_url": record.source_url, "source_station_id": record.source_station_id,
+            "source_sha256": record.source_sha256}
     observations = [{"time": pd.Timestamp(t, tz="UTC").isoformat(), **values} for t, values in sorted(rows.items())]
     references = [{"time": pd.Timestamp(t, tz="UTC").isoformat(), "column": column, **ref} for (t, column), ref in sorted(refs.items())]
     return observations, pd.Timestamp(issue, tz="UTC").isoformat(), references

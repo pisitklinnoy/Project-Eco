@@ -62,14 +62,18 @@ class ForecastService:
         forecaster = get_forecaster()
         features = forecaster.build_features(observations, issue_time, model_code, family)
         result = forecaster.predict_features(features, issue_time, model_code, family)
+        rain_features = {name: value for name, value in features.items() if name.startswith('rain_')}
         result.update({
             "model_station_code": model_code, "station_code": ecosystem,
             "mode": mode, "model_name": f"Random Forest {family}", "model_version": f"rf-v2-{mode}",
             "input_source": "Verified database RID/HII telemetry" if mode == "shadow" else replay_source or "Caller-supplied historical observations",
             "observation_refs": refs, "alert_dispatched": False,
             "input_features": {k: None if pd.isna(v) else float(v) for k, v in features.items()},
+            "rain_input_summary": {"used_count": sum(not pd.isna(value) for value in rain_features.values()),
+                                   "total_count": len(rain_features),
+                                   "missing_features": [name for name, value in rain_features.items() if pd.isna(value)]},
         })
-        used = {"station": ecosystem, "mode": mode, "issue_time": result["issue_time"], "family": family, "features": result["input_features"], "artifacts": result["model_artifacts"]}
+        used = {"adapter_version": "rid-hii-hourly-v2", "station": ecosystem, "mode": mode, "issue_time": result["issue_time"], "family": family, "features": result["input_features"], "artifacts": result["model_artifacts"]}
         key = hashlib.sha256(json.dumps(used, sort_keys=True, allow_nan=False).encode()).hexdigest()
         existing = db.query(ForecastRecord).filter(ForecastRecord.forecast_key == key).first()
         if existing:
@@ -78,7 +82,7 @@ class ForecastService:
             station_code=ecosystem, forecast_time=utc_naive(result["issue_time"]),
             predicted_1h=result["predictions"][0]["level_m"], predicted_2h=result["predictions"][1]["level_m"], predicted_3h=result["predictions"][2]["level_m"],
             model_name=result["model_name"], model_version=result["model_version"],
-            input_mode=("RID_HII_API" if result["rain_available"] else "RID_API_ONLY") if mode == "shadow" else "REPLAY",
+            input_mode=("RID_HII_API" if result["rain_available"] else "RID_HII_PARTIAL" if result['rain_input_summary']['used_count'] else "RID_API_ONLY") if mode == "shadow" else "REPLAY",
             data_quality_status=result["input_quality"], context_json=result, forecast_key=key,
         )
         db.add(record)

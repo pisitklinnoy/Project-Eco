@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent } from './types';
+import type { Station, WaterMeasurement, RainfallMeasurement, ForecastRecord, AlertEvent } from './types';
 import { floodlensApi } from './api/floodlensApi';
 import { Navbar } from './components/Navbar';
 import { FloatingSidebar } from './components/FloatingSidebar';
@@ -23,6 +23,7 @@ export const App: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [measurement, setMeasurement] = useState<WaterMeasurement | null>(null);
   const [stationMeasurements, setStationMeasurements] = useState<Record<string, WaterMeasurement>>({});
+  const [stationRain, setStationRain] = useState<Record<string, RainfallMeasurement>>({});
   const [history, setHistory] = useState<WaterMeasurement[]>([]);
   const [forecast, setForecast] = useState<ForecastRecord | null>(null);
   const [forecastError, setForecastError] = useState('');
@@ -57,18 +58,21 @@ export const App: React.FC = () => {
       const results = await Promise.all(
         stnList.map(async (stn) => {
           try {
-            const data = await floodlensApi.getLatestWater(stn.station_code);
-            return { code: stn.station_code, data };
+            const [water, rain] = await Promise.allSettled([floodlensApi.getLatestWater(stn.station_code), floodlensApi.getLatestRain(stn.station_code)]);
+            return { code: stn.station_code, data: water.status === 'fulfilled' ? water.value : null, rain: rain.status === 'fulfilled' ? rain.value : null };
           } catch {
             return null;
           }
         })
       );
       const map: Record<string, WaterMeasurement> = {};
+      const rainMap: Record<string, RainfallMeasurement> = {};
       results.forEach((r) => {
         if (r && r.data) map[r.code] = r.data;
+        if (r?.rain) rainMap[r.code] = r.rain;
       });
       setStationMeasurements(map);
+      setStationRain(rainMap);
     } catch (err) {
       console.error('Failed to load all station measurements', err);
     }
@@ -286,7 +290,7 @@ export const App: React.FC = () => {
           onSelectStation={selectStation}
         />
 
-        <StationOverview stations={stations} measurements={stationMeasurements} forecasts={stationForecasts}
+        <StationOverview stations={stations} measurements={stationMeasurements} rain={stationRain} forecasts={stationForecasts}
           errors={stationErrors} refreshing={refreshingAll} onRefresh={refreshAllStations} onSelect={selectStation} />
 
         {/* ========================================================= */}

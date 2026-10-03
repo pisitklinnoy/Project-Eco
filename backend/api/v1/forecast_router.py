@@ -33,11 +33,9 @@ def refresh_all(db: Session = Depends(get_db)):
     from services.telemetry_service import telemetry_service
     from services.station_service import station_service
     station_service.get_all_stations(db)
-    ingestion_error = None
-    try:
-        telemetry_service.ingest_rid(db)
-    except ForecastInputError as exc:
-        ingestion_error = str(exc)
+    telemetry = telemetry_service.ingest_all(db)
+    failures = [f"{name}: {result['reason']}" for name, result in telemetry.items() if result['status'] == 'unavailable']
+    ingestion_error = '; '.join(failures) or None
     results = []
     for code in STATION_MAPPING:
         try:
@@ -55,7 +53,7 @@ def refresh_all(db: Session = Depends(get_db)):
             results.append({"station_code": code, "forecast": ForecastResponse.model_validate(record).model_dump(mode="json"), "error": None})
         except ForecastInputError as exc:
             results.append({"station_code": code, "forecast": None, "error": str(exc)})
-    return {"stations": results, "ingestion_error": ingestion_error}
+    return {"stations": results, "ingestion_error": ingestion_error, "telemetry": telemetry}
 
 
 @router.get("/latest", response_model=ForecastResponse)

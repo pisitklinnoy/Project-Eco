@@ -111,9 +111,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       }
       return `https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg?t=${refreshKey}`;
     }
-    return station.camera_stream_url
-      ? `${station.camera_stream_url}?t=${refreshKey}`
-      : null;
+    return `/api/v1/stations/${encodeURIComponent(station.station_code)}/live-feed.jpg?t=${refreshKey}`;
   };
 
   const streamUrl = getActiveStreamUrl();
@@ -289,7 +287,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
                 {viewMode === 'live'
-                  ? (isHatyai ? 'สตรีมสด Axis Camera (ที่ว่าการ อ.หาดใหญ่) พร้อมวาดกรอบตรวจจับ AI' : 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE) พร้อมวาดกรอบตรวจจับ AI')
+                  ? 'ภาพล่าสุดจากกล้องต้นทาง · รีเฟรชทุก 60 วินาที พร้อมกรอบตำแหน่งเสาวัดน้ำ'
                   : 'การวิเคราะห์ AI Realtime: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
               </p>
             </div>
@@ -692,7 +690,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               {viewMode === 'live' ? (
                 <span className="flex items-center space-x-1.5 text-[11px] text-emerald-300 font-extrabold bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-400/30 shadow-lg">
                   <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-                  <span>LIVE 30 FPS</span>
+                  <span>CAMERA SNAPSHOT</span>
                 </span>
               ) : (
                 <span className="flex items-center space-x-1.5 text-[11px] text-teal-200 font-extrabold bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-teal-400/40 shadow-lg">

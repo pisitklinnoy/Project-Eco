@@ -47,7 +47,7 @@ class ForecastService:
         return query.order_by(ForecastRecord.forecast_time.desc(), ForecastRecord.id.desc()).limit(limit).all()
 
     @staticmethod
-    def run_forecast(db, station_code, family="delta", mode="shadow", issue_time=None, observations=None):
+    def run_forecast(db, station_code, family="delta", mode="shadow", issue_time=None, observations=None, replay_source=None, replay_refs=None):
         ecosystem, model_code = station_codes(station_code)
         if mode == "shadow":
             if issue_time or observations is not None:
@@ -56,7 +56,7 @@ class ForecastService:
         elif mode == "replay":
             if issue_time is None or observations is None:
                 raise ForecastInputError("Replay requires issue_time and observations in the JSON body")
-            refs = []
+            refs = replay_refs or []
         else:
             raise ForecastInputError("Unknown forecast mode")
         forecaster = get_forecaster()
@@ -65,7 +65,7 @@ class ForecastService:
         result.update({
             "model_station_code": model_code, "station_code": ecosystem,
             "mode": mode, "model_name": f"Random Forest {family}", "model_version": f"rf-v2-{mode}",
-            "input_source": "Verified database RID/HII telemetry" if mode == "shadow" else "Caller-supplied historical observations",
+            "input_source": "Verified database RID/HII telemetry" if mode == "shadow" else replay_source or "Caller-supplied historical observations",
             "observation_refs": refs, "alert_dispatched": False,
             "input_features": {k: None if pd.isna(v) else float(v) for k, v in features.items()},
         })

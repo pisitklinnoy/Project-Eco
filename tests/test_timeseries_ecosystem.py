@@ -64,6 +64,55 @@ def test_no_seeded_forecasts_or_water_when_data_unavailable(client, db):
     assert db.query(WaterMeasurement).count() == 0
 
 
+@pytest.mark.parametrize("age_hours,expected_mode", [(0, "shadow"), (4, "replay")])
+def test_refresh_all_uses_verified_data_and_labels_delayed_inputs(client, db, monkeypatch, age_hours, expected_mode):
+    from services.telemetry_service import telemetry_service
+    monkeypatch.setattr(telemetry_service, "ingest_rid", lambda db: {"status": "ingested"})
+    add_live_inputs(db, age_hours=age_hours)
+    response = client.post("/api/v1/forecast/refresh-all")
+    assert response.status_code == 200, response.text
+    rows = response.json()["stations"]
+    assert {row["station_code"] for row in rows} == set(STATION_MAPPING)
+    for row in rows:
+        assert row["error"] is None
+        context = row["forecast"]["context_json"]
+        assert context["mode"] == expected_mode
+        assert context["observation_refs"]
+        assert context["input_source"].startswith("Verified database RID/HII")
+        assert context["alert_dispatched"] is False
+    assert client.post("/api/v1/forecast/refresh-all").json() == response.json()
+    if expected_mode == "replay":
+        assert client.get("/api/v1/forecast/latest").status_code == 404
+
+
+def test_refresh_all_does_not_invent_predictions_without_inputs(client, db, monkeypatch):
+    from services.telemetry_service import telemetry_service
+    monkeypatch.setattr(telemetry_service, "ingest_rid", lambda db: {"status": "ingested"})
+    rows = client.post("/api/v1/forecast/refresh-all").json()["stations"]
+    assert len(rows) == 3
+    assert all(row["forecast"] is None and row["error"] for row in rows)
+    assert db.query(ForecastRecord).count() == 0
+
+
+def test_camera_retries_incomplete_source_jpeg(monkeypatch):
+    import cv2
+    import numpy as np
+    from io import BytesIO
+    from services.vision_service import vision_service
+    success, encoded = cv2.imencode('.jpg', np.zeros((8, 8, 3), dtype=np.uint8))
+    assert success
+    complete = encoded.tobytes()
+    bodies = iter([complete[:-2], complete])
+    monkeypatch.setattr('urllib.request.urlopen', lambda *args, **kwargs: BytesIO(next(bodies)))
+    frame = vision_service.fetch_live_frame('STN-MUANGKONG')
+    assert frame is not None and frame.shape == (8, 8, 3)
+    bodies = iter([complete[:-2], complete[:-2]])
+    assert vision_service.fetch_live_frame('STN-MUANGKONG') is not None
+    vision_service._cached_frames.clear()
+    bodies = iter([complete[:-2], complete[:-2]])
+    assert vision_service.fetch_live_frame('STN-MUANGKONG') is None
+
+
 def test_shadow_ignores_demo_and_vision_rain_and_future_measurements(client, db):
     issue = add_live_inputs(db)
     db.add(RainfallMeasurement(station_code="STN-BANGSALA", timestamp=issue - timedelta(hours=1), rain_amount_1h=999))

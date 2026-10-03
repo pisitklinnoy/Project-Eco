@@ -38,7 +38,14 @@ export const floodlensApi = {
   // 3. Forecast
   getLatestForecast: async (stationCode: string): Promise<ForecastRecord | null> => {
     const res = await fetch(`${API_BASE}/forecast/latest?station_code=${encodeURIComponent(stationCode)}`);
-    if (res.status === 404) return null;
+    if (res.status === 404) {
+      const replay = await fetch(`${API_BASE}/forecast/latest?station_code=${encodeURIComponent(stationCode)}&mode=replay`);
+      if (replay.status === 404) return null;
+      if (!replay.ok) throw await apiError(replay);
+      const record: ForecastRecord = await replay.json();
+      const age = Date.now() - new Date(record.forecast_time).getTime();
+      return age >= 0 && age <= 24 * 3600000 ? record : null;
+    }
     if (!res.ok) throw await apiError(res);
     return res.json();
   },
@@ -47,6 +54,12 @@ export const floodlensApi = {
     const res = await fetch(`${API_BASE}/forecast/trigger?station_code=${encodeURIComponent(stationCode)}`, {
       method: 'POST',
     });
+    if (!res.ok) throw await apiError(res);
+    return res.json();
+  },
+
+  refreshAllForecasts: async (): Promise<{ stations: { station_code: string; forecast: ForecastRecord | null; error: string | null }[]; ingestion_error: string | null }> => {
+    const res = await fetch(`${API_BASE}/forecast/refresh-all`, { method: 'POST' });
     if (!res.ok) throw await apiError(res);
     return res.json();
   },

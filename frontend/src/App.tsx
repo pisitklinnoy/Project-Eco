@@ -10,6 +10,7 @@ import { StationMap } from './components/StationMap';
 import { TelemetryCard } from './components/TelemetryCard';
 import { ForecastChart } from './components/ForecastChart';
 import { ForecastHistory } from './components/ForecastHistory';
+import { StationOverview } from './components/StationOverview';
 import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
@@ -25,6 +26,10 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<WaterMeasurement[]>([]);
   const [forecast, setForecast] = useState<ForecastRecord | null>(null);
   const [forecastError, setForecastError] = useState('');
+  const [stationForecasts, setStationForecasts] = useState<Record<string, ForecastRecord>>({});
+  const [stationErrors, setStationErrors] = useState<Record<string, string>>({});
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const refreshInFlight = useRef(false);
   const stationCodeRef = useRef<string | null>(null);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
 
@@ -68,6 +73,45 @@ export const App: React.FC = () => {
       console.error('Failed to load all station measurements', err);
     }
   }, []);
+
+  const refreshAllStations = useCallback(async () => {
+    if (refreshInFlight.current || !stations.length) return;
+    refreshInFlight.current = true;
+    setRefreshingAll(true);
+    try {
+      const result = await floodlensApi.refreshAllForecasts();
+      const forecasts: Record<string, ForecastRecord> = {};
+      const errors: Record<string, string> = {};
+      result.stations.forEach(row => {
+        if (row.forecast) forecasts[row.station_code] = row.forecast;
+        if (row.error) errors[row.station_code] = row.error;
+      });
+      setStationForecasts(forecasts);
+      setStationErrors(errors);
+      await loadAllStationMeasurements(stations);
+      const code = stationCodeRef.current;
+      if (code) {
+        const [water, waterHistory] = await Promise.all([floodlensApi.getLatestWater(code), floodlensApi.getWaterHistory(code, 24)]);
+        if (stationCodeRef.current === code) {
+          setMeasurement(water);
+          setHistory(waterHistory);
+          setForecast(forecasts[code] ?? null);
+          setForecastError(errors[code] ?? '');
+        }
+      }
+    } catch (err) {
+      setStationErrors(Object.fromEntries(stations.map(station => [station.station_code, err instanceof Error ? err.message : 'โหลดข้อมูลไม่ได้'])));
+    } finally {
+      refreshInFlight.current = false;
+      setRefreshingAll(false);
+    }
+  }, [stations, loadAllStationMeasurements]);
+
+  useEffect(() => {
+    void refreshAllStations();
+    const timer = setInterval(() => void refreshAllStations(), 300000);
+    return () => clearInterval(timer);
+  }, [refreshAllStations]);
 
   // 1. Initial Load: Stations
   useEffect(() => {
@@ -172,7 +216,8 @@ export const App: React.FC = () => {
     setForecastError('');
     const code = selectedStation.station_code;
     try {
-      const res = await floodlensApi.triggerForecast(selectedStation.station_code);
+      await refreshAllStations();
+      const res = await floodlensApi.getLatestForecast(selectedStation.station_code);
       if (stationCodeRef.current !== code) return;
       setForecast(res);
       await loadStationData();
@@ -240,6 +285,9 @@ export const App: React.FC = () => {
           onOpenReview={() => setIsReviewOpen(true)}
           onSelectStation={selectStation}
         />
+
+        <StationOverview stations={stations} measurements={stationMeasurements} forecasts={stationForecasts}
+          errors={stationErrors} refreshing={refreshingAll} onRefresh={refreshAllStations} onSelect={selectStation} />
 
         {/* ========================================================= */}
         {/* SECTION 1: GIS Map & Real-Time Telemetry & CCTV Zoom      */}

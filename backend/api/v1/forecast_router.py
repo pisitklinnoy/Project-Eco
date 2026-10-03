@@ -10,7 +10,7 @@ from models.forecast import ForecastRecord
 from models.station import Station
 from schemas.forecast import ForecastResponse, ReplayForecastInput, ForecastComparisonResponse
 from services.forecast_service import forecast_service
-from services.timeseries_inputs import STATION_MAPPING, station_codes
+from services.timeseries_inputs import STATION_MAPPING, station_codes, load_observations
 
 router = APIRouter(prefix="/forecast", tags=["Flood Forecasting"])
 
@@ -25,6 +25,37 @@ def validate_station(station_code):
 @router.get("/catalog")
 def catalog():
     return {"stations": STATION_MAPPING, "families": ["delta", "level"], "modes": ["shadow", "replay"], "operational_ready": False}
+
+
+@router.post("/refresh-all")
+def refresh_all(db: Session = Depends(get_db)):
+    """Refresh verified telemetry and calculate all stations, labelling delayed data as replay."""
+    from services.telemetry_service import telemetry_service
+    from services.station_service import station_service
+    station_service.get_all_stations(db)
+    ingestion_error = None
+    try:
+        telemetry_service.ingest_rid(db)
+    except ForecastInputError as exc:
+        ingestion_error = str(exc)
+    results = []
+    for code in STATION_MAPPING:
+        try:
+            # Only recent observations may produce a shadow forecast.
+            observations, issue, refs = load_observations(db, code, 1440)
+            age_minutes = (datetime.now(timezone.utc) - datetime.fromisoformat(issue)).total_seconds() / 60
+            mode = "shadow" if age_minutes <= settings.forecast_max_age_minutes else "replay"
+            record = forecast_service.run_forecast(
+                db, code, settings.forecast_model_family, mode,
+                issue_time=issue if mode == "replay" else None,
+                observations=observations if mode == "replay" else None,
+                replay_source="Verified database RID/HII telemetry (delayed observations)",
+                replay_refs=refs,
+            )
+            results.append({"station_code": code, "forecast": ForecastResponse.model_validate(record).model_dump(mode="json"), "error": None})
+        except ForecastInputError as exc:
+            results.append({"station_code": code, "forecast": None, "error": str(exc)})
+    return {"stations": results, "ingestion_error": ingestion_error}
 
 
 @router.get("/latest", response_model=ForecastResponse)

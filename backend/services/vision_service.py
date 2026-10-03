@@ -47,6 +47,7 @@ class VisionService:
         self.station_components: Dict[str, Dict[str, Any]] = {}
         self._cached_dashboards: Dict[str, Tuple[float, bytes]] = {}  # {code: (timestamp, jpeg_bytes)}
         self._cached_metadata: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._cached_frames: Dict[str, Tuple[float, np.ndarray]] = {}
         self.cache_ttl_seconds = 15.0
         self._load_configs()
 
@@ -130,18 +131,30 @@ class VisionService:
             stream_url = "https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg"
 
         try:
-            req = urllib.request.Request(
-                stream_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) FloodLens/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                img_data = resp.read()
+            # The upstream last-photo file can be read while it is being written.
+            # Retry incomplete JPEGs instead of silently filling the image with grey.
+            img_data = b""
+            for attempt in range(2):
+                req = urllib.request.Request(
+                    f"{stream_url}?t={time.time_ns()}",
+                    headers={"User-Agent": "Mozilla/5.0 FloodLens/1.0", "Cache-Control": "no-cache"}
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    img_data = resp.read(15 * 1024 * 1024 + 1)
+                if len(img_data) <= 15 * 1024 * 1024 and img_data.startswith(b"\xff\xd8") and img_data.endswith(b"\xff\xd9"):
+                    break
+            else:
+                raise ValueError("Upstream camera returned an incomplete JPEG")
 
             pil_img = Image.open(io.BytesIO(img_data)).convert("RGB")
             frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            self._cached_frames[station_code] = (time.monotonic(), frame)
             return frame
         except Exception as e:
             print(f"[VisionService] Failed to fetch live frame for {station_code}: {e}")
+            cached = self._cached_frames.get(station_code)
+            if cached and time.monotonic() - cached[0] <= 300:
+                return cached[1].copy()
             return None
 
     def get_realtime_analysis_dashboard(self, station_code: str, mode: str = "live") -> Optional[bytes]:

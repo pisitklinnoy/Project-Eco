@@ -27,6 +27,7 @@ wheels/
 docs
 # Environment variables
 .env
+.env.local
 
 # Storage and Data
 data/

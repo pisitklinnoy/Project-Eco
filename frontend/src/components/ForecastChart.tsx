@@ -159,7 +159,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       {/* Chart Canvas */}
       <div className="text-xs text-slate-600 mb-3" role="status">
         {error ? <p className="text-amber-700">{error}</p> : !forecast ? <p>ยังไม่มีผลพยากรณ์จากโมเดลที่มีข้อมูลล่าสุดเพียงพอ</p> : (
-          <p>{isSimulation ? 'ผลจากสูตรสถานการณ์จำลอง' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+          <p>{isSimulation ? 'ผลจากสูตรสถานการณ์จำลอง' : forecast.context_json?.mode === 'replay' ? 'คำนวณย้อนหลังจากข้อมูลล่าสุดที่มี (Replay) · ไม่ใช่พยากรณ์ ณ เวลาปัจจุบัน' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
             {!isSimulation && forecast.context_json?.missing_features?.length ? ` · ข้อมูลเข้าขาด ${forecast.context_json.missing_features.length} ตัวแปร` : ''}
             {!isSimulation && forecast.context_json?.rain_available === false ? ' · ฝนไม่ครบ' : ''}
           </p>
@@ -172,19 +172,19 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       {/* Predictions Cards */}
       <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-slate-100 text-center">
         <div className="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/80 shadow-sm transition-all hover:bg-slate-50">
-          <span className="text-[11px] text-slate-500 font-semibold block mb-1">อีก 1 ชั่วโมง (+1h)</span>
+          <span className="text-[11px] text-slate-500 font-semibold block mb-1">+1 ชม. จากเวลาข้อมูล</span>
           <div className="text-xl font-bold font-display text-slate-900">
             {forecast?.predicted_1h?.toFixed(2) || '-'} <span className="text-xs font-normal text-slate-500">ม.</span>
           </div>
         </div>
         <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/70 shadow-sm transition-all hover:bg-amber-50">
-          <span className="text-[11px] text-amber-800 font-semibold block mb-1">อีก 2 ชั่วโมง (+2h)</span>
+          <span className="text-[11px] text-amber-800 font-semibold block mb-1">+2 ชม. จากเวลาข้อมูล</span>
           <div className="text-xl font-bold font-display text-amber-700">
             {forecast?.predicted_2h?.toFixed(2) || '-'} <span className="text-xs font-normal text-amber-600">ม.</span>
           </div>
         </div>
         <div className="p-3 rounded-2xl bg-rose-50/60 border border-rose-200/70 shadow-sm transition-all hover:bg-rose-50">
-          <span className="text-[11px] text-rose-800 font-semibold block mb-1">อีก 3 ชั่วโมง (+3h)</span>
+          <span className="text-[11px] text-rose-800 font-semibold block mb-1">+3 ชม. จากเวลาข้อมูล</span>
           <div className="text-xl font-bold font-display text-rose-700">
             {forecast?.predicted_3h?.toFixed(2) || '-'} <span className="text-xs font-normal text-rose-600">ม.</span>
           </div>

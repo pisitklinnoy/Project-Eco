@@ -101,8 +101,8 @@ services:
   # -------------------------------------------------------------
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: floodlens_backend
     restart: unless-stopped
     ports:
@@ -120,8 +120,15 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - FORECAST_MAX_AGE_MINUTES=${FORECAST_MAX_AGE_MINUTES:-120}
+      - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
     volumes:
       - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     depends_on:
       - postgres
       - redis
@@ -152,6 +159,8 @@ services:
       - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN:-}
       - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET:-}
       - LINE_TARGET_USER_OR_GROUP_ID=${LINE_TARGET_USER_OR_GROUP_ID:-}
+      - BACKEND_API_URL=http://backend:8000
+      - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
     volumes:
       - ./workers:/app
     depends_on:
@@ -159,6 +168,7 @@ services:
       - postgres
       - minio
       - mlflow
+      - backend
 
   # -------------------------------------------------------------
   # 8. Observability Stack (Prometheus, Loki, Tempo, Grafana)

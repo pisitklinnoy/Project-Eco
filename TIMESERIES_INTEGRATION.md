@@ -1,0 +1,131 @@
+# Time Series ใน AI Ecosystem
+
+เชื่อมชุด `TimeSeries-Integration` กับ backend, PostgreSQL, ARQ workers และ frontend ที่มีอยู่แล้ว โดยใช้โมเดล RF v2 เดิมครบ 18 ไฟล์ ไม่มีการฝึกใหม่ โค้ดนี้รวมฐาน `main`, `frontend` และ `feat/timeseries-integration` ไว้ใน local branch `integration/ecosystem-timeseries`
+
+## เส้นทางข้อมูล
+
+```text
+ARQ ingestion (ทุก 15 นาที)
+  → POST /api/v1/water/ingest-rid
+  → ตรวจ station mapping จาก RID metadata + อ่านรายงานย้อนหลัง 3 วัน
+  → PostgreSQL water_measurements (RID_API_VERIFIED, timestamp UTC)
+
+ARQ forecast (นาที 1/16/31/46) หรือปุ่มคำนวณบนเว็บ
+  → POST /api/v1/forecast/trigger?mode=shadow
+  → service อ่านระดับน้ำ/ฝนรายชั่วโมงจาก DB + ตรวจความสด
+  → hatyai_timeseries.Forecaster → RF v2 +1/+2/+3 ชั่วโมง
+  → forecast_records พร้อม input snapshot, record references และ model SHA-256
+  → latest/history/comparison API → กราฟและตารางประวัติบนเว็บ
+```
+
+การประมวลผลภาพและเก็บภาพบน MinIO ยังอยู่ในเส้นทางเดิม ค่า CAMERA_VISION ไม่ถูกเฉลี่ยเข้ากับ RID อัตโนมัติ เพราะโมเดลฝึกด้วยระดับน้ำ RID และ datum ของกล้องยังต้องยืนยัน ขั้น forecast ไม่เรียก LINE หรือสร้าง AlertEvent อัตโนมัติ
+
+โมเดลติดตั้งจาก local package เข้า backend image พร้อม dependencies ที่ตรงกับโมเดล จึงไม่ต้องดึงโมเดลใหม่จาก MLflow/MinIO ทุก request บริการ MLflow/MinIO ของระบบยังคงอยู่; RF ชุดนี้ระบุเวอร์ชันและ SHA-256 ในผลทุกครั้ง หากต้องเปลี่ยนที่เก็บ artifacts ให้กำหนด `FORECAST_MODEL_DIR` ไปยัง directory ของโมเดลที่ผ่านการตรวจรับ ไม่ได้ register/train โมเดลใหม่อัตโนมัติ
+
+## รหัสสถานี
+
+| Ecosystem / frontend / DB | โมเดล / RID | ฝน HII |
+|---|---|---|
+| STN-MUANGKONG | X.173A | SLA003 |
+| STN-BANGSALA | X.90 | SLA002 |
+| STN-HATYAINAI | X.44 | SLA001 |
+
+API รับรหัสทั้งสองแบบ แต่ผลและ DB ใช้ STN-* เสมอ ไม่เปลี่ยนรหัสสถานีของ frontend/กล้อง
+
+## การเริ่มใช้งาน
+
+ใช้ Python 3.10–3.12 แนะนำ 3.11 Dependencies หลักล็อกใน `uv.lock`; scikit-learn 1.4.2 และ NumPy 1.26.4 ต้องตรงกับโมเดล
+
+```powershell
+cd D:\Project-Eco
+uv sync --locked
+# SQLite สำหรับ local development (PostgreSQL ยังคงเป็นค่าเริ่มต้นใน Compose)
+$env:DATABASE_URL = 'sqlite:///./floodlens_local.db'
+uv run uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+สำหรับ stack เดิม:
+
+```powershell
+docker compose build backend workers
+docker compose up -d
+```
+
+Frontend เรียก `/api/v1` ผ่าน proxy เดิม ใช้ `npm run dev` ใน `frontend` หรือเปิดบริการ frontend ของ Compose พอร์ต 3001 หากเครื่องมีระบบอื่นใช้พอร์ต 8000/5432/3000 อยู่แล้ว ให้เลือกพอร์ตใน Compose ให้ไม่ชนกัน
+
+ค่าที่ตั้งได้:
+
+| Environment | ค่าเริ่มต้น | ความหมาย |
+|---|---|---|
+| DATABASE_URL | PostgreSQL จาก POSTGRES_* | เลือก DB ชัดเจน; ไม่มี fallback ไป SQLite โดยเงียบ |
+| FORECAST_MAX_AGE_MINUTES | 120 | อายุสูงสุดของระดับน้ำที่อนุญาตให้พยากรณ์สด |
+| FORECAST_MODEL_FAMILY | delta | delta หรือ level; API/UI/worker ใช้ค่าเดียวกัน |
+| FORECAST_MODEL_DIR | package models | เปลี่ยน directory ของ RF artifacts |
+| BACKEND_API_URL | http://backend:8000 | API ที่ ingestion/forecast worker เรียก; local worker ใช้ http://127.0.0.1:8000 |
+
+หลังเริ่ม backend จะสร้างตารางและทำ additive migration เพิ่ม `forecast_records.context_json`, `forecast_records.forecast_key` และ `rainfall_measurements.source_type` ใช้ได้ทั้ง PostgreSQL และ SQLite เก็บแถวเดิมไว้และกำหนดฝนเก่าที่ไม่มี provenance เป็น UNKNOWN ผลเก่าจาก mock/simulator ไม่อยู่ใน latest/history ของ RF
+
+## API ที่ใช้งาน
+
+- `GET /api/v1/forecast/catalog`: station mapping, families และ modes
+- `POST /api/v1/water/ingest-rid`: อ่าน RID จริงและบันทึกเวลารายงานเป็น UTC; รายการที่ค่าเดิมไม่เพิ่มซ้ำ หากค่าถูกแก้ที่ต้นทางเก็บ revision ใหม่
+- `POST /api/v1/forecast/trigger?station_code=STN-HATYAINAI&mode=shadow&family=delta`: ใช้ verified telemetry ใน DB; ไม่รับ input custom ในโหมดนี้
+- `GET /api/v1/forecast/latest?station_code=STN-HATYAINAI`: ผล RF ล่าสุดที่ยังสด; ไม่มีผลตอบ 404 และไม่สร้างค่าจำลอง
+- `GET /api/v1/forecast/history?station_code=STN-HATYAINAI&mode=shadow&limit=30`: ประวัติผลที่เก็บไว้ รับ `start`, `end` ISO timestamp และ `family` ได้
+- `GET /api/v1/forecast/{id}/comparison`: เทียบ +1/+2/+3 ชั่วโมงกับ RID ของ station+target_time เดียวกัน หากไม่มีค่าจริงคืน null
+- `POST /api/v1/forecast/simulate`: สูตร What-If เดิมคืน `SIMULATION` และ id=0 ไม่บันทึกปะปนกับ RF
+
+ตัวอย่าง replay จาก sample เดิมในชุดส่งต่อ:
+
+```python
+import pandas as pd
+import requests
+
+sample = pd.read_csv('TimeSeries-Integration/examples/observations.csv')
+rows = sample.astype(object).where(pd.notna(sample), None).to_dict('records')
+response = requests.post(
+    'http://127.0.0.1:8000/api/v1/forecast/trigger',
+    params={'station_code': 'STN-HATYAINAI', 'mode': 'replay', 'family': 'delta'},
+    json={'issue_time': '2025-01-10T00:00:00+07:00', 'observations': rows},
+    timeout=60,
+)
+response.raise_for_status()
+print(response.json())
+```
+
+Replay ต้องส่งข้อมูลเองและระบุเวลา ไม่แอบโหลด sample เป็นข้อมูลสด ใช้รูปแบบ observation ของ [README ชุดโมเดล](TimeSeries-Integration/README.md) บนเว็บเปิด “ประวัติผลพยากรณ์และค่าจริง” เลือกข้อมูล RID เพื่อทดลองหรือทดสอบย้อนหลัง แล้วกดเทียบค่าจริงของรอบที่ต้องการ
+
+## Input policy และประวัติ
+
+Shadow ใช้เฉพาะระดับน้ำ `source_type=RID_API_VERIFIED` และฝน `HII_API_VERIFIED` อ่าน exact-hour lag จาก t−24h ถึง t ไม่ forward-fill ไม่ interpolate และไม่อ่านค่าจริงในอนาคต timestamp ใน DB เป็น UTC แบบไม่มี timezone ตาม schema เดิม แต่ API ส่ง timezone +00:00 เสมอ library แปลงเป็น Asia/Bangkok
+
+ฝนสดยังไม่มี verified feed ในชุดนี้ worker จึงไม่เขียนค่าคงที่ 4.2/28.5 อีก ฝน UNKNOWN/ค่าติดลบ/sentinel ถูกละไว้เป็น missing พร้อมคืน `PARTIAL_INPUTS`, `missing_features` และ `rain_available=False` ใช้ imputer ที่ฝึกไว้แล้ว หากระดับน้ำปัจจุบันหายหรือเก่าเกิน policy ตอบ 503 และ worker บันทึกสถานะ unavailable โดยไม่ออก prediction fallback
+
+ระบบที่มี HII feed แล้วให้เขียน `rainfall_measurements.station_code` เป็น SLA001/002/003 หรือ STN-* ที่จับคู่ในตาราง พร้อม `source_type=HII_API_VERIFIED`, timestamp ชั่วโมงรายงาน UTC, ค่าฝนที่วัดแล้วผ่าน QC และ `created_at` เวลาได้รับข้อมูลจริง อย่าเปลี่ยนฝนเก่า UNKNOWN เป็น VERIFIED โดยไม่มีหลักฐาน เวลาเผยแพร่และความหมายชั่วโมงสะสมฝนยังต้องตรวจจากแหล่งข้อมูล
+
+รันซ้ำด้วยสถานี/issue_time/mode/family/features/model hashes เดิมจะคืน record เดิม ผ่าน unique `forecast_key` หาก input หรือโมเดลเปลี่ยนจะเก็บรอบใหม่ `context_json` เก็บ exact input_features และ observation_refs เพื่อย้อนตรวจค่าที่ใช้จริง ส่วน `generated_at`/`created_at` คือเวลารัน ไม่ใช่เวลารายงานต้นทาง
+
+โมเดลยังเป็นงานทดลอง (`operational_ready=False`) ไม่ใช้เกณฑ์บนหน้าเว็บเพื่อเปิดแจ้งเตือนอัตโนมัติ ต้องยืนยัน datum, ฝนสด และประเมินน้ำสูงที่ไม่เคยใช้เลือกโมเดลก่อน ประวัติหลายรอบที่ target_time เดียวกันเป็นคำทำนายจาก issue/horizon/revision ต่างกัน จึงต้องประเมินแยกตามรอบ
+
+## ตรวจรับ
+
+```powershell
+uv run pytest tests -q
+uv run python -m unittest discover -s TimeSeries-Integration/tests -v
+cd frontend
+npm run build
+npm run lint
+```
+
+tests ครอบคลุม RF ทั้ง 18 โมเดล, UTC/ไทย, station aliases, ความสด, ฝนขาดและ provenance, input revision, การรันซ้ำ, การแยก simulation/replay, history/comparison, parser RID และ migration ของ DB เดิม โดย default ใช้ SQLite ในหน่วยความจำ
+
+สำหรับทดสอบ PostgreSQL ใช้ **DB แยกชื่อ floodlens_ts_test** เท่านั้น:
+
+```powershell
+$env:TIMESERIES_TEST_DATABASE_URL='postgresql://ts_test:ts_test_local@127.0.0.1:55434/floodlens_ts_test'
+uv run pytest tests -q
+```
+
+fixture สร้าง/ลบตารางใน DB ทดสอบนี้ทุก test ไม่ใช้ DB หลัก ตรวจ RID สดแบบ read-only ได้ด้วย `uv run python scripts/check_timeseries_live.py` โดยกำหนด DATABASE_URL สำหรับ environment local ให้เรียบร้อย คำสั่งนี้ไม่เขียนฐานข้อมูล ไม่แจ้งเตือน และไม่ทำนาย
+
+ผลตรวจรับวันที่ 3 ตุลาคม 2026: integration tests ผ่าน 14 รายการทั้ง SQLite และ PostgreSQL 15, ชุดทดสอบ portable models ผ่าน 6 รายการ, frontend production build และ lint ผ่าน (มี warnings ของโค้ด UI เดิม), Docker backend/worker build ผ่าน และอ่าน RID จริงได้ทั้ง 3 สถานี การทดสอบทั้งหมดใช้ฐานข้อมูลทดสอบแยก ไม่แก้ข้อมูลใน deployment เดิม

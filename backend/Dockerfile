@@ -12,10 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
+COPY TimeSeries-Integration /opt/TimeSeries-Integration
+RUN uv pip install --system --no-cache /opt/TimeSeries-Integration
 
-COPY . .
+COPY backend/ .
 
 EXPOSE 8000
 

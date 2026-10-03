@@ -36,6 +36,23 @@ export interface ForecastRecord {
   model_version: string;
   input_mode: string;
   data_quality_status: string;
+  created_at?: string;
+  context_json?: {
+    mode: 'shadow' | 'replay' | 'simulation';
+    issue_time?: string;
+    current_level_m?: number;
+    input_quality?: string;
+    missing_features?: string[];
+    rain_available?: boolean;
+    operational_ready: boolean;
+    predictions?: { horizon_h: number; target_time: string; level_m: number }[];
+  };
+}
+
+export interface ForecastComparison {
+  forecast_id: number;
+  station_code: string;
+  items: { lead_time_hours: number; target_time: string; predicted_level: number; actual_level: number | null; mae_error: number | null }[];
 }
 
 export interface AlertEvent {

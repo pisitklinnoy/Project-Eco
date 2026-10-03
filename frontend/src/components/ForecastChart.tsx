@@ -32,6 +32,7 @@ interface ForecastChartProps {
   forecast: ForecastRecord | null;
   onTriggerForecast: () => void;
   triggering: boolean;
+  error?: string;
 }
 
 export const ForecastChart: React.FC<ForecastChartProps> = ({
@@ -40,43 +41,26 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   forecast,
   onTriggerForecast,
   triggering,
+  error,
 }) => {
   if (!station) return null;
 
-  // Prepare labels & data points
-  const recentHistory = history.length > 0 ? history.slice(-8) : [];
-  const historyLabels = recentHistory.length > 0
-    ? recentHistory.map((h) =>
-        new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      )
-    : ['ปัจจุบัน'];
-  const historyValues = recentHistory.length > 0
-    ? recentHistory.map((h) => h.water_level)
-    : [station.normal_level];
-
-  // 2. Forecast points
-  const forecastLabels = ['+1 ชม.', '+2 ชม.', '+3 ชม.'];
-  const allLabels = [...historyLabels, ...forecastLabels];
-
-  // Actual history line (null for forecast part)
-  const actualDataset = [...historyValues, null, null, null];
-
-  // Forecast line (connects from last history point)
-  const lastHistoryVal = historyValues[historyValues.length - 1] ?? station.normal_level;
-  const paddingLength = Math.max(0, historyValues.length - 1);
-  const forecastDataset = [
-    ...new Array(paddingLength).fill(null),
-    lastHistoryVal,
-    forecast?.predicted_1h ?? Number((lastHistoryVal + 0.2).toFixed(2)),
-    forecast?.predicted_2h ?? Number((lastHistoryVal + 0.4).toFixed(2)),
-    forecast?.predicted_3h ?? Number((lastHistoryVal + 0.6).toFixed(2)),
-  ];
+  const issue = forecast ? new Date(forecast.forecast_time).getTime()
+    : history.length ? new Date(history[history.length - 1].timestamp).getTime() : null;
+  const timeline = issue === null ? [] : Array.from({ length: forecast ? 28 : 25 }, (_, i) => issue + (i - 24) * 3600000);
+  const byTime = new Map(history.map(row => [new Date(row.timestamp).getTime(), row.water_level]));
+  const allLabels = timeline.map(t => new Date(t).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }));
+  const actualDataset = timeline.map(t => byTime.get(t) ?? null);
+  const forecastValues = [forecast?.context_json?.current_level_m ?? null, forecast?.predicted_1h ?? null, forecast?.predicted_2h ?? null, forecast?.predicted_3h ?? null];
+  const forecastDataset = timeline.map((_, i) => forecast && i >= 24 ? forecastValues[i - 24] : null);
+  const historyValues = actualDataset.filter((value): value is number => value !== null);
+  const isSimulation = forecast?.context_json?.mode === 'simulation';
 
   const data = {
     labels: allLabels,
     datasets: [
       {
-        label: 'ระดับน้ำตรวจวัดจริง (ม. รทก.)',
+        label: 'ระดับน้ำ RID (เมตรตามรายงาน)',
         data: actualDataset,
         borderColor: '#0284c7',
         backgroundColor: 'rgba(2, 132, 199, 0.08)',
@@ -88,7 +72,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
         pointBackgroundColor: '#0284c7',
       },
       {
-        label: 'พยากรณ์ระดับน้ำ AI (ม. รทก.)',
+        label: isSimulation ? 'สถานการณ์จำลอง (สูตรทดลอง)' : 'พยากรณ์ระดับน้ำ AI (เมตรตามรายงาน)',
         data: forecastDataset,
         borderColor: '#d97706',
         borderDash: [6, 4],
@@ -133,8 +117,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       y: {
         grid: { color: 'rgba(226, 232, 240, 0.6)' },
         ticks: { color: '#64748b', font: { size: 10, weight: 'bold' as const } },
-        min: Math.max(0, Math.min(...historyValues, 1.0) - 0.5),
-        max: station.bank_level + 0.5,
+        suggestedMin: historyValues.length ? Math.min(...historyValues) - 0.5 : undefined,
       },
     },
   };
@@ -157,7 +140,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
 
         <div className="flex items-center space-x-2">
           <span className="text-[11px] px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-            โหมด: {forecast?.input_mode || 'API_PLUS_VISION'}
+            โหมด: {isSimulation ? 'สถานการณ์จำลอง' : forecast?.input_mode || 'รอข้อมูล'}
           </span>
           <PillButton
             onClick={onTriggerForecast}
@@ -174,6 +157,14 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       </div>
 
       {/* Chart Canvas */}
+      <div className="text-xs text-slate-600 mb-3" role="status">
+        {error ? <p className="text-amber-700">{error}</p> : !forecast ? <p>ยังไม่มีผลพยากรณ์จากโมเดลที่มีข้อมูลล่าสุดเพียงพอ</p> : (
+          <p>{isSimulation ? 'ผลจากสูตรสถานการณ์จำลอง' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+            {!isSimulation && forecast.context_json?.missing_features?.length ? ` · ข้อมูลเข้าขาด ${forecast.context_json.missing_features.length} ตัวแปร` : ''}
+            {!isSimulation && forecast.context_json?.rain_available === false ? ' · ฝนไม่ครบ' : ''}
+          </p>
+        )}
+      </div>
       <div className="w-full h-64 sm:h-72 my-auto">
         <Line data={data} options={options} />
       </div>

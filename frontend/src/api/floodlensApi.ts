@@ -1,6 +1,11 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage } from '../types';
+import type { Station, WaterMeasurement, ForecastRecord, ForecastComparison, AlertEvent, ReviewPackage } from '../types';
 
 const API_BASE = '/api/v1';
+
+async function apiError(response: Response): Promise<Error> {
+  const body = await response.json().catch(() => ({}));
+  return new Error(typeof body.detail === 'string' ? body.detail : `API error (${response.status})`);
+}
 
 export const floodlensApi = {
   // 1. Stations
@@ -17,9 +22,10 @@ export const floodlensApi = {
   },
 
   // 2. Water & Telemetry
-  getLatestWater: async (stationCode: string): Promise<WaterMeasurement> => {
+  getLatestWater: async (stationCode: string): Promise<WaterMeasurement | null> => {
     const res = await fetch(`${API_BASE}/water/latest?station_code=${encodeURIComponent(stationCode)}`);
-    if (!res.ok) throw new Error('Failed to fetch latest water measurement');
+    if (res.status === 404) return null;
+    if (!res.ok) throw await apiError(res);
     return res.json();
   },
 
@@ -30,9 +36,10 @@ export const floodlensApi = {
   },
 
   // 3. Forecast
-  getLatestForecast: async (stationCode: string): Promise<ForecastRecord> => {
+  getLatestForecast: async (stationCode: string): Promise<ForecastRecord | null> => {
     const res = await fetch(`${API_BASE}/forecast/latest?station_code=${encodeURIComponent(stationCode)}`);
-    if (!res.ok) throw new Error('Failed to fetch forecast');
+    if (res.status === 404) return null;
+    if (!res.ok) throw await apiError(res);
     return res.json();
   },
 
@@ -40,7 +47,19 @@ export const floodlensApi = {
     const res = await fetch(`${API_BASE}/forecast/trigger?station_code=${encodeURIComponent(stationCode)}`, {
       method: 'POST',
     });
-    if (!res.ok) throw new Error('Failed to trigger forecast');
+    if (!res.ok) throw await apiError(res);
+    return res.json();
+  },
+
+  getForecastHistory: async (stationCode: string, mode: 'shadow' | 'replay' = 'shadow'): Promise<ForecastRecord[]> => {
+    const res = await fetch(`${API_BASE}/forecast/history?station_code=${encodeURIComponent(stationCode)}&mode=${mode}&limit=30`);
+    if (!res.ok) throw await apiError(res);
+    return res.json();
+  },
+
+  getForecastComparison: async (id: number): Promise<ForecastComparison> => {
+    const res = await fetch(`${API_BASE}/forecast/${id}/comparison`);
+    if (!res.ok) throw await apiError(res);
     return res.json();
   },
 

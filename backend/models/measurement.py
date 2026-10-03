@@ -23,6 +23,7 @@ class RainfallMeasurement(Base):
     id = Column(Integer, primary_key=True, index=True)
     station_code = Column(String(50), index=True, nullable=False)
     timestamp = Column(DateTime, index=True, nullable=False)
+    source_type = Column(String(50), default="UNKNOWN", server_default="UNKNOWN", nullable=False)
     rain_amount_1h = Column(Float, default=0.0) # mm
     rain_amount_24h = Column(Float, default=0.0) # mm
     created_at = Column(DateTime, default=datetime.utcnow)

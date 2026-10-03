@@ -93,7 +93,7 @@ export const StationMap: React.FC<StationMapProps> = ({
       
       const meas = measurementsByStation[stn.station_code] || 
         (isSelected && latestWater ? latestWater : null);
-      const waterLvl = meas ? meas.water_level : stn.normal_level;
+      const waterLvl = meas ? meas.water_level : Number.NaN;
 
       // Color coding based on real station-specific thresholds
       let statusText = 'ปกติ';
@@ -120,7 +120,11 @@ export const StationMap: React.FC<StationMapProps> = ({
       }
 
       const shortName = stn.name.split(' ')[0];
-      const distanceToBank = (stn.bank_level - waterLvl).toFixed(2);
+      if (!meas) {
+        statusText = 'ไม่มีข้อมูล'; themeColor = '#94a3b8'; bgBadge = '#f1f5f9';
+        textBadge = '#475569'; borderBadge = '#cbd5e1'; pingClass = '';
+      }
+      const distanceToBank = meas ? (stn.bank_level - waterLvl).toFixed(2) : '—';
 
       // Clean circular dot marker
       const iconHtml = `
@@ -147,7 +151,7 @@ export const StationMap: React.FC<StationMapProps> = ({
             transition: all 0.2s ease;
             ${isSelected ? 'transform: scale(1.18);' : ''}
           ">
-            ${waterLvl.toFixed(1)}
+            ${meas ? waterLvl.toFixed(1) : '—'}
           </div>
         </div>
       `;
@@ -163,7 +167,7 @@ export const StationMap: React.FC<StationMapProps> = ({
 
       // Compact, non-overlapping hover tooltip
       marker.bindTooltip(
-        `<strong>${shortName}</strong>: ${waterLvl.toFixed(2)} ม. รทก. (${statusText})`,
+        `<strong>${shortName}</strong>: ${meas ? waterLvl.toFixed(2) + ' เมตรตามรายงาน' : '—'} (${statusText})`,
         { direction: 'top', offset: [0, -18], className: 'font-sans text-xs' }
       );
 
@@ -188,7 +192,7 @@ export const StationMap: React.FC<StationMapProps> = ({
           <div class="flex justify-between items-center text-xs">
             <span class="font-semibold text-slate-700">ระดับน้ำตรวจวัดล่าสุด:</span>
             <span class="font-extrabold text-base font-mono" style="color: ${themeColor}">
-              ${waterLvl.toFixed(2)} ม. รทก.
+              ${meas ? waterLvl.toFixed(2) + ' เมตรตามรายงาน' : 'ไม่มีข้อมูล'}
             </span>
           </div>
           <div class="text-[10px] text-slate-500 flex justify-between mt-1 pt-1 border-t border-slate-200/60 font-medium">

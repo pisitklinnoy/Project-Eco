@@ -98,7 +98,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   if (!station) return null;
 
-  const currentLevel = measurement ? measurement.water_level : station.normal_level;
+  const currentLevel = measurement ? measurement.water_level : Number.NaN;
 
   const getActiveStreamUrl = () => {
     if (!station) return null;
@@ -182,7 +182,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   };
 
   const bbox = getStationBBox(station.station_code);
-  const confidencePercent = measurement?.vision_confidence ? Math.round(measurement.vision_confidence * 100) : 92;
+  const confidencePercent = measurement?.vision_confidence != null ? Math.round(measurement.vision_confidence * 100) : null;
 
   // Zoom Handlers
   const handleZoomIn = () => {
@@ -634,7 +634,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                         {/* Label Badge on top of bounding box */}
                         <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-emerald-700/90 backdrop-blur-md text-emerald-100 text-[9px] font-black px-1.5 py-0.5 rounded shadow border border-emerald-400/50 whitespace-nowrap flex items-center space-x-1">
                           <Target className="w-2.5 h-2.5 text-emerald-300 shrink-0" />
-                          <span>Staff Gauge: {confidencePercent}%</span>
+                          <span>Staff Gauge: {confidencePercent == null ? '—' : `${confidencePercent}%`}</span>
                         </div>
 
                         {/* Corner Accents */}
@@ -645,7 +645,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                       </div>
 
                       {/* 2. Orange Waterline Contact Line cutting across the staff gauge */}
-                      <div
+                      {Number.isFinite(currentLevel) && <div
                         className="absolute pointer-events-none border-b-2 border-dashed border-orange-500 opacity-95 shadow-[0_0_16px_rgba(249,115,22,0.95)] flex items-center justify-between"
                         style={{
                           top: `${topPercent}%`,
@@ -655,10 +655,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                       >
                         <span className="text-[10px] bg-gradient-to-r from-orange-600 to-amber-600 text-white font-black px-2 py-0.5 rounded shadow -translate-y-3.5 flex items-center space-x-1 border border-white/20 whitespace-nowrap">
                           <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
-                          <span>AI ผิวน้ำ: {currentLevel.toFixed(2)} ม. รทก.</span>
+                          <span>{measurement?.source_type === 'RID_API_VERIFIED' ? 'ระดับ RID' : 'AI ผิวน้ำ'}: {Number.isFinite(currentLevel) ? currentLevel.toFixed(2) : '—'} เมตรตามรายงาน</span>
                         </span>
                         <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white shadow-md -translate-y-1.5 animate-ping"></span>
-                      </div>
+                      </div>}
                     </>
                   )}
                 </div>
@@ -724,9 +724,9 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                     displayLevel >= station.critical_level ? 'text-red-600' :
                     displayLevel >= station.warning_level ? 'text-amber-600' : 'text-blue-700'
                   }`}>
-                    {displayLevel.toFixed(2)}
+                    {Number.isFinite(displayLevel) ? displayLevel.toFixed(2) : '—'}
                   </span>
-                  <span className="text-[11px] text-slate-700 font-bold">ม. รทก.</span>
+                  <span className="text-[11px] text-slate-700 font-bold">เมตรตามรายงาน</span>
                 </div>
               </div>
             </div>
@@ -916,7 +916,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   }}
                 >
                   <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-emerald-700/90 text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
-                    Staff Gauge: {confidencePercent}%
+                    Staff Gauge: {confidencePercent == null ? '—' : `${confidencePercent}%`}
                   </div>
                 </div>
               )}
@@ -932,7 +932,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   displayLevel >= station.critical_level ? 'text-rose-400' :
                   displayLevel >= station.warning_level ? 'text-amber-400' : 'text-emerald-300'
                 }`}>
-                  {displayLevel.toFixed(2)} ม. รทก.
+                  {Number.isFinite(displayLevel) ? displayLevel.toFixed(2) : '—'} เมตรตามรายงาน
                 </span>
                 <span className="text-slate-400">|</span>
                 <span className="text-slate-300">เตือนภัย: {station.warning_level} ม. รทก.</span>

@@ -48,6 +48,8 @@
 
 ## 🚀 เริ่มต้นใช้งานอย่างรวดเร็ว (Quick Start)
 
+Time Series เชื่อมกับ RF v2 จริงแล้ว ผ่าน API/ARQ/PostgreSQL และ frontend เดิม ดูวิธีใช้งาน, input policy, replay และประวัติผลพยากรณ์ใน [คู่มือ Time Series integration](TIMESERIES_INTEGRATION.md) เมื่อไม่มี verified input ระบบแสดงข้อมูลไม่พอแทนค่าพยากรณ์จำลอง
+
 ### 1. คัดลอกและตั้งค่า Environment Variables
 ```bash
 cp .env.example .env

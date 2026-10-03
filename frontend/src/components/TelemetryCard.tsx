@@ -21,12 +21,12 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
 }) => {
   if (!station) return null;
 
-  const currentLevel = measurement ? measurement.water_level : station.normal_level;
+  const currentLevel = measurement ? measurement.water_level : Number.NaN;
   const isCritical = currentLevel >= station.critical_level;
   const isWarning = currentLevel >= station.warning_level && !isCritical;
 
   // Percentage of bank level (0 to 100%)
-  const percentage = Math.min(Math.round((currentLevel / station.bank_level) * 100), 100);
+  const percentage = measurement ? Math.max(0, Math.min(Math.round((currentLevel / station.bank_level) * 100), 100)) : 0;
   const distanceToBank = Math.max(0, station.bank_level - currentLevel);
 
   return (
@@ -82,10 +82,10 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
                   isCritical ? 'text-rose-600' : isWarning ? 'text-amber-600' : 'text-slate-900'
                 }`}
               >
-                {currentLevel.toFixed(2)}
+                {measurement ? currentLevel.toFixed(2) : '—'}
               </span>
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-700">เมตร (ม. รทก.)</span>
+                <span className="text-xs font-bold text-slate-700">เมตรตามรายงาน</span>
                 <span className="text-[10px] text-slate-600 font-medium">ระดับน้ำปัจจุบัน</span>
               </div>
             </div>
@@ -112,7 +112,7 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
               ) : (
                 <>
                   <Waves className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>ระดับปกติ</span>
+                  <span>{measurement ? 'ระดับปกติ' : 'ไม่มีข้อมูล'}</span>
                 </>
               )}
             </span>
@@ -123,7 +123,7 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
         <div className="lg:col-span-4 flex flex-col justify-center space-y-3.5 lg:border-l lg:border-slate-200/60 lg:pl-6 pt-4 lg:pt-0 border-t border-slate-100 lg:border-t-0">
           <div className="flex justify-between items-center text-xs">
             <span className="font-semibold text-slate-700">ความจุลำน้ำคลองอู่ตะเภา</span>
-            <span className="font-display font-extrabold text-sky-700 text-sm">{percentage}%</span>
+            <span className="font-display font-extrabold text-sky-700 text-sm">{measurement ? `${percentage}%` : '—'}</span>
           </div>
 
           <div className="w-full bg-slate-100/90 rounded-full h-3 overflow-hidden p-0.5 border border-slate-200/60">
@@ -161,7 +161,7 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
           <div className="text-xs text-slate-600 flex items-center justify-between pt-1">
             <span>ระยะก่อนล้นตลิ่ง:</span>
             <span className="font-bold font-display text-slate-900 whitespace-nowrap bg-slate-100 px-2.5 py-0.5 rounded-full text-[11px]">
-              เหลืออีก {distanceToBank.toFixed(2)} เมตร
+              {measurement ? `เหลืออีก ${distanceToBank.toFixed(2)} เมตร` : 'ไม่มีข้อมูลระดับน้ำ'}
             </span>
           </div>
         </div>
@@ -175,7 +175,7 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
                 <span>แหล่งตรวจวัด:</span>
               </span>
               <span className="text-slate-900 font-bold font-mono text-[11px] truncate">
-                {measurement?.source_type || 'CAMERA_VISION'}
+                {measurement?.source_type || 'ไม่มีข้อมูล'}
               </span>
             </div>
 
@@ -185,7 +185,7 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
                 <span>ความเชื่อมั่น AI:</span>
               </span>
               <span className="text-emerald-700 font-bold font-display">
-                {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 92).toFixed(0)}%
+                {measurement?.vision_confidence != null ? `${(measurement.vision_confidence * 100).toFixed(0)}%` : '—'}
               </span>
             </div>
 
@@ -195,13 +195,14 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
                 <span>เวลาอัปเดต:</span>
               </span>
               <span className="text-slate-800 font-medium">
-                {measurement ? new Date(measurement.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ล่าสุด'}
+                {measurement ? new Date(measurement.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
               </span>
             </div>
           </div>
 
           <PillButton
             onClick={onOpenReview}
+            disabled={!measurement?.image_minio_path}
             variant="glass"
             size="sm"
             icon={<ShieldCheck className="w-3.5 h-3.5 text-sky-600 shrink-0" />}

@@ -3,7 +3,7 @@ name = "hatyai-floodlens"
 version = "1.0.0"
 description = "ระบบเฝ้าระวังและพยากรณ์ระดับน้ำในพื้นที่หาดใหญ่ด้วย AI จากข้อมูลอนุกรมเวลาและภาพกล้อง"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.28.0",
@@ -24,8 +24,10 @@ dependencies = [
     "mlflow-skinny>=2.11.0",
     "label-studio-sdk>=0.0.34",
     "pillow>=10.2.0",
-    "numpy>=1.26.4",
-    "pandas>=2.2.1",
+    "numpy==1.26.4",
+    "pandas>=2.2.1,<3",
+    "hatyai-timeseries",
+    "opencv-python-headless>=4.8,<4.12",
 ]
 
 [dependency-groups]
@@ -33,3 +35,6 @@ dev = [
     "pytest>=8.0.0",
     "httpx>=0.27.0",
 ]
+
+[tool.uv.sources]
+hatyai-timeseries = { path = "TimeSeries-Integration", editable = true }

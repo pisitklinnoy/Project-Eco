@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Station, WaterMeasurement, ForecastRecord, AlertEvent } from './types';
 import { floodlensApi } from './api/floodlensApi';
 import { Navbar } from './components/Navbar';
@@ -9,6 +9,7 @@ import { SectionHeader } from './components/ui/SectionHeader';
 import { StationMap } from './components/StationMap';
 import { TelemetryCard } from './components/TelemetryCard';
 import { ForecastChart } from './components/ForecastChart';
+import { ForecastHistory } from './components/ForecastHistory';
 import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
@@ -23,12 +24,23 @@ export const App: React.FC = () => {
   const [stationMeasurements, setStationMeasurements] = useState<Record<string, WaterMeasurement>>({});
   const [history, setHistory] = useState<WaterMeasurement[]>([]);
   const [forecast, setForecast] = useState<ForecastRecord | null>(null);
+  const [forecastError, setForecastError] = useState('');
+  const stationCodeRef = useRef<string | null>(null);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [triggeringForecast, setTriggeringForecast] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
+
+  const selectStation = useCallback((station: Station) => {
+    stationCodeRef.current = station.station_code;
+    setSelectedStation(station);
+    setForecast(null);
+    setMeasurement(null);
+    setHistory([]);
+    setForecastError('');
+  }, []);
 
   // Active section tracking for floating navbar & sidebar
   const [activeSection, setActiveSection] = useState<string>('hero');
@@ -64,34 +76,43 @@ export const App: React.FC = () => {
       .then((data) => {
         setStations(data);
         if (data.length > 0) {
-          setSelectedStation(data[0]);
+          selectStation(data[0]);
           loadAllStationMeasurements(data);
         }
       })
       .catch((err) => console.error('Failed to load stations', err))
       .finally(() => setLoading(false));
-  }, [loadAllStationMeasurements]);
+  }, [loadAllStationMeasurements, selectStation]);
 
   // 2. Fetch Station Specific Data
   const loadStationData = useCallback(async () => {
     if (!selectedStation) return;
+    const code = selectedStation.station_code;
     try {
-      const [latestWater, waterHistory, latestForecast, recentAlerts] = await Promise.all([
+      const [waterResult, historyResult, forecastResult, alertsResult] = await Promise.allSettled([
         floodlensApi.getLatestWater(selectedStation.station_code),
         floodlensApi.getWaterHistory(selectedStation.station_code, 24),
         floodlensApi.getLatestForecast(selectedStation.station_code),
         floodlensApi.getRecentAlerts(10),
       ]);
+      if (stationCodeRef.current !== code) return;
+      const latestWater = waterResult.status === 'fulfilled' ? waterResult.value : null;
+      const waterHistory = historyResult.status === 'fulfilled' ? historyResult.value : [];
+      const latestForecast = forecastResult.status === 'fulfilled' ? forecastResult.value : null;
+      const recentAlerts = alertsResult.status === 'fulfilled' ? alertsResult.value : [];
       setMeasurement(latestWater);
       setHistory(waterHistory);
       setForecast(latestForecast);
       setAlerts(recentAlerts);
+      setForecastError(forecastResult.status === 'rejected' ? String(forecastResult.reason) : '');
 
       // Update in dictionary
-      setStationMeasurements((prev) => ({
-        ...prev,
-        [selectedStation.station_code]: latestWater,
-      }));
+      setStationMeasurements((prev) => {
+        const next = { ...prev };
+        if (latestWater) next[code] = latestWater;
+        else delete next[code];
+        return next;
+      });
     } catch (err) {
       console.error('Failed to load station telemetry', err);
     }
@@ -148,12 +169,15 @@ export const App: React.FC = () => {
   const handleTriggerForecast = async () => {
     if (!selectedStation) return;
     setTriggeringForecast(true);
+    setForecastError('');
+    const code = selectedStation.station_code;
     try {
       const res = await floodlensApi.triggerForecast(selectedStation.station_code);
+      if (stationCodeRef.current !== code) return;
       setForecast(res);
       await loadStationData();
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการคำนวณผลพยากรณ์');
+      if (stationCodeRef.current === code) setForecastError(err instanceof Error ? err.message : 'ไม่สามารถคำนวณพยากรณ์ได้');
     } finally {
       setTriggeringForecast(false);
     }
@@ -193,7 +217,7 @@ export const App: React.FC = () => {
       <Navbar
         stations={stations}
         selectedStation={selectedStation}
-        onSelectStation={setSelectedStation}
+        onSelectStation={selectStation}
         systemStatus="healthy"
         activeSection={activeSection}
         onNavigate={handleNavigate}
@@ -214,7 +238,7 @@ export const App: React.FC = () => {
           onExploreClick={() => handleNavigate('gis-cctv')}
           onSimulateClick={() => handleNavigate('simulation')}
           onOpenReview={() => setIsReviewOpen(true)}
-          onSelectStation={setSelectedStation}
+          onSelectStation={selectStation}
         />
 
         {/* ========================================================= */}
@@ -245,7 +269,7 @@ export const App: React.FC = () => {
               <StationMap
                 stations={stations}
                 selectedStation={selectedStation}
-                onSelectStation={setSelectedStation}
+                onSelectStation={selectStation}
                 latestWater={measurement}
                 measurementsByStation={stationMeasurements}
               />
@@ -303,7 +327,9 @@ export const App: React.FC = () => {
                 forecast={forecast}
                 onTriggerForecast={handleTriggerForecast}
                 triggering={triggeringForecast}
+                error={forecastError}
               />
+              <ForecastHistory stationCode={selectedStation?.station_code ?? null} refreshKey={forecast?.id ?? 0} />
             </div>
 
             <div className="lg:col-span-4">

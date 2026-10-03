@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.database import engine, Base
+from core.schema_migrations import upgrade_timeseries_schema
 import models # ensure all SQLAlchemy models are registered
 from api.v1 import api_router
 
@@ -17,9 +18,10 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 # Initialize database schema
 try:
     Base.metadata.create_all(bind=engine)
+    upgrade_timeseries_schema(engine)
     print("[Database] Schema synchronized successfully.")
 except Exception as e:
-    print(f"[Database] Schema creation note: {e}")
+    raise RuntimeError("Database schema initialization failed") from e
 
 app = FastAPI(
     title=settings.app_name,

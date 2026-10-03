@@ -32,12 +32,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenReview,
   onSelectStation,
 }) => {
-  const currentLevel = measurement ? measurement.water_level : (station?.normal_level ?? 3.0);
+  const currentLevel = measurement ? measurement.water_level : Number.NaN;
   const bankLevel = station?.bank_level ?? 15.0;
   const isCritical = station ? currentLevel >= station.critical_level : false;
   const isWarning = station ? currentLevel >= station.warning_level && !isCritical : false;
   const distanceToBank = Math.max(0, bankLevel - currentLevel);
-  const capacityPercent = Math.min(Math.round((currentLevel / bankLevel) * 100), 100);
+  const capacityPercent = measurement ? Math.max(0, Math.min(Math.round((currentLevel / bankLevel) * 100), 100)) : 0;
 
   return (
     <section className="relative w-full pt-4 pb-6 select-none" id="hero">
@@ -117,7 +117,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {stations.map((stn) => {
                 const isSelected = station?.station_code === stn.station_code;
                 const stnWater = stationMeasurements[stn.station_code];
-                const stnLvl = stnWater ? stnWater.water_level : stn.normal_level;
+                const stnLvl = stnWater ? stnWater.water_level : Number.NaN;
                 return (
                   <button
                     key={stn.station_code}
@@ -138,7 +138,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       }`}
                     />
                     <span>{stn.name.split(' ')[0]}</span>
-                    <span className="font-mono text-[11px] opacity-80">{stnLvl.toFixed(2)}m</span>
+                    <span className="font-mono text-[11px] opacity-80">{stnWater ? `${stnLvl.toFixed(2)}m` : 'ไม่มีข้อมูล'}</span>
                   </button>
                 );
               })}
@@ -178,7 +178,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   }`}
                 >
-                  {isCritical ? 'วิกฤตน้ำท่วม' : isWarning ? 'เตือนภัย' : 'ระดับปกติ'}
+                  {!measurement ? 'ไม่มีข้อมูล' : isCritical ? 'วิกฤตน้ำท่วม' : isWarning ? 'เตือนภัย' : 'ระดับปกติ'}
                 </span>
               </div>
 
@@ -194,9 +194,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         isCritical ? 'text-rose-600' : isWarning ? 'text-amber-600' : 'text-slate-900'
                       }`}
                     >
-                      {currentLevel.toFixed(2)}
+                      {measurement ? currentLevel.toFixed(2) : '—'}
                     </span>
-                    <span className="text-sm font-extrabold text-slate-500">ม. รทก.</span>
+                    <span className="text-sm font-extrabold text-slate-500">เมตรตามรายงาน</span>
                   </div>
                 </div>
 
@@ -205,7 +205,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     ความจุลำน้ำ
                   </span>
                   <span className="text-2xl font-black font-mono text-blue-700 mt-1 block">
-                    {capacityPercent}%
+                    {measurement ? `${capacityPercent}%` : '—'}
                   </span>
                 </div>
               </div>
@@ -232,12 +232,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </div>
                 <div className="bg-slate-50/70 p-2 rounded-2xl border border-slate-100">
                   <span className="text-[10px] text-slate-500 block">ระยะก่อนล้น</span>
-                  <span className="text-xs font-bold text-blue-700 font-mono">{distanceToBank.toFixed(2)}ม.</span>
+                  <span className="text-xs font-bold text-blue-700 font-mono">{measurement ? `${distanceToBank.toFixed(2)}ม.` : '—'}</span>
                 </div>
                 <div className="bg-slate-50/70 p-2 rounded-2xl border border-slate-100">
                   <span className="text-[10px] text-slate-500 block">ความเชื่อมั่น</span>
                   <span className="text-xs font-bold text-emerald-700 font-mono">
-                    {(measurement?.vision_confidence ? measurement.vision_confidence * 100 : 92).toFixed(0)}%
+                    {measurement?.vision_confidence != null ? `${(measurement.vision_confidence * 100).toFixed(0)}%` : '—'}
                   </span>
                 </div>
               </div>

@@ -14,7 +14,6 @@ import { StationOverview } from './components/StationOverview';
 import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
-import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
 import { OnDemandPredictorModal } from './components/OnDemandPredictorModal';
 import { ReviewHub } from './components/ReviewHub';
@@ -197,7 +196,7 @@ export const App: React.FC = () => {
   // Handle section scrolling observer
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'simulation', 'forecast-alerts', 'review-hub'];
+      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'forecast-alerts', 'review-hub'];
       const scrollPos = window.scrollY + 200;
 
       for (const sectionId of sections) {
@@ -306,7 +305,6 @@ export const App: React.FC = () => {
           stationMeasurements={stationMeasurements}
           onExploreClick={() => handleNavigate('gis-cctv')}
           onRetrainHubClick={() => handleNavigate('review-hub')}
-          onSimulateClick={() => handleNavigate('simulation')}
           onOpenReview={() => setIsReviewOpen(true)}
           onSelectStation={selectStation}
         />
@@ -373,30 +371,11 @@ export const App: React.FC = () => {
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION 2: What-If Flood Scenario Simulation              */}
-        {/* ========================================================= */}
-        <section className="space-y-6" id="simulation">
-          <SectionHeader
-            number="02"
-            badge="What-If Simulator"
-            title="ห้องทดลองจำลองสถานการณ์น้ำท่วม (What-If Flood Scenario Simulator)"
-            subtitle="ทดสอบผลกระทบของการเปลี่ยนแปลงสภาพอากาศ ฝนตกหนัก มวลน้ำหลาก และการบริหารจัดการประตูน้ำ"
-            actionLabel="Interactive Modeler"
-          />
-
-          <WhatIfSimulator
-            station={selectedStation}
-            currentWaterLevel={measurement ? measurement.water_level : (selectedStation?.normal_level || 3.0)}
-            onApplySimulation={(simForecast) => setForecast(simForecast)}
-          />
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 3: Forecast Horizon & Emergency Alerts Feed       */}
+        {/* SECTION 2: Forecast Horizon & Emergency Alerts Feed       */}
         {/* ========================================================= */}
         <section className="space-y-6" id="forecast-alerts">
           <SectionHeader
-            number="03"
+            number="02"
             badge="Early Warning Horizon"
             title="ระบบพยากรณ์ระดับน้ำล่วงหน้า 1–3 ชม. และศูนย์แจ้งเตือนภัยฉุกเฉิน"
             subtitle="ประเมินแนวโน้มมวลน้ำด้วยแบบจำลอง AI และระบบส่งข้อความเตือนภัยเข้าสู่ LINE Messaging Outbox"
@@ -431,11 +410,11 @@ export const App: React.FC = () => {
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION 4: Continuous Learning & Auto Retrain Hub         */}
+        {/* SECTION 3: Continuous Learning & Auto Retrain Hub         */}
         {/* ========================================================= */}
         <section className="space-y-6" id="review-hub">
           <SectionHeader
-            number="04"
+            number="03"
             badge="Active Learning Hub"
             title="ศูนย์ตรวจทานภาพ (Label Studio) & ฝึกฝน AI อัตโนมัติ"
             subtitle="ระบบบันทึกภาพตรวจทานจากผู้เชี่ยวชาญ และส่งเข้าสู่กระบวนการ Re-train อัตโนมัติเมื่อครบ 20 ภาพ"

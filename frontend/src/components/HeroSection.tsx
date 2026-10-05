@@ -18,7 +18,6 @@ interface HeroSectionProps {
   stationMeasurements: Record<string, WaterMeasurement>;
   onExploreClick: () => void;
   onRetrainHubClick: () => void;
-  onSimulateClick?: () => void;
   onOpenReview: () => void;
   onSelectStation: (stn: Station) => void;
 }
@@ -30,7 +29,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   stationMeasurements,
   onExploreClick,
   onRetrainHubClick,
-  onSimulateClick,
   onOpenReview,
   onSelectStation,
 }) => {
@@ -101,17 +99,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               >
                 ศูนย์ตรวจทาน & Retrain AI
               </PillButton>
-
-              {onSimulateClick && (
-                <PillButton
-                  onClick={onSimulateClick}
-                  variant="glass"
-                  size="lg"
-                  icon={<Sparkles className="w-4 h-4 text-amber-500" />}
-                >
-                  จำลองสถานการณ์น้ำ (What-If)
-                </PillButton>
-              )}
 
               <PillButton
                 onClick={onOpenReview}

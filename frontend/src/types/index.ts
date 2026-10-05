@@ -50,7 +50,7 @@ export interface ForecastRecord {
   data_quality_status: string;
   created_at?: string;
   context_json?: {
-    mode: 'shadow' | 'replay' | 'simulation';
+    mode: 'shadow' | 'replay';
     issue_time?: string;
     current_level_m?: number;
     input_quality?: string;
@@ -66,13 +66,6 @@ export interface ForecastComparison {
   forecast_id: number;
   station_code: string;
   items: { lead_time_hours: number; target_time: string; predicted_level: number; actual_level: number | null; mae_error: number | null }[];
-}
-
-export interface WhatIfSimulationParams {
-  rain_surge_mm: number;
-  upstream_surge_percent: number;
-  gate_r1_open_percent: number;
-  sea_tide_surge_m: number;
 }
 
 export interface AlertEvent {

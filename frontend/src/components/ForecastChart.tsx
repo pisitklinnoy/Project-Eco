@@ -54,7 +54,6 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   const forecastValues = [forecast?.context_json?.current_level_m ?? null, forecast?.predicted_1h ?? null, forecast?.predicted_2h ?? null, forecast?.predicted_3h ?? null];
   const forecastDataset = timeline.map((_, i) => forecast && i >= 24 ? forecastValues[i - 24] : null);
   const historyValues = actualDataset.filter((value): value is number => value !== null);
-  const isSimulation = forecast?.context_json?.mode === 'simulation';
 
   const data = {
     labels: allLabels,
@@ -72,7 +71,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
         pointBackgroundColor: '#0284c7',
       },
       {
-        label: isSimulation ? 'สถานการณ์จำลอง (สูตรทดลอง)' : 'พยากรณ์ระดับน้ำ AI (เมตรตามรายงาน)',
+        label: 'พยากรณ์ระดับน้ำ AI (เมตรตามรายงาน)',
         data: forecastDataset,
         borderColor: '#d97706',
         borderDash: [6, 4],
@@ -140,7 +139,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
 
         <div className="flex items-center space-x-2">
           <span className="text-[11px] px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-            โหมด: {isSimulation ? 'สถานการณ์จำลอง' : forecast?.input_mode || 'รอข้อมูล'}
+            โหมด: {forecast?.input_mode || 'รอข้อมูล'}
           </span>
           <PillButton
             onClick={onTriggerForecast}
@@ -159,10 +158,10 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       {/* Chart Canvas */}
       <div className="text-xs text-slate-600 mb-3" role="status">
         {error ? <p className="text-amber-700">{error}</p> : !forecast ? <p>ยังไม่มีผลพยากรณ์จากโมเดลที่มีข้อมูลล่าสุดเพียงพอ</p> : (
-          <p>{isSimulation ? 'ผลจากสูตรสถานการณ์จำลอง' : forecast.context_json?.mode === 'replay' ? 'คำนวณย้อนหลังจากข้อมูลล่าสุดที่มี (Replay) · ไม่ใช่พยากรณ์ ณ เวลาปัจจุบัน' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
-            {!isSimulation && forecast.context_json?.missing_features?.length ? ` · ข้อมูลเข้าขาด ${forecast.context_json.missing_features.length} ตัวแปร` : ''}
-            {!isSimulation && forecast.context_json?.rain_available === false ? ` · ใช้ฝนจริง ${forecast.context_json.rain_input_summary?.used_count ?? 0}/${forecast.context_json.rain_input_summary?.total_count ?? '—'} ตัวแปร · ฝนบางชั่วโมงขาด` : ''}
-            {!isSimulation && forecast.context_json?.rain_available === true ? ' · ใช้ฝน HII รายชั่วโมงจริงครบ' : ''}
+          <p>{forecast.context_json?.mode === 'replay' ? 'คำนวณย้อนหลังจากข้อมูลล่าสุดที่มี (Replay) · ไม่ใช่พยากรณ์ ณ เวลาปัจจุบัน' : 'ผลพยากรณ์เพื่อทดลอง'} · ข้อมูล ณ {new Date(forecast.forecast_time).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+            {forecast.context_json?.missing_features?.length ? ` · ข้อมูลเข้าขาด ${forecast.context_json.missing_features.length} ตัวแปร` : ''}
+            {forecast.context_json?.rain_available === false ? ` · ใช้ฝนจริง ${forecast.context_json.rain_input_summary?.used_count ?? 0}/${forecast.context_json.rain_input_summary?.total_count ?? '—'} ตัวแปร · ฝนบางชั่วโมงขาด` : ''}
+            {forecast.context_json?.rain_available === true ? ' · ใช้ฝน HII รายชั่วโมงจริงครบ' : ''}
           </p>
         )}
       </div>

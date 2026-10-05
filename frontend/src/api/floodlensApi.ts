@@ -81,29 +81,6 @@ export const floodlensApi = {
     return res.json();
   },
 
-  simulateWhatIf: async (
-    stationCode: string,
-    params: {
-      rain_surge_mm: number;
-      upstream_surge_percent: number;
-      gate_r1_open_percent: number;
-      sea_tide_surge_m: number;
-    }
-  ): Promise<ForecastRecord> => {
-    const query = new URLSearchParams({
-      station_code: stationCode,
-      rain_surge_mm: params.rain_surge_mm.toString(),
-      upstream_surge_percent: params.upstream_surge_percent.toString(),
-      gate_r1_open_percent: params.gate_r1_open_percent.toString(),
-      sea_tide_surge_m: params.sea_tide_surge_m.toString(),
-    });
-    const res = await fetch(`${API_BASE}/forecast/simulate?${query.toString()}`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw new Error('Failed to run what-if simulation');
-    return res.json();
-  },
-
   // 4. Human-in-the-Loop & Review
   getReviewPackage: async (measurementId: number, stationCode: string): Promise<ReviewPackage> => {
     const res = await fetch(`${API_BASE}/review/package/${measurementId}?station_code=${encodeURIComponent(stationCode)}`);

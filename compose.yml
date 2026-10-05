@@ -68,7 +68,7 @@ services:
       - postgres
       - minio
     command: >
-      sh -c "pip install psycopg2-binary && mlflow server
+      sh -c "pip install psycopg2-binary boto3 && mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password123}@postgres:5432/${POSTGRES_DB:-hatyai_flood_db}
       --default-artifact-root s3://flood-models/
       --host 0.0.0.0

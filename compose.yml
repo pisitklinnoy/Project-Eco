@@ -104,8 +104,8 @@ services:
   # -------------------------------------------------------------
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: floodlens_backend
     restart: unless-stopped
     ports:
@@ -130,6 +130,8 @@ services:
       - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
     volumes:
       - ./backend:/app
+      - ./time_series_ecosystem:/time_series_ecosystem
+      - ./TimeSeries-Integration:/opt/TimeSeries-Integration
     depends_on:
       - postgres
       - redis

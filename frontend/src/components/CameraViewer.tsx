@@ -32,7 +32,7 @@ interface CameraViewerProps {
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
-  measurement,
+  measurement: _measurement,
   onOpenReview,
   onOpenCalibrate,
   onOpenOnDemand,
@@ -135,8 +135,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   if (!station) return null;
 
-  const currentLevel = measurement ? measurement.water_level : station.normal_level;
-
   const getActiveStreamUrl = () => {
     if (!station) return null;
     if (isHatyai) {
@@ -198,23 +196,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     overlayMode,
     aiViewType
   );
-
-  const getBenchmarkLevel = (code: string, scenario: 'daytime' | 'nighttime' | 'flood' | 'live', liveLvl: number) => {
-    if (scenario === 'live') return liveLvl;
-    const upper = code.toUpperCase();
-    if (upper.includes('MUANGKONG') || upper.includes('X.173A')) {
-      return scenario === 'daytime' ? 10.22 : 10.20;
-    }
-    if (upper.includes('BANGSALA') || upper.includes('X.90')) {
-      return scenario === 'daytime' ? 2.76 : 2.75;
-    }
-    if (scenario === 'flood') return 7.27;
-    return 0.60;
-  };
-
-  const displayLevel = viewMode === 'ai_dashboard'
-    ? getBenchmarkLevel(station.station_code, aiScenario, currentLevel)
-    : currentLevel;
 
   // Zoom Handlers
   const handleZoomIn = () => {
@@ -1062,25 +1043,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               )}
 
             </div>
-
-            {/* Bottom floating info (Only in AI dashboard mode) */}
-            {showOverlays && viewMode === 'ai_dashboard' && (
-              <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs flex items-center space-x-3">
-                <span className="font-bold text-sky-300">
-                  ระดับน้ำตรวจวัด AI ({aiScenario.toUpperCase()}):
-                </span>
-                <span className={`font-extrabold text-base font-mono ${
-                  displayLevel >= station.critical_level ? 'text-rose-400' :
-                  displayLevel >= station.warning_level ? 'text-amber-400' : 'text-emerald-300'
-                }`}>
-                  {displayLevel.toFixed(2)} ม. รทก.
-                </span>
-                <span className="text-slate-400">|</span>
-                <span className="text-slate-300">เตือนภัย: {station.warning_level} ม. รทก.</span>
-                <span className="text-slate-400">|</span>
-                <span className="text-rose-400 font-bold">วิกฤต: {station.critical_level} ม. รทก.</span>
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -356,3 +356,60 @@ def render_model_v2_detection_view(
         cv2.putText(out, txt_sub, (40, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 200, 220), 1, cv2.LINE_AA)
     return out
 
+
+def render_gauge_not_detected_image(
+    frame_shape: tuple,
+    station_name: str,
+    model_name: str = "model_best_v2.pt"
+) -> np.ndarray:
+    """
+    สร้างภาพแจ้งเตือนเมื่อ AI ตรวจไม่พบเสาวัดระดับน้ำ สำหรับโหมด Gauge Ruler หรือ Composite
+    แจ้งเตือนผู้ใช้ให้ใช้ฟีเจอร์ ปรับเทียบเสา เพื่อนำไป Retrain Model
+    """
+    h = max(720, frame_shape[0])
+    w = max(1280, frame_shape[1])
+    canvas = np.zeros((h, w, 3), dtype=np.uint8)
+    canvas[:] = (42, 23, 15)  # Dark slate navy in BGR
+
+    # กรอบกล่องข้อความเตือนตรงกลาง
+    box_w = min(w - 80, 980)
+    box_h = min(h - 80, 500)
+    bx1 = (w - box_w) // 2
+    by1 = (h - box_h) // 2
+    bx2 = bx1 + box_w
+    by2 = by1 + box_h
+
+    # Card background
+    cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (56, 32, 24), -1)
+    cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (40, 160, 245), 2)  # Amber border
+
+    # Warning Header
+    cv2.putText(canvas, "[!] STAFF GAUGE NOT DETECTED", (bx1 + 50, by1 + 75),
+                cv2.FONT_HERSHEY_DUPLEX, 1.1, (50, 160, 255), 2, cv2.LINE_AA)
+    cv2.putText(canvas, f"Station: {station_name} | AI Model: {model_name}", (bx1 + 50, by1 + 120),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (200, 220, 245), 2, cv2.LINE_AA)
+
+    # Separator
+    cv2.line(canvas, (bx1 + 50, by1 + 145), (bx2 - 50, by1 + 145), (110, 80, 60), 1)
+
+    # Explanation text
+    cv2.putText(canvas, "Cannot extract staff gauge scale ruler or composite view",
+                (bx1 + 50, by1 + 195), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (230, 235, 245), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "because no staff gauge was detected by the AI model in this frame.",
+                (bx1 + 50, by1 + 235), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (170, 185, 205), 1, cv2.LINE_AA)
+
+    # Recommendation Box
+    rec_y1 = by1 + 275
+    rec_y2 = by1 + 420
+    cv2.rectangle(canvas, (bx1 + 50, rec_y1), (bx2 - 50, rec_y2), (75, 45, 32), -1)
+    cv2.rectangle(canvas, (bx1 + 50, rec_y1), (bx2 - 50, rec_y2), (255, 160, 70), 1)
+
+    cv2.putText(canvas, "RECOMMENDED ACTION:", (bx1 + 75, rec_y1 + 45),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 210, 255), 2, cv2.LINE_AA)
+    cv2.putText(canvas, "Please use the 'Calibrate Pole' feature to locate the gauge coordinates",
+                (bx1 + 75, rec_y1 + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 245, 255), 1, cv2.LINE_AA)
+    cv2.putText(canvas, "and submit this frame to RE-TRAIN the YOLO model.",
+                (bx1 + 75, rec_y1 + 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 245, 255), 1, cv2.LINE_AA)
+
+    return canvas
+

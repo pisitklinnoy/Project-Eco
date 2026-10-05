@@ -13,7 +13,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 from core.vision.pole_coordinates import PoleCoordinateManager
 from core.vision.scale_calibrator import PiecewiseScaleCalibrator
 from core.vision.water_surface_detector import WaterSurfaceDetector
-from core.vision.dashboard_builder import build_dashboard, render_cctv_frame, render_gauge_overlay, render_model_v2_detection_view
+from core.vision.dashboard_builder import build_dashboard, render_cctv_frame, render_gauge_overlay, render_model_v2_detection_view, render_gauge_not_detected_image
 from core.vision.auto_localizer import StaffGaugeAutoLocalizer
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -256,10 +256,11 @@ class VisionService:
         try:
             # 1. ตรวจจับโดยตรงด้วย YOLO model_best_v2.pt
             raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
+            gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+            stn_name = cfg.get("thai_name") or cfg.get("station_name") or station_code
 
             if view == "cctv":
                 # โหมดมุมมองกล้อง CCTV: ใช้เฉพาะ model_best_v2.pt ตรวจจับเสาตรงไปตรงมาตามคำขอ
-                stn_name = cfg.get("thai_name") or cfg.get("station_name") or station_code
                 img_out = render_model_v2_detection_view(
                     frame=frame,
                     station_name=stn_name,
@@ -268,38 +269,47 @@ class VisionService:
                     overlay_mode=overlay
                 )
             else:
-                loc_res = self.localizer.localize(frame, cfg)
-                if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
-                    bx1, by1, bx2, by2 = loc_res["bbox"]
-                    cfg["staff_gauge_bbox"]["x1"] = bx1
-                    cfg["staff_gauge_bbox"]["x2"] = bx2
-
-                pole_mgr = PoleCoordinateManager(cfg)
-                rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
-                calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
-                detector = WaterSurfaceDetector(calibrator, cfg)
-
-                # 2. Stage 2: Sub-pixel Waterline Analysis
-                water_info = detector.detect_waterline(enhanced)
-
-                if view == "gauge":
-                    img_out = render_gauge_overlay(
-                        enhanced_gauge=enhanced,
-                        water_info=water_info,
-                        calibrator=calibrator,
-                        cfg=cfg
+                # view == "gauge" or view == "composite"
+                if len(gauges) == 0:
+                    # ถ้าตรวจไม่พบเสาวัดระดับน้ำ: ไม่แสดงสเกลเสาหรือภาพรวมคู่ แต่แสดงภาพการแจ้งเตือนแนะนำให้ปรับเทียบเสา
+                    img_out = render_gauge_not_detected_image(
+                        frame_shape=frame.shape,
+                        station_name=stn_name,
+                        model_name="model_best_v2.pt"
                     )
-                else:  # view == "composite"
-                    img_out = build_dashboard(
-                        frame=frame,
-                        enhanced_gauge=enhanced,
-                        water_info=water_info,
-                        pole_mgr=pole_mgr,
-                        calibrator=calibrator,
-                        cfg=cfg,
-                        yolo_info=loc_res,
-                        overlay_mode=overlay
-                    )
+                else:
+                    loc_res = self.localizer.localize(frame, cfg)
+                    if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
+                        bx1, by1, bx2, by2 = loc_res["bbox"]
+                        cfg["staff_gauge_bbox"]["x1"] = bx1
+                        cfg["staff_gauge_bbox"]["x2"] = bx2
+
+                    pole_mgr = PoleCoordinateManager(cfg)
+                    rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
+                    calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
+                    detector = WaterSurfaceDetector(calibrator, cfg)
+
+                    # 2. Stage 2: Sub-pixel Waterline Analysis
+                    water_info = detector.detect_waterline(enhanced)
+
+                    if view == "gauge":
+                        img_out = render_gauge_overlay(
+                            enhanced_gauge=enhanced,
+                            water_info=water_info,
+                            calibrator=calibrator,
+                            cfg=cfg
+                        )
+                    else:  # view == "composite"
+                        img_out = build_dashboard(
+                            frame=frame,
+                            enhanced_gauge=enhanced,
+                            water_info=water_info,
+                            pole_mgr=pole_mgr,
+                            calibrator=calibrator,
+                            cfg=cfg,
+                            yolo_info=loc_res,
+                            overlay_mode=overlay
+                        )
 
             # Encode JPEG
             ret, buf = cv2.imencode(".jpg", img_out, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -358,6 +368,104 @@ class VisionService:
             "warning_thresholds": cfg.get("warning_thresholds", {}),
             "baseline_water_level_m": cfg.get("baseline_water_level_m") or cfg.get("warning_thresholds", {}).get("normal_m")
         }
+
+    def check_detection_status(self, station_code: str, mode: str = "live") -> Dict[str, Any]:
+        """
+        ตรวจสอบสถานะว่าโมเดล YOLO (model_best_v2.pt) สามารถตรวจพบเสาวัดระดับน้ำ (Staff Gauge) หรือไม่
+        """
+        stn_key = self._resolve_station_key(station_code)
+        if not stn_key:
+            return {"detected": False, "can_analyze_gauge": False, "error": "Invalid station code"}
+
+        mgr = self.station_components[stn_key]
+        cfg = mgr["config"]
+        stn_name = cfg.get("thai_name") or cfg.get("station_name") or station_code
+
+        station_num = "station1_muangkong" if "MUANGKONG" in stn_key or "173A" in stn_key else \
+                      "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
+                      "station3_hatyainai"
+
+        frame = None
+        if mode == "live":
+            frame = self.fetch_live_frame(station_code)
+            if frame is None:
+                # Fallback to sample if camera is offline
+                sample_candidates = [
+                    os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                    os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+                ]
+                for p in sample_candidates:
+                    if os.path.exists(p):
+                        frame = cv2.imread(p); break
+        elif mode == "nighttime":
+            sample_candidates = [
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_nighttime.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_nighttime.jpg"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p); break
+        elif mode == "flood":
+            sample_candidates = [
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_flood.png"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_flood.png"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p); break
+        else:  # daytime
+            sample_candidates = [
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_daytime.jpg"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p); break
+
+        if frame is None:
+            return {
+                "detected": False,
+                "confidence": 0.0,
+                "bbox": None,
+                "station_code": station_code,
+                "station_name": stn_name,
+                "mode": mode,
+                "can_analyze_gauge": False,
+                "recommendation": "camera_offline",
+                "message": "ไม่สามารถดึงภาพจากกล้อง CCTV ได้ในขณะนี้"
+            }
+
+        raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
+        gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+        has_gauge = len(gauges) > 0
+
+        if has_gauge:
+            best_g = max(gauges, key=lambda x: x["confidence"])
+            return {
+                "detected": True,
+                "confidence": round(float(best_g["confidence"]), 3),
+                "bbox": best_g["bbox"],
+                "station_code": station_code,
+                "station_name": stn_name,
+                "mode": mode,
+                "can_analyze_gauge": True,
+                "recommendation": None,
+                "message": f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {best_g['confidence']*100:.1f}%) พร้อมสำหรับการวิเคราะห์สเกลเสา"
+            }
+        else:
+            return {
+                "detected": False,
+                "confidence": 0.0,
+                "bbox": None,
+                "station_code": station_code,
+                "station_name": stn_name,
+                "mode": mode,
+                "can_analyze_gauge": False,
+                "recommendation": "calibrate_pole",
+                "message": "ไม่พบเสาวัดระดับน้ำในภาพด้วยโมเดล AI (model_best_v2.pt) แนะนำให้ใช้ฟีเจอร์ 'ปรับเทียบเสา' เพื่อระบุพิกัดและนำไป Re-train โมเดลใหม่"
+            }
 
 
 vision_service = VisionService()

@@ -19,6 +19,7 @@ import {
   Moon,
   Waves,
   Columns,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface CameraViewerProps {
@@ -50,6 +51,20 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // Overlay Mode: 'bbox' = Green rectangular Bounding Box as preferred
   const overlayMode = 'bbox';
+
+  // AI Staff Gauge Detection Status
+  interface DetectionStatus {
+    detected: boolean;
+    confidence: number;
+    bbox?: number[];
+    station_code: string;
+    station_name: string;
+    mode: string;
+    can_analyze_gauge: boolean;
+    recommendation?: string;
+    message?: string;
+  }
+  const [detectionStatus, setDetectionStatus] = useState<DetectionStatus | null>(null);
 
   const isHatyai = Boolean(
     station?.station_code.toUpperCase().includes('HATYAI') ||
@@ -93,6 +108,30 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     }, intervalMs);
     return () => clearInterval(timer);
   }, [viewMode, aiScenario]);
+
+  // Fetch AI Staff Gauge detection status from backend
+  useEffect(() => {
+    if (!station?.station_code) return;
+    let isMounted = true;
+    const fetchDetectionStatus = async () => {
+      try {
+        const res = await fetch(`/api/v1/stations/${encodeURIComponent(station.station_code)}/detection-status?mode=${aiScenario}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setDetectionStatus(data);
+          }
+        }
+      } catch (err) {
+        console.warn('[CameraViewer] Failed to check detection status:', err);
+      }
+    };
+
+    fetchDetectionStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [station?.station_code, aiScenario, refreshKey]);
 
   if (!station) return null;
 
@@ -251,6 +290,61 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   const zoomPercent = Math.round(zoomLevel * 100);
 
+  const renderNotDetectedRecommendation = (isModal: boolean = false) => (
+    <div className="flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto bg-slate-900/95 border border-amber-500/40 rounded-3xl shadow-2xl backdrop-blur-md">
+      <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4 text-amber-400">
+        <AlertTriangle className="w-8 h-8 animate-pulse" />
+      </div>
+
+      <h3 className="text-base sm:text-lg font-black text-white mb-1.5">
+        ไม่พบเสาวัดระดับน้ำ (Staff Gauge Not Detected)
+      </h3>
+
+      <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-mono mb-3">
+        <span>โมเดล AI: model_best_v2.pt</span>
+        <span>&bull;</span>
+        <span>โหมด: {aiScenario === 'live' ? 'กล้องสด (Live)' : aiScenario.toUpperCase()}</span>
+      </div>
+
+      <p className="text-xs text-slate-300 mb-4 leading-relaxed max-w-md">
+        ระบบ AI ไม่สามารถตรวจจับเสาวัดระดับน้ำในภาพมุมกล้องนี้ได้ จึง<strong>ไม่สามารถแสดงภาพสเกลเสาหรือวิเคราะห์ระดับน้ำอัตโนมัติได้</strong>
+      </p>
+
+      <div className="w-full bg-amber-950/40 border border-amber-600/30 rounded-2xl p-3.5 mb-5 text-left text-xs text-amber-100">
+        <div className="flex items-center space-x-2 text-amber-300 font-extrabold text-xs mb-1">
+          <Target className="w-4 h-4 shrink-0 text-amber-400" />
+          <span>คำแนะนำสำหรับเจ้าหน้าที่ / ผู้ดูแลระบบ:</span>
+        </div>
+        <p className="text-[11px] text-amber-200/90 leading-normal">
+          กรุณาใช้ฟีเจอร์ <strong>"ปรับเทียบเสา" (Calibrate Pole)</strong> เพื่อระบุพิกัดตำแหน่งเสาจริงในภาพนี้ จากนั้นนำภาพที่บันทึกไป <strong>Re-train โมเดล AI</strong> เพื่อให้สามารถตรวจจับเสาวัดระดับน้ำในมุมกล้องนี้ได้อย่างถูกต้อง
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+        {onOpenCalibrate && (
+          <button
+            onClick={() => {
+              if (isModal) setIsFullscreen(false);
+              onOpenCalibrate();
+            }}
+            className="flex-1 w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
+          >
+            <Target className="w-4 h-4" />
+            <span>เปิดฟีเจอร์ "ปรับเทียบเสา"</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setAiViewType('cctv')}
+          className="w-full sm:w-auto py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-white/10 transition flex items-center justify-center space-x-1.5 cursor-pointer"
+        >
+          <Camera className="w-3.5 h-3.5" />
+          <span>ดูมุมกล้อง CCTV</span>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="bg-white/85 backdrop-blur-2xl border border-white/90 rounded-[32px] sm:rounded-[36px] overflow-hidden shadow-[0_20px_50px_-12px_rgba(15,23,42,0.06)] hover:shadow-[0_24px_60px_-12px_rgba(15,23,42,0.10)] transition-all flex flex-col h-full min-h-[480px]">
@@ -312,68 +406,176 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
         {/* AI Staff Gauge Scenario Ribbon - When in AI Dashboard Mode */}
         {viewMode === 'ai_dashboard' && (
-          <div className="px-5 py-2 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 border-b border-slate-700/60 flex flex-wrap items-center justify-between gap-2 text-xs text-white">
-            <div className="flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="font-bold text-sky-200 text-[11px] flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>โมเดล AI: <code className="bg-white/10 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[10px]">model_best_v2.pt</code></span>
-              </span>
-            </div>
+          <>
+            <div className="px-5 py-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 border-b border-slate-700/60 flex flex-wrap items-center justify-between gap-2.5 text-xs text-white">
+              {/* Left: Model tag & Detection Status */}
+              <div className="flex items-center space-x-2">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  detectionStatus?.detected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping'
+                }`} />
+                <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                  <span className="font-bold text-sky-200 text-xs flex items-center space-x-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>AI: <code className="bg-white/10 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">model_best_v2.pt</code></span>
+                  </span>
+                  {detectionStatus && (
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold flex items-center space-x-1 ${
+                      detectionStatus.detected
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                    }`}>
+                      {detectionStatus.detected ? (
+                        <>
+                          <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>พบเสาวัดน้ำ ({Math.round(detectionStatus.confidence * 100)}%)</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                          <span>ไม่พบเสาในภาพ</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-            <div className="flex items-center space-x-1 bg-black/40 p-0.5 rounded-xl border border-white/15 text-[11px]">
-              <button
-                onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'daytime'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="ทดสอบตรวจจับเสาในภาพเวลากลางวัน (Daytime)"
-              >
-                <Sun className="w-3 h-3 text-amber-200 shrink-0" />
-                <span>กลางวัน</span>
-              </button>
-              <button
-                onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'nighttime'
-                    ? 'bg-indigo-600 text-white shadow-xs font-black'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="ทดสอบตรวจจับเสาในภาพเวลากลางคืน (Nighttime)"
-              >
-                <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
-                <span>กลางคืน</span>
-              </button>
-              {isHatyai && (
+              {/* Center: AI View Types Toggle (CCTV vs Gauge Ruler vs Split View) */}
+              <div className="flex items-center space-x-1 bg-black/50 p-1 rounded-xl border border-white/15 text-[11px]">
                 <button
-                  onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
+                  onClick={() => { setAiViewType('cctv'); handleResetZoom(); }}
                   className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                    aiScenario === 'flood'
-                      ? 'bg-rose-600 text-white shadow-xs font-black'
+                    aiViewType === 'cctv'
+                      ? 'bg-blue-600 text-white shadow-sm font-black'
                       : 'text-slate-300 hover:text-white'
                   }`}
-                  title="ทดสอบตรวจจับเสาในภาพสภาวะน้ำท่วม (Flood Simulation)"
+                  title="แสดงภาพมุมกว้างกล้อง CCTV พร้อมกรอบ Bounding Box"
                 >
-                  <Waves className="w-3 h-3 text-rose-200 shrink-0" />
-                  <span>น้ำท่วม</span>
+                  <Camera className="w-3.5 h-3.5 text-sky-200" />
+                  <span>กล้อง CCTV</span>
                 </button>
-              )}
-              <button
-                onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'live'
-                    ? 'bg-emerald-600 text-white shadow-xs font-black'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="ตรวจจับสดจากกล้อง CCTV ปัจจุบันแบบ Realtime"
-              >
-                <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
-                <span>สด (Live)</span>
-              </button>
+
+                <button
+                  onClick={() => { setAiViewType('gauge'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiViewType === 'gauge'
+                      ? 'bg-emerald-600 text-white shadow-sm font-black'
+                      : 'text-slate-300 hover:text-white'
+                  } ${detectionStatus && !detectionStatus.detected ? 'border border-amber-500/40 text-amber-300' : ''}`}
+                  title={detectionStatus && !detectionStatus.detected ? "AI ตรวจไม่พบเสาวัดระดับน้ำ (คลิกเพื่อดูคำแนะนำการปรับเทียบ)" : "แสดงเฉพาะสเกลเสาวัดน้ำดิจิทัล (Ruler)"}
+                >
+                  {detectionStatus && !detectionStatus.detected ? (
+                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                  ) : (
+                    <Sliders className="w-3 h-3 text-amber-300 shrink-0" />
+                  )}
+                  <span>สเกลเสา</span>
+                  {detectionStatus && !detectionStatus.detected && (
+                    <span className="text-[9px] bg-amber-500/30 text-amber-200 px-1 py-0.2 rounded font-mono">!</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { setAiViewType('composite'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiViewType === 'composite'
+                      ? 'bg-slate-700 text-white shadow-sm font-black'
+                      : 'text-slate-300 hover:text-white'
+                  } ${detectionStatus && !detectionStatus.detected ? 'border border-amber-500/40 text-amber-300' : ''}`}
+                  title={detectionStatus && !detectionStatus.detected ? "AI ตรวจไม่พบเสาวัดระดับน้ำ (คลิกเพื่อดูคำแนะนำการปรับเทียบ)" : "แสดงภาพรวมคู่ (Split)"}
+                >
+                  {detectionStatus && !detectionStatus.detected ? (
+                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                  ) : (
+                    <Columns className="w-3 h-3 text-white shrink-0" />
+                  )}
+                  <span>ภาพรวมคู่</span>
+                  {detectionStatus && !detectionStatus.detected && (
+                    <span className="text-[9px] bg-amber-500/30 text-amber-200 px-1 py-0.2 rounded font-mono">!</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Right: Scenario Toggle */}
+              <div className="flex items-center space-x-1 bg-black/40 p-0.5 rounded-xl border border-white/15 text-[11px]">
+                <button
+                  onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiScenario === 'daytime'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="ทดสอบตรวจจับเสาในภาพเวลากลางวัน (Daytime)"
+                >
+                  <Sun className="w-3 h-3 text-amber-200 shrink-0" />
+                  <span>กลางวัน</span>
+                </button>
+                <button
+                  onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiScenario === 'nighttime'
+                      ? 'bg-indigo-600 text-white shadow-xs font-black'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="ทดสอบตรวจจับเสาในภาพเวลากลางคืน (Nighttime)"
+                >
+                  <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
+                  <span>กลางคืน</span>
+                </button>
+                {isHatyai && (
+                  <button
+                    onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                      aiScenario === 'flood'
+                        ? 'bg-rose-600 text-white shadow-xs font-black'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                    title="ทดสอบตรวจจับเสาในภาพสภาวะน้ำท่วม (Flood Simulation)"
+                  >
+                    <Waves className="w-3 h-3 text-rose-200 shrink-0" />
+                    <span>น้ำท่วม</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => { setAiScenario('live'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiScenario === 'live'
+                      ? 'bg-emerald-600 text-white shadow-xs font-black'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="ตรวจจับสดจากกล้อง CCTV ปัจจุบันแบบ Realtime"
+                >
+                  <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
+                  <span>สด (Live)</span>
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* Notification Banner when Staff Gauge is NOT detected */}
+            {detectionStatus && !detectionStatus.detected && (
+              <div className="bg-gradient-to-r from-amber-950/90 via-slate-900/90 to-amber-950/90 border-b border-amber-500/30 px-5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                  <span className="font-semibold text-amber-100">
+                    โมเดล AI (model_best_v2.pt) ตรวจไม่พบเสาวัดระดับน้ำในภาพนี้
+                  </span>
+                  <span className="text-[11px] text-slate-300 hidden md:inline">
+                    &bull; ปิดการแสดงผลสเกลเสาและภาพรวมคู่
+                  </span>
+                </div>
+                {onOpenCalibrate && (
+                  <button
+                    onClick={onOpenCalibrate}
+                    className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+                    title="เปิดเครื่องมือปรับเทียบพิกัดเสาเพื่อนำไป Re-train โมเดลใหม่"
+                  >
+                    <Target className="w-3.5 h-3.5 shrink-0" />
+                    <span>ใช้ฟีเจอร์ปรับเทียบเสา (เตรียม Re-train)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* Hatyai Axis Camera Dedicated Ribbon - Only in Live Mode */}
@@ -548,21 +750,27 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           >
             {/* VIEW MODE 1: REALTIME AI MODEL DASHBOARD */}
             {viewMode === 'ai_dashboard' ? (
-              <div className="relative w-full h-full flex items-center justify-center">
-                <img
-                  key={`${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
-                  src={aiDashboardUrl}
-                  alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
-                  onError={(e) => {
-                    // Fallback to static public image if dynamic endpoint is temporarily unavailable
-                    const target = e.target as HTMLImageElement;
-                    if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
-                      target.src = staticFallbackUrl;
-                    }
-                  }}
-                  className="w-full h-full object-cover object-center pointer-events-none"
-                />
-              </div>
+              (aiViewType === 'gauge' || aiViewType === 'composite') && detectionStatus && !detectionStatus.detected ? (
+                <div className="w-full h-full flex items-center justify-center p-6">
+                  {renderNotDetectedRecommendation(false)}
+                </div>
+              ) : (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    key={`${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
+                    src={aiDashboardUrl}
+                    alt={`AI Staff Gauge Model Dashboard - ${station.name}`}
+                    onError={(e) => {
+                      // Fallback to static public image if dynamic endpoint is temporarily unavailable
+                      const target = e.target as HTMLImageElement;
+                      if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
+                        target.src = staticFallbackUrl;
+                      }
+                    }}
+                    className="w-full h-full object-cover object-center pointer-events-none"
+                  />
+                </div>
+              )
             ) : (
               /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Video Feed) */
               streamUrl && !imgError ? (
@@ -733,11 +941,18 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                       aiViewType === 'gauge'
                         ? 'bg-emerald-600 text-white shadow-sm font-black'
                         : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="แสดงเฉพาะสเกลเสาวัดน้ำดิจิทัล (Ruler)"
+                    } ${detectionStatus && !detectionStatus.detected ? 'border border-amber-500/40 text-amber-300' : ''}`}
+                    title={detectionStatus && !detectionStatus.detected ? "AI ตรวจไม่พบเสาวัดระดับน้ำ (คลิกเพื่อดูคำแนะนำการปรับเทียบ)" : "แสดงเฉพาะสเกลเสาวัดน้ำดิจิทัล (Ruler)"}
                   >
-                    <Sliders className="w-3 h-3 text-amber-300" />
+                    {detectionStatus && !detectionStatus.detected ? (
+                      <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                    ) : (
+                      <Sliders className="w-3 h-3 text-amber-300" />
+                    )}
                     <span>สเกลเสา</span>
+                    {detectionStatus && !detectionStatus.detected && (
+                      <span className="text-[9px] bg-amber-500/30 text-amber-200 px-1 py-0.2 rounded font-mono">!</span>
+                    )}
                   </button>
                   <button
                     onClick={() => { setAiViewType('composite'); handleResetZoom(); }}
@@ -745,11 +960,18 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                       aiViewType === 'composite'
                         ? 'bg-slate-700 text-white shadow-sm font-black'
                         : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="แสดงภาพรวมคู่ (Split)"
+                    } ${detectionStatus && !detectionStatus.detected ? 'border border-amber-500/40 text-amber-300' : ''}`}
+                    title={detectionStatus && !detectionStatus.detected ? "AI ตรวจไม่พบเสาวัดระดับน้ำ (คลิกเพื่อดูคำแนะนำการปรับเทียบ)" : "แสดงภาพรวมคู่ (Split)"}
                   >
-                    <Columns className="w-3 h-3 text-white" />
+                    {detectionStatus && !detectionStatus.detected ? (
+                      <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                    ) : (
+                      <Columns className="w-3 h-3 text-white" />
+                    )}
                     <span>ภาพรวมคู่</span>
+                    {detectionStatus && !detectionStatus.detected && (
+                      <span className="text-[9px] bg-amber-500/30 text-amber-200 px-1 py-0.2 rounded font-mono">!</span>
+                    )}
                   </button>
                 </div>
 
@@ -818,20 +1040,26 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
               }}
             >
-              <img
-                key={`fullscreen-${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
-                src={viewMode === 'ai_dashboard' ? aiDashboardUrl : (streamUrl || '')}
-                alt={station.name}
-                onError={(e) => {
-                  if (viewMode === 'ai_dashboard') {
-                    const target = e.target as HTMLImageElement;
-                    if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
-                      target.src = staticFallbackUrl;
+              {viewMode === 'ai_dashboard' && (aiViewType === 'gauge' || aiViewType === 'composite') && detectionStatus && !detectionStatus.detected ? (
+                <div className="w-full h-full flex items-center justify-center p-6">
+                  {renderNotDetectedRecommendation(true)}
+                </div>
+              ) : (
+                <img
+                  key={`fullscreen-${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
+                  src={viewMode === 'ai_dashboard' ? aiDashboardUrl : (streamUrl || '')}
+                  alt={station.name}
+                  onError={(e) => {
+                    if (viewMode === 'ai_dashboard') {
+                      const target = e.target as HTMLImageElement;
+                      if (target.src !== staticFallbackUrl && !target.src.endsWith(staticFallbackUrl)) {
+                        target.src = staticFallbackUrl;
+                      }
                     }
-                  }
-                }}
-                className="w-full h-full object-contain pointer-events-none"
-              />
+                  }}
+                  className="w-full h-full object-contain pointer-events-none"
+                />
+              )}
 
             </div>
 

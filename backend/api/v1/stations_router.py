@@ -51,6 +51,15 @@ def save_station_calibration(
     }
 
 
+@router.get("/{station_code}/detection-status")
+def get_station_detection_status(station_code: str, mode: str = "live"):
+    """
+    ตรวจสอบสถานะว่าโมเดล YOLO (model_best_v2.pt) สามารถตรวจพบเสาวัดระดับน้ำ (Staff Gauge) ในโหมดที่กำหนดหรือไม่
+    """
+    from services.vision_service import vision_service
+    return vision_service.check_detection_status(station_code, mode=mode)
+
+
 @router.get("/{station_code}/cctv-analysis.jpg")
 def get_cctv_analysis_image(station_code: str, mode: str = "live", overlay: str = "bbox", view: str = "cctv", db: Session = Depends(get_db)):
     """

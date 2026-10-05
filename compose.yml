@@ -126,6 +126,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - ENABLE_OTEL=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - FORECAST_MAX_AGE_MINUTES=${FORECAST_MAX_AGE_MINUTES:-120}
+      - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
     volumes:
       - ./backend:/app
     depends_on:
@@ -158,6 +160,8 @@ services:
       - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN:-}
       - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET:-}
       - LINE_TARGET_USER_OR_GROUP_ID=${LINE_TARGET_USER_OR_GROUP_ID:-}
+      - BACKEND_API_URL=http://backend:8000
+      - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
     volumes:
       - ./workers:/app
     depends_on:

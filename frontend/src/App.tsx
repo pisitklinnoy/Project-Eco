@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent } from './types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import type { Station, WaterMeasurement, RainfallMeasurement, ForecastRecord, AlertEvent } from './types';
 import { floodlensApi } from './api/floodlensApi';
 import { Navbar } from './components/Navbar';
 import { FloatingSidebar } from './components/FloatingSidebar';
@@ -9,9 +9,12 @@ import { SectionHeader } from './components/ui/SectionHeader';
 import { StationMap } from './components/StationMap';
 import { TelemetryCard } from './components/TelemetryCard';
 import { ForecastChart } from './components/ForecastChart';
+import { ForecastHistory } from './components/ForecastHistory';
+import { StationOverview } from './components/StationOverview';
 import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
+import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
 import { OnDemandPredictorModal } from './components/OnDemandPredictorModal';
 import { ReviewHub } from './components/ReviewHub';
@@ -22,8 +25,15 @@ export const App: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [measurement, setMeasurement] = useState<WaterMeasurement | null>(null);
   const [stationMeasurements, setStationMeasurements] = useState<Record<string, WaterMeasurement>>({});
+  const [stationRain, setStationRain] = useState<Record<string, RainfallMeasurement>>({});
   const [history, setHistory] = useState<WaterMeasurement[]>([]);
   const [forecast, setForecast] = useState<ForecastRecord | null>(null);
+  const [forecastError, setForecastError] = useState<string>('');
+  const [stationForecasts, setStationForecasts] = useState<Record<string, ForecastRecord>>({});
+  const [stationErrors, setStationErrors] = useState<Record<string, string>>({});
+  const [refreshingAll, setRefreshingAll] = useState<boolean>(false);
+  const refreshInFlight = useRef<boolean>(false);
+  const stationCodeRef = useRef<string | null>(null);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -35,6 +45,15 @@ export const App: React.FC = () => {
   // Active section tracking for floating navbar & sidebar
   const [activeSection, setActiveSection] = useState<string>('hero');
 
+  const selectStation = useCallback((station: Station) => {
+    stationCodeRef.current = station.station_code;
+    setSelectedStation(station);
+    setForecast(null);
+    setMeasurement(null);
+    setHistory([]);
+    setForecastError('');
+  }, []);
+
   // Fetch telemetry for all active stations
   const loadAllStationMeasurements = useCallback(async (stnList: Station[]) => {
     if (!stnList || stnList.length === 0) return;
@@ -42,22 +61,78 @@ export const App: React.FC = () => {
       const results = await Promise.all(
         stnList.map(async (stn) => {
           try {
-            const data = await floodlensApi.getLatestWater(stn.station_code);
-            return { code: stn.station_code, data };
+            const [water, rain] = await Promise.allSettled([
+              floodlensApi.getLatestWater(stn.station_code),
+              floodlensApi.getLatestRain(stn.station_code),
+            ]);
+            return {
+              code: stn.station_code,
+              data: water.status === 'fulfilled' ? water.value : null,
+              rain: rain.status === 'fulfilled' ? rain.value : null,
+            };
           } catch {
             return null;
           }
         })
       );
       const map: Record<string, WaterMeasurement> = {};
+      const rainMap: Record<string, RainfallMeasurement> = {};
       results.forEach((r) => {
         if (r && r.data) map[r.code] = r.data;
+        if (r && r.rain) rainMap[r.code] = r.rain;
       });
       setStationMeasurements(map);
+      setStationRain(rainMap);
     } catch (err) {
       console.error('Failed to load all station measurements', err);
     }
   }, []);
+
+  const refreshAllStations = useCallback(async () => {
+    if (refreshInFlight.current || !stations.length) return;
+    refreshInFlight.current = true;
+    setRefreshingAll(true);
+    try {
+      const result = await floodlensApi.refreshAllForecasts();
+      const forecasts: Record<string, ForecastRecord> = {};
+      const errors: Record<string, string> = {};
+      result.stations.forEach((row) => {
+        if (row.forecast) forecasts[row.station_code] = row.forecast;
+        if (row.error) errors[row.station_code] = row.error;
+      });
+      setStationForecasts(forecasts);
+      setStationErrors(errors);
+      await loadAllStationMeasurements(stations);
+      const code = stationCodeRef.current;
+      if (code) {
+        const [water, waterHistory] = await Promise.all([
+          floodlensApi.getLatestWater(code),
+          floodlensApi.getWaterHistory(code, 24),
+        ]);
+        if (stationCodeRef.current === code) {
+          setMeasurement(water);
+          setHistory(waterHistory);
+          setForecast(forecasts[code] ?? null);
+          setForecastError(errors[code] ?? '');
+        }
+      }
+    } catch (err) {
+      setStationErrors(
+        Object.fromEntries(stations.map((s) => [s.station_code, err instanceof Error ? err.message : 'โหลดข้อมูลไม่ได้']))
+      );
+    } finally {
+      refreshInFlight.current = false;
+      setRefreshingAll(false);
+    }
+  }, [stations, loadAllStationMeasurements]);
+
+  useEffect(() => {
+    if (stations.length > 0) {
+      void refreshAllStations();
+      const timer = setInterval(() => void refreshAllStations(), 300000);
+      return () => clearInterval(timer);
+    }
+  }, [refreshAllStations, stations.length]);
 
   // 1. Initial Load: Stations
   useEffect(() => {
@@ -66,34 +141,43 @@ export const App: React.FC = () => {
       .then((data) => {
         setStations(data);
         if (data.length > 0) {
-          setSelectedStation(data[0]);
+          selectStation(data[0]);
           loadAllStationMeasurements(data);
         }
       })
       .catch((err) => console.error('Failed to load stations', err))
       .finally(() => setLoading(false));
-  }, [loadAllStationMeasurements]);
+  }, [loadAllStationMeasurements, selectStation]);
 
   // 2. Fetch Station Specific Data
   const loadStationData = useCallback(async () => {
     if (!selectedStation) return;
+    const code = selectedStation.station_code;
     try {
-      const [latestWater, waterHistory, latestForecast, recentAlerts] = await Promise.all([
+      const [waterResult, historyResult, forecastResult, alertsResult] = await Promise.allSettled([
         floodlensApi.getLatestWater(selectedStation.station_code),
         floodlensApi.getWaterHistory(selectedStation.station_code, 24),
         floodlensApi.getLatestForecast(selectedStation.station_code),
         floodlensApi.getRecentAlerts(10),
       ]);
+      if (stationCodeRef.current !== code) return;
+      const latestWater = waterResult.status === 'fulfilled' ? waterResult.value : null;
+      const waterHistory = historyResult.status === 'fulfilled' ? historyResult.value : [];
+      const latestForecast = forecastResult.status === 'fulfilled' ? forecastResult.value : null;
+      const recentAlerts = alertsResult.status === 'fulfilled' ? alertsResult.value : [];
+
       setMeasurement(latestWater);
       setHistory(waterHistory);
       setForecast(latestForecast);
       setAlerts(recentAlerts);
 
       // Update in dictionary
-      setStationMeasurements((prev) => ({
-        ...prev,
-        [selectedStation.station_code]: latestWater,
-      }));
+      if (latestWater) {
+        setStationMeasurements((prev) => ({
+          ...prev,
+          [selectedStation.station_code]: latestWater,
+        }));
+      }
     } catch (err) {
       console.error('Failed to load station telemetry', err);
     }
@@ -101,7 +185,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadStationData();
-    // Auto-refresh interval (every 30 seconds)
     const timer = setInterval(() => {
       loadStationData();
       if (stations.length > 0) {
@@ -114,7 +197,7 @@ export const App: React.FC = () => {
   // Handle section scrolling observer
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'forecast-alerts', 'review-hub'];
+      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'simulation', 'forecast-alerts', 'review-hub'];
       const scrollPos = window.scrollY + 200;
 
       for (const sectionId of sections) {
@@ -150,12 +233,18 @@ export const App: React.FC = () => {
   const handleTriggerForecast = async () => {
     if (!selectedStation) return;
     setTriggeringForecast(true);
+    setForecastError('');
+    const code = selectedStation.station_code;
     try {
-      const res = await floodlensApi.triggerForecast(selectedStation.station_code);
+      await refreshAllStations();
+      const res = await floodlensApi.getLatestForecast(selectedStation.station_code);
+      if (stationCodeRef.current !== code) return;
       setForecast(res);
       await loadStationData();
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการคำนวณผลพยากรณ์');
+      if (stationCodeRef.current === code) {
+        setForecastError(err instanceof Error ? err.message : 'ไม่สามารถคำนวณพยากรณ์ได้');
+      }
     } finally {
       setTriggeringForecast(false);
     }
@@ -196,7 +285,7 @@ export const App: React.FC = () => {
       <Navbar
         stations={stations}
         selectedStation={selectedStation}
-        onSelectStation={setSelectedStation}
+        onSelectStation={selectStation}
         systemStatus="healthy"
         activeSection={activeSection}
         onNavigate={handleNavigate}
@@ -217,8 +306,23 @@ export const App: React.FC = () => {
           stationMeasurements={stationMeasurements}
           onExploreClick={() => handleNavigate('gis-cctv')}
           onRetrainHubClick={() => handleNavigate('review-hub')}
+          onSimulateClick={() => handleNavigate('simulation')}
           onOpenReview={() => setIsReviewOpen(true)}
-          onSelectStation={setSelectedStation}
+          onSelectStation={selectStation}
+        />
+
+        {/* ========================================================= */}
+        {/* SECTION 0: Multi-Station Live Overview (Cameras & Models) */}
+        {/* ========================================================= */}
+        <StationOverview
+          stations={stations}
+          measurements={stationMeasurements}
+          rain={stationRain}
+          forecasts={stationForecasts}
+          errors={stationErrors}
+          refreshing={refreshingAll}
+          onRefresh={refreshAllStations}
+          onSelect={selectStation}
         />
 
         {/* ========================================================= */}
@@ -249,7 +353,7 @@ export const App: React.FC = () => {
               <StationMap
                 stations={stations}
                 selectedStation={selectedStation}
-                onSelectStation={setSelectedStation}
+                onSelectStation={selectStation}
                 latestWater={measurement}
                 measurementsByStation={stationMeasurements}
               />
@@ -269,11 +373,30 @@ export const App: React.FC = () => {
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION 2: Forecast Horizon & Emergency Alerts Feed       */}
+        {/* SECTION 2: What-If Flood Scenario Simulation              */}
+        {/* ========================================================= */}
+        <section className="space-y-6" id="simulation">
+          <SectionHeader
+            number="02"
+            badge="What-If Simulator"
+            title="ห้องทดลองจำลองสถานการณ์น้ำท่วม (What-If Flood Scenario Simulator)"
+            subtitle="ทดสอบผลกระทบของการเปลี่ยนแปลงสภาพอากาศ ฝนตกหนัก มวลน้ำหลาก และการบริหารจัดการประตูน้ำ"
+            actionLabel="Interactive Modeler"
+          />
+
+          <WhatIfSimulator
+            station={selectedStation}
+            currentWaterLevel={measurement ? measurement.water_level : (selectedStation?.normal_level || 3.0)}
+            onApplySimulation={(simForecast) => setForecast(simForecast)}
+          />
+        </section>
+
+        {/* ========================================================= */}
+        {/* SECTION 3: Forecast Horizon & Emergency Alerts Feed       */}
         {/* ========================================================= */}
         <section className="space-y-6" id="forecast-alerts">
           <SectionHeader
-            number="02"
+            number="03"
             badge="Early Warning Horizon"
             title="ระบบพยากรณ์ระดับน้ำล่วงหน้า 1–3 ชม. และศูนย์แจ้งเตือนภัยฉุกเฉิน"
             subtitle="ประเมินแนวโน้มมวลน้ำด้วยแบบจำลอง AI และระบบส่งข้อความเตือนภัยเข้าสู่ LINE Messaging Outbox"
@@ -282,13 +405,18 @@ export const App: React.FC = () => {
 
           {/* Bento Asymmetric Row: Forecast Chart (8 Cols) & Alerts Feed (4 Cols) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-8 space-y-6">
               <ForecastChart
                 station={selectedStation}
                 history={history}
                 forecast={forecast}
                 onTriggerForecast={handleTriggerForecast}
                 triggering={triggeringForecast}
+                error={forecastError}
+              />
+              <ForecastHistory
+                stationCode={selectedStation?.station_code ?? null}
+                refreshKey={forecast?.id ?? 0}
               />
             </div>
 
@@ -303,11 +431,11 @@ export const App: React.FC = () => {
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION 3: Continuous Learning & Auto Retrain Hub         */}
+        {/* SECTION 4: Continuous Learning & Auto Retrain Hub         */}
         {/* ========================================================= */}
         <section className="space-y-6" id="review-hub">
           <SectionHeader
-            number="03"
+            number="04"
             badge="Active Learning Hub"
             title="ศูนย์ตรวจทานภาพ (Label Studio) & ฝึกฝน AI อัตโนมัติ"
             subtitle="ระบบบันทึกภาพตรวจทานจากผู้เชี่ยวชาญ และส่งเข้าสู่กระบวนการ Re-train อัตโนมัติเมื่อครบ 20 ภาพ"

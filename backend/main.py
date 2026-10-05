@@ -17,6 +17,11 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 # Initialize database schema
 try:
     Base.metadata.create_all(bind=engine)
+    try:
+        from core.schema_migrations import upgrade_timeseries_schema
+        upgrade_timeseries_schema(engine)
+    except Exception as mig_err:
+        print(f"[Database] Schema migration note: {mig_err}")
     print("[Database] Schema synchronized successfully.")
 except Exception as e:
     print(f"[Database] Schema creation note: {e}")

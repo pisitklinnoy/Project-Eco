@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
 from datetime import datetime
 from core.database import Base
 
@@ -19,4 +19,6 @@ class ForecastRecord(Base):
     model_version = Column(String(50), default="1")
     input_mode = Column(String(50), default="API_PLUS_VISION") # "API_ONLY", "API_PLUS_VISION", "FALLBACK"
     data_quality_status = Column(String(50), default="HIGH_CONFIDENCE")
+    context_json = Column(JSON, nullable=True)
+    forecast_key = Column(String(64), nullable=True, unique=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)

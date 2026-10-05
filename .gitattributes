@@ -1,0 +1,2 @@
+# Ensure LightGBM model text files always maintain Unix LF line endings
+time_series_ecosystem/models/*.txt text eol=lf

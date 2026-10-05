@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, MapPin, Camera, Sliders, Bell } from 'lucide-react';
+import { LayoutDashboard, MapPin, Camera, Bell, Cpu } from 'lucide-react';
 
 interface MobileBottomNavProps {
   activeSection: string;
@@ -16,8 +16,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     { id: 'hero', icon: <LayoutDashboard className="w-5 h-5" />, label: 'ภาพรวม' },
     { id: 'gis-cctv', icon: <MapPin className="w-5 h-5" />, label: 'GIS' },
     { id: 'cctv-inspector', icon: <Camera className="w-5 h-5" />, label: 'AI เสา' },
-    { id: 'simulation', icon: <Sliders className="w-5 h-5" />, label: 'จำลอง' },
     { id: 'forecast-alerts', icon: <Bell className="w-5 h-5" />, label: 'แจ้งเตือน', badge: alertCount },
+    { id: 'review-hub', icon: <Cpu className="w-5 h-5" />, label: 'Retrain' },
   ];
 
   return (

@@ -4,11 +4,11 @@ import {
   LayoutDashboard,
   MapPin,
   Camera,
-  Sliders,
   TrendingUp,
   ShieldCheck,
   Target,
   RefreshCw,
+  Cpu,
 } from 'lucide-react';
 import { IconButton } from './ui/IconButton';
 
@@ -33,8 +33,8 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
     { id: 'hero', icon: <LayoutDashboard className="w-4 h-4" />, label: 'ภาพรวมระบบ (Overview)' },
     { id: 'gis-cctv', icon: <MapPin className="w-4 h-4" />, label: 'แผนที่ GIS & กล้อง CCTV' },
     { id: 'cctv-inspector', icon: <Camera className="w-4 h-4" />, label: 'วิเคราะห์ AI Staff Gauge' },
-    { id: 'simulation', icon: <Sliders className="w-4 h-4" />, label: 'จำลองสภาวะน้ำท่วม (What-If)' },
     { id: 'forecast-alerts', icon: <TrendingUp className="w-4 h-4" />, label: 'พยากรณ์ล่วงหน้า & แจ้งเตือน' },
+    { id: 'review-hub', icon: <Cpu className="w-4 h-4 text-emerald-600" />, label: 'ศูนย์ตรวจทาน & Retrain AI' },
   ];
 
   return (

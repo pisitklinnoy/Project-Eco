@@ -1,4 +1,4 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage } from '../types';
+import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -81,30 +81,7 @@ export const floodlensApi = {
     return res.json();
   },
 
-  // 6. Interactive Features (What-If & Calibration)
-  simulateWhatIf: async (
-    stationCode: string,
-    params: {
-      rain_surge_mm: number;
-      upstream_surge_percent: number;
-      gate_r1_open_percent: number;
-      sea_tide_surge_m: number;
-    }
-  ): Promise<ForecastRecord> => {
-    const query = new URLSearchParams({
-      station_code: stationCode,
-      rain_surge_mm: params.rain_surge_mm.toString(),
-      upstream_surge_percent: params.upstream_surge_percent.toString(),
-      gate_r1_open_percent: params.gate_r1_open_percent.toString(),
-      sea_tide_surge_m: params.sea_tide_surge_m.toString(),
-    });
-    const res = await fetch(`${API_BASE}/forecast/simulate?${query.toString()}`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw new Error('Failed to run what-if simulation');
-    return res.json();
-  },
-
+  // 6. Camera Calibration
   saveCalibration: async (stationCode: string, calibrationData: any) => {
     const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/calibrate`, {
       method: 'POST',
@@ -112,6 +89,23 @@ export const floodlensApi = {
       body: JSON.stringify(calibrationData),
     });
     if (!res.ok) throw new Error('Failed to save calibration');
+    return res.json();
+  },
+
+  // 7. Continuous Learning & Retrain Hub
+  getRetrainStatus: async (): Promise<RetrainStatus> => {
+    const res = await fetch(`${API_BASE}/review/retrain-status`);
+    if (!res.ok) throw new Error('Failed to fetch retrain status');
+    return res.json();
+  },
+
+  triggerManualRetrain: async (): Promise<RetrainTriggerResponse> => {
+    const res = await fetch(`${API_BASE}/review/trigger-retrain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error('Failed to trigger manual retrain');
     return res.json();
   },
 };

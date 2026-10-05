@@ -25,8 +25,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'hero', label: 'ภาพรวม' },
     { id: 'gis-cctv', label: 'แผนที่ GIS & กล้อง' },
     { id: 'cctv-inspector', label: 'AI Staff Gauge' },
-    { id: 'simulation', label: 'จำลองสภาวะน้ำ' },
     { id: 'forecast-alerts', label: 'พยากรณ์ล่วงหน้า' },
+    { id: 'review-hub', label: 'ตรวจทาน & Retrain AI' },
   ];
 
   return (

@@ -80,9 +80,38 @@ export interface CalibrationResult {
   formula_str?: string;
 }
 
-export interface WhatIfSimulationParams {
-  rain_surge_mm: number;
-  upstream_surge_percent: number;
-  gate_r1_open_percent: number;
-  sea_tide_surge_m: number;
+export interface RetrainHistoryItem {
+  id: string;
+  model_version: string;
+  trigger_type: string;
+  images_count: number;
+  mae_meters: number;
+  pixel_error_px: number;
+  timestamp: string;
+  status: string;
+  mlflow_run_id: string;
+}
+
+export interface RetrainStatus {
+  pending_count: number;
+  target_count: number;
+  progress_percent: number;
+  current_model_name: string;
+  current_model_version: string;
+  last_mae_meters: number;
+  last_retrained_at: string;
+  is_retraining: boolean;
+  history: RetrainHistoryItem[];
+}
+
+export interface RetrainTriggerResponse {
+  message: string;
+  result: {
+    status: string;
+    model_version: string;
+    mae_meters: number;
+    mlflow_run_id: string;
+    timestamp: string;
+    trigger_type: string;
+  };
 }

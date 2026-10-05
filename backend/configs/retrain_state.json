@@ -1,0 +1,44 @@
+{
+  "pending_count": 10,
+  "target_count": 20,
+  "current_model_name": "Flood-Forecaster",
+  "current_model_version": "v1.3",
+  "last_mae_meters": 0.038,
+  "last_retrained_at": "2026-10-05T11:33:04.290627",
+  "is_retraining": false,
+  "history": [
+    {
+      "id": "retrain-1791199984",
+      "model_version": "v1.3",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 20,
+      "mae_meters": 0.038,
+      "pixel_error_px": 3.2,
+      "timestamp": "2026-10-05T11:33:04.290614",
+      "status": "SUCCESS",
+      "mlflow_run_id": "4a2e6085ba0346ada038d5f83099d36d"
+    },
+    {
+      "id": "retrain-001",
+      "model_version": "v1.1",
+      "trigger_type": "INITIAL_BENCHMARK",
+      "images_count": 20,
+      "mae_meters": 0.048,
+      "pixel_error_px": 4.5,
+      "timestamp": "2026-10-01T10:15:00Z",
+      "status": "SUCCESS",
+      "mlflow_run_id": "8169b3509dbd4ec192fc18aea799e7c8"
+    },
+    {
+      "id": "retrain-002",
+      "model_version": "v1.2",
+      "trigger_type": "AUTO_BATCH_20",
+      "images_count": 20,
+      "mae_meters": 0.042,
+      "pixel_error_px": 3.8,
+      "timestamp": "2026-10-02T14:30:00Z",
+      "status": "SUCCESS",
+      "mlflow_run_id": "b90b2fc5bad34b41a1207f057e3e2c08"
+    }
+  ]
+}

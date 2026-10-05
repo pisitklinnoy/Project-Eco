@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Station, CalibrationPoint } from '../types';
-import { Target, CheckCircle2, RotateCcw, Save, X, Info } from 'lucide-react';
+import { Target, CheckCircle2, RotateCcw, Save, X, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
 import { PillButton } from './ui/PillButton';
 import { IconButton } from './ui/IconButton';
@@ -26,24 +26,109 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
+  // Zoom & Pan state
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mouseStartPos, setMouseStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Determine current active step (1, 2, or 3)
+  const currentStep = !point1 ? 1 : !point2 ? 2 : 3;
+
+  // Zoom Handlers
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(Number((prev + 0.3).toFixed(1)), 3.5));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => {
+      const next = Math.max(Number((prev - 0.3).toFixed(1)), 1.0);
+      if (next === 1.0) setPan({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Mouse wheel zoom event listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.2 : 0.2;
+      setZoomLevel((prev) => {
+        const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), 3.5);
+        if (next === 1.0) setPan({ x: 0, y: 0 });
+        return next;
+      });
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [isOpen]);
+
+  // Mouse drag panning handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setMouseStartPos({ x: e.clientX, y: e.clientY });
+    if (zoomLevel > 1.0) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomLevel <= 1.0) return;
+    e.preventDefault();
+    const maxPan = (zoomLevel - 1) * 220;
+    const newX = Math.max(Math.min(e.clientX - dragStart.x, maxPan), -maxPan);
+    const newY = Math.max(Math.min(e.clientY - dragStart.y, maxPan), -maxPan);
+    setPan({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   if (!isOpen || !station) return null;
 
-  // Handle clicking on image
+  // Handle clicking on image with accurate coordinate scaling
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    // If mouse moved more than 5px during down/up, consider it a drag/pan, not a click
+    const moveDist = Math.hypot(e.clientX - mouseStartPos.x, e.clientY - mouseStartPos.y);
+    if (moveDist > 6) return;
+
     if (!imgRef.current) return;
     const rect = imgRef.current.getBoundingClientRect();
-    const x = Math.round(e.clientX - rect.left);
-    const y = Math.round(e.clientY - rect.top);
+    if (!rect.width || !rect.height) return;
+
+    const unscaledW = imgRef.current.clientWidth;
+    const unscaledH = imgRef.current.clientHeight;
+    const x = Math.round((e.clientX - rect.left) * (unscaledW / rect.width));
+    const y = Math.round((e.clientY - rect.top) * (unscaledH / rect.height));
+
+    const clampedX = Math.max(0, Math.min(x, unscaledW));
+    const clampedY = Math.max(0, Math.min(y, unscaledH));
 
     if (!point1) {
-      setPoint1({ x, y, value_m: val1 });
+      setPoint1({ x: clampedX, y: clampedY, value_m: val1 });
     } else if (!point2) {
-      setPoint2({ x, y, value_m: val2 });
+      setPoint2({ x: clampedX, y: clampedY, value_m: val2 });
     } else {
       // Test measuring click
-      setTestClickY(y);
+      setTestClickY(clampedY);
     }
   };
 
@@ -69,6 +154,8 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     setPoint2(null);
     setTestClickY(null);
     setSaveSuccess(false);
+    setZoomLevel(1.0);
+    setPan({ x: 0, y: 0 });
   };
 
   const handleSave = async () => {
@@ -124,102 +211,307 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-transparent">
           {/* Left Canvas/Image Area (8 Cols) */}
           <div className="lg:col-span-8 flex flex-col space-y-3">
-            {/* Guide Badge */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
-              <div className="flex items-center space-x-2 text-slate-700 font-medium">
-                <Info className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>
-                  {!point1
-                    ? 'ขั้นตอนที่ 1: คลิกที่ขีดตัวเลขบนเสาด้านบน (เช่น ขีด 2.0 ม.)'
-                    : !point2
-                    ? 'ขั้นตอนที่ 2: คลิกที่ขีดตัวเลขบนเสาด้านล่าง (เช่น ขีด 1.0 ม.)'
-                    : 'ปรับเทียบสำเร็จ! ลองคลิกที่ผิวน้ำเพื่อทดสอบอ่านค่าระดับน้ำ'}
-                </span>
+            {/* Compact Step Bar & Zoom Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2 text-xs shadow-xs">
+              {/* Left: Step Indicators with Tooltip on Hover */}
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <span className="text-[11px] font-bold text-slate-400 hidden sm:inline mr-0.5">ขั้นตอน:</span>
+
+                {/* Step 1 Pill */}
+                <div className="relative group">
+                  <div
+                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer select-none ${
+                      currentStep === 1
+                        ? 'bg-sky-500 text-white shadow-xs'
+                        : point1
+                        ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                        : 'bg-white text-slate-400 border border-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-black ${
+                        currentStep === 1
+                          ? 'bg-white text-sky-600'
+                          : point1
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {point1 ? '✓' : '1'}
+                    </span>
+                    <span>จุดบนเสา</span>
+                  </div>
+
+                  {/* Tooltip on Hover */}
+                  <div className="absolute left-0 top-full mt-2 z-30 hidden group-hover:block w-64 bg-slate-900/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md text-[11px] pointer-events-none transition-all">
+                    <div className="font-bold text-sky-300 flex items-center space-x-1.5 mb-1">
+                      <span>ขั้นที่ 1: กำหนดจุดบนเสา</span>
+                      {point1 && <span className="text-emerald-400 text-[10px] font-mono">(เสร็จสิ้น)</span>}
+                    </div>
+                    <p className="text-slate-300 leading-snug">
+                      คลิกเลือกตำแหน่งขีดตัวเลขสเกลด้านบนของเสา (เช่น ขีด {val1} ม.)
+                    </p>
+                    {point1 ? (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-800 text-[10px] text-sky-300 font-mono flex items-center justify-between">
+                        <span>พิกัดจุด: Y={point1.y}px</span>
+                        <span className="font-bold">{val1} เมตร</span>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 text-[10px] text-amber-300 font-semibold">
+                        &bull; กำลังรอการคลิกบนภาพ
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <span className="text-slate-300 text-xs font-bold">&rsaquo;</span>
+
+                {/* Step 2 Pill */}
+                <div className="relative group">
+                  <div
+                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer select-none ${
+                      currentStep === 2
+                        ? 'bg-emerald-500 text-white shadow-xs'
+                        : point2
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-white text-slate-400 border border-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-black ${
+                        currentStep === 2
+                          ? 'bg-white text-emerald-600'
+                          : point2
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {point2 ? '✓' : '2'}
+                    </span>
+                    <span>จุดล่างเสา</span>
+                  </div>
+
+                  {/* Tooltip on Hover */}
+                  <div className="absolute left-0 top-full mt-2 z-30 hidden group-hover:block w-64 bg-slate-900/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md text-[11px] pointer-events-none transition-all">
+                    <div className="font-bold text-emerald-300 flex items-center space-x-1.5 mb-1">
+                      <span>ขั้นที่ 2: กำหนดจุดล่างเสา</span>
+                      {point2 && <span className="text-emerald-400 text-[10px] font-mono">(เสร็จสิ้น)</span>}
+                    </div>
+                    <p className="text-slate-300 leading-snug">
+                      คลิกเลือกตำแหน่งขีดตัวเลขสเกลด้านล่างของเสา (เช่น ขีด {val2} ม.) เพื่อคำนวณอัตราส่วนมาตราส่วน
+                    </p>
+                    {point2 ? (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-800 text-[10px] text-emerald-300 font-mono flex items-center justify-between">
+                        <span>พิกัดจุด: Y={point2.y}px</span>
+                        <span className="font-bold">{val2} เมตร</span>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 text-[10px] text-amber-300 font-semibold">
+                        {point1 ? '&bull; คลิกบนภาพเพื่อเลือกจุดที่ 2' : '&bull; รอดำเนินการขั้นที่ 1 ก่อน'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <span className="text-slate-300 text-xs font-bold">&rsaquo;</span>
+
+                {/* Step 3 Pill */}
+                <div className="relative group">
+                  <div
+                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer select-none ${
+                      currentStep === 3
+                        ? testClickY !== null
+                          ? 'bg-amber-500 text-slate-950 shadow-xs'
+                          : 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white text-slate-400 border border-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-black ${
+                        testClickY !== null
+                          ? 'bg-slate-950 text-amber-400'
+                          : currentStep === 3
+                          ? 'bg-white text-indigo-600'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {testClickY !== null ? '✓' : '3'}
+                    </span>
+                    <span>ทดสอบผิวน้ำ</span>
+                  </div>
+
+                  {/* Tooltip on Hover */}
+                  <div className="absolute right-0 sm:left-0 top-full mt-2 z-30 hidden group-hover:block w-64 bg-slate-900/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md text-[11px] pointer-events-none transition-all">
+                    <div className="font-bold text-amber-300 flex items-center space-x-1.5 mb-1">
+                      <span>ขั้นที่ 3: ทดสอบระดับน้ำ</span>
+                      {testClickY !== null && <span className="text-emerald-400 text-[10px] font-mono">(ทดสอบแล้ว)</span>}
+                    </div>
+                    <p className="text-slate-300 leading-snug">
+                      คลิกที่ระนาบผิวน้ำเพื่อทดสอบอ่านค่า และตรวจความถูกต้องก่อนกดบันทึก
+                    </p>
+                    {testClickY !== null ? (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-800 text-[10px] text-amber-300 font-mono flex items-center justify-between">
+                        <span>ระดับน้ำที่วัดได้:</span>
+                        <span className="font-bold text-sm text-amber-200">{testMeasuredLevel} ม.</span>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 text-[10px] text-slate-400">
+                        {point1 && point2 ? '&bull; คลิกที่ผิวน้ำเพื่อทดสอบอ่านค่า' : '&bull; รอมาร์ก 2 จุดแรกให้เสร็จ'}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={handleReset}
-                className="text-xs text-sky-700 hover:text-sky-900 font-bold flex items-center space-x-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>รีเซ็ต</span>
-              </button>
+
+              {/* Right: Zoom Controls & Reset Button */}
+              <div className="flex items-center space-x-1 bg-white p-0.5 rounded-xl border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={handleZoomOut}
+                  disabled={zoomLevel <= 1.0}
+                  className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer"
+                  title="ซูมออก (-) หรือหมุนลูกกลิ้งลง"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span
+                  className="font-mono font-bold text-sky-700 px-1.5 py-0.5 text-[11px] min-w-[42px] text-center"
+                  title="หมุนลูกกลิ้งเมาส์บนภาพเพื่อซูมเข้า/ออก"
+                >
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  disabled={zoomLevel >= 3.5}
+                  className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer"
+                  title="ซูมเข้า (+) หรือหมุนลูกกลิ้งขึ้น"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+                {zoomLevel > 1.0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    className="px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                    title="รีเซ็ตขนาดซูม (100%)"
+                  >
+                    1x
+                  </button>
+                )}
+                <div className="h-3 w-px bg-slate-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  title="รีเซ็ตการมาร์กจุดทั้งหมด"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            {/* Clickable Camera Viewport */}
-            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 shadow-md select-none cursor-crosshair">
-              {station.camera_stream_url ? (
-                <img
-                  ref={imgRef}
-                  src={station.camera_stream_url}
-                  alt={station.name}
-                  onClick={handleImageClick}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                  ไม่พบภาพกล้อง CCTV
-                </div>
-              )}
-
-              {/* Point 1 Marker */}
-              {point1 && (
-                <div
-                  className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
-                  style={{ left: `${point1.x}px`, top: `${point1.y}px` }}
-                >
-                  <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white shadow-lg animate-ping absolute" />
-                  <div className="w-4 h-4 rounded-full bg-sky-600 border-2 border-white shadow-lg relative flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">1</span>
-                  </div>
-                  <span className="bg-sky-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                    จุดที่ 1 ({val1}ม.)
-                  </span>
-                </div>
-              )}
-
-              {/* Point 2 Marker */}
-              {point2 && (
-                <div
-                  className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
-                  style={{ left: `${point2.x}px`, top: `${point2.y}px` }}
-                >
-                  <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg animate-ping absolute" />
-                  <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg relative flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">2</span>
-                  </div>
-                  <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                    จุดที่ 2 ({val2}ม.)
-                  </span>
-                </div>
-              )}
-
-              {/* Calibration Scale Line Overlay */}
-              {point1 && point2 && (
-                <svg className="absolute inset-0 pointer-events-none w-full h-full">
-                  <line
-                    x1={point1.x}
-                    y1={point1.y}
-                    x2={point2.x}
-                    y2={point2.y}
-                    stroke="#38bdf8"
-                    strokeWidth="3"
-                    strokeDasharray="4,4"
+            {/* Clickable & Zoomable Camera Viewport */}
+            <div
+              ref={containerRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              className={`relative aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 shadow-md select-none touch-none overscroll-contain ${
+                zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-crosshair'
+              }`}
+            >
+              {/* Transformed Layer - Scales and Pans Image + Markers together */}
+              <div
+                className="w-full h-full relative flex items-center justify-center transition-transform duration-75 ease-out origin-center"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
+                }}
+              >
+                {station.camera_stream_url ? (
+                  <img
+                    ref={imgRef}
+                    src={station.camera_stream_url}
+                    alt={station.name}
+                    onClick={handleImageClick}
+                    className="w-full h-full object-cover pointer-events-auto"
+                    draggable={false}
                   />
-                </svg>
-              )}
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+                    ไม่พบภาพกล้อง CCTV
+                  </div>
+                )}
 
-              {/* Test Click Water Measurement Line */}
-              {testClickY !== null && (
-                <div
-                  className="absolute inset-x-0 pointer-events-none border-b-2 border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex items-center justify-between px-4"
-                  style={{ top: `${testClickY}px` }}
-                >
-                  <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full -translate-y-3">
-                    ผิวน้ำที่ทดสอบคลิก
-                  </span>
-                  <span className="text-xs font-mono font-bold bg-white text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400 -translate-y-3 shadow">
-                    {testMeasuredLevel} เมตร
-                  </span>
+                {/* Point 1 Marker */}
+                {point1 && (
+                  <div
+                    className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
+                    style={{ left: `${point1.x}px`, top: `${point1.y}px` }}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white shadow-lg animate-ping absolute" />
+                    <div className="w-4 h-4 rounded-full bg-sky-600 border-2 border-white shadow-lg relative flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-white">1</span>
+                    </div>
+                    <span className="bg-sky-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                      จุดที่ 1 ({val1}ม.)
+                    </span>
+                  </div>
+                )}
+
+                {/* Point 2 Marker */}
+                {point2 && (
+                  <div
+                    className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
+                    style={{ left: `${point2.x}px`, top: `${point2.y}px` }}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg animate-ping absolute" />
+                    <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg relative flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-white">2</span>
+                    </div>
+                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                      จุดที่ 2 ({val2}ม.)
+                    </span>
+                  </div>
+                )}
+
+                {/* Calibration Scale Line Overlay */}
+                {point1 && point2 && (
+                  <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                    <line
+                      x1={point1.x}
+                      y1={point1.y}
+                      x2={point2.x}
+                      y2={point2.y}
+                      stroke="#38bdf8"
+                      strokeWidth="3"
+                      strokeDasharray="4,4"
+                    />
+                  </svg>
+                )}
+
+                {/* Test Click Water Measurement Line */}
+                {testClickY !== null && (
+                  <div
+                    className="absolute inset-x-0 pointer-events-none border-b-2 border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex items-center justify-between px-4"
+                    style={{ top: `${testClickY}px` }}
+                  >
+                    <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full -translate-y-3">
+                      ผิวน้ำที่ทดสอบคลิก
+                    </span>
+                    <span className="text-xs font-mono font-bold bg-white text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400 -translate-y-3 shadow">
+                      {testMeasuredLevel} เมตร
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Floating Helper Hint when zoomed */}
+              {zoomLevel > 1.0 && (
+                <div className="absolute bottom-2.5 left-2.5 bg-black/70 backdrop-blur-md text-white px-2.5 py-1 rounded-xl text-[10px] font-medium border border-white/20 pointer-events-none flex items-center space-x-1.5 shadow-lg">
+                  <Move className="w-3 h-3 text-sky-300 shrink-0" />
+                  <span>ลากเมาส์เพื่อเลื่อนดูเสา &bull; หมุนลูกกลิ้งเพื่อซูม &bull; คลิกเพื่อมาร์กจุด</span>
                 </div>
               )}
             </div>

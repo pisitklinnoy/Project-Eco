@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Station, CalibrationPoint } from '../types';
-import { Target, CheckCircle2, RotateCcw, Save, X, ZoomIn, ZoomOut, Move } from 'lucide-react';
+import { Target, CheckCircle2, RotateCcw, Save, X, ZoomIn, ZoomOut, Move, Waves } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
 import { PillButton } from './ui/PillButton';
 import { IconButton } from './ui/IconButton';
@@ -23,6 +23,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
   const [val1, setVal1] = useState<number>(2.0);
   const [val2, setVal2] = useState<number>(1.0);
   const [testClickY, setTestClickY] = useState<number | null>(null);
+  const [testClickPos, setTestClickPos] = useState<{ x: number; y: number } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
@@ -38,6 +39,9 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 
   // Determine current active step (1, 2, or 3)
   const currentStep = !point1 ? 1 : !point2 ? 2 : 3;
+
+  // Counter-scaling factor so markers stay small and crisp regardless of zoom
+  const uiScale = 1 / zoomLevel;
 
   // Zoom Handlers
   const handleZoomIn = () => {
@@ -129,6 +133,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     } else {
       // Test measuring click
       setTestClickY(clampedY);
+      setTestClickPos({ x: clampedX, y: clampedY });
     }
   };
 
@@ -153,6 +158,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     setPoint1(null);
     setPoint2(null);
     setTestClickY(null);
+    setTestClickPos(null);
     setSaveSuccess(false);
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
@@ -444,65 +450,141 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   </div>
                 )}
 
-                {/* Point 1 Marker */}
+                {/* Point 1 Marker - Precision Target Reticle with Counter-Scale */}
                 {point1 && (
                   <div
-                    className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
-                    style={{ left: `${point1.x}px`, top: `${point1.y}px` }}
+                    className="absolute pointer-events-none z-10 flex items-center"
+                    style={{
+                      left: `${point1.x}px`,
+                      top: `${point1.y}px`,
+                      transform: `translate(-10px, -10px) scale(${uiScale})`,
+                      transformOrigin: '10px 10px',
+                    }}
                   >
-                    <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white shadow-lg animate-ping absolute" />
-                    <div className="w-4 h-4 rounded-full bg-sky-600 border-2 border-white shadow-lg relative flex items-center justify-center">
-                      <span className="text-[8px] font-bold text-white">1</span>
+                    {/* Precision Crosshair Target Pin */}
+                    <div className="w-5 h-5 rounded-full border-2 border-sky-400 bg-sky-500/25 flex items-center justify-center relative shadow-md">
+                      <div className="w-1.5 h-1.5 rounded-full bg-sky-300 shadow" />
+                      {/* Hairline Crosshair */}
+                      <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-sky-300/80 -translate-x-1/2" />
+                      <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-sky-300/80 -translate-y-1/2" />
                     </div>
-                    <span className="bg-sky-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                      จุดที่ 1 ({val1}ม.)
-                    </span>
+
+                    {/* Compact Label Offset to the Right */}
+                    <div className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 backdrop-blur-xs border border-sky-400/80 text-sky-200 font-mono text-[10px] font-bold shadow-lg flex items-center space-x-1 whitespace-nowrap">
+                      <span className="w-3.5 h-3.5 rounded-full bg-sky-500 text-slate-950 flex items-center justify-center text-[9px] font-black">
+                        1
+                      </span>
+                      <span>{val1} ม.</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Point 2 Marker */}
+                {/* Point 2 Marker - Precision Target Reticle with Counter-Scale */}
                 {point2 && (
                   <div
-                    className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 flex items-center space-x-1"
-                    style={{ left: `${point2.x}px`, top: `${point2.y}px` }}
+                    className="absolute pointer-events-none z-10 flex items-center"
+                    style={{
+                      left: `${point2.x}px`,
+                      top: `${point2.y}px`,
+                      transform: `translate(-10px, -10px) scale(${uiScale})`,
+                      transformOrigin: '10px 10px',
+                    }}
                   >
-                    <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg animate-ping absolute" />
-                    <div className="w-4 h-4 rounded-full bg-emerald-600 border-2 border-white shadow-lg relative flex items-center justify-center">
-                      <span className="text-[8px] font-bold text-white">2</span>
+                    {/* Precision Crosshair Target Pin */}
+                    <div className="w-5 h-5 rounded-full border-2 border-emerald-400 bg-emerald-500/25 flex items-center justify-center relative shadow-md">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow" />
+                      {/* Hairline Crosshair */}
+                      <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-emerald-300/80 -translate-x-1/2" />
+                      <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-emerald-300/80 -translate-y-1/2" />
                     </div>
-                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                      จุดที่ 2 ({val2}ม.)
-                    </span>
+
+                    {/* Compact Label Offset to the Right */}
+                    <div className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 backdrop-blur-xs border border-emerald-400/80 text-emerald-200 font-mono text-[10px] font-bold shadow-lg flex items-center space-x-1 whitespace-nowrap">
+                      <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[9px] font-black">
+                        2
+                      </span>
+                      <span>{val2} ม.</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Calibration Scale Line Overlay */}
-                {point1 && point2 && (
-                  <svg className="absolute inset-0 pointer-events-none w-full h-full">
-                    <line
-                      x1={point1.x}
-                      y1={point1.y}
-                      x2={point2.x}
-                      y2={point2.y}
-                      stroke="#38bdf8"
-                      strokeWidth="3"
-                      strokeDasharray="4,4"
-                    />
-                  </svg>
-                )}
+                {/* Calibration Scale Line Overlay & Water Surface in SVG */}
+                <svg className="absolute inset-0 pointer-events-none w-full h-full overflow-visible">
+                  <defs>
+                    <linearGradient id="waterSurfaceGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
 
-                {/* Test Click Water Measurement Line */}
+                  {/* Connecting Dashed Line with Non-Scaling Stroke */}
+                  {point1 && point2 && (
+                    <g>
+                      <line
+                        x1={point1.x}
+                        y1={point1.y}
+                        x2={point2.x}
+                        y2={point2.y}
+                        stroke="#38bdf8"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 3"
+                        vectorEffect="non-scaling-stroke"
+                        className="opacity-90"
+                      />
+                      <circle cx={point1.x} cy={point1.y} r="2" fill="#38bdf8" vectorEffect="non-scaling-stroke" />
+                      <circle cx={point2.x} cy={point2.y} r="2" fill="#34d399" vectorEffect="non-scaling-stroke" />
+                    </g>
+                  )}
+
+                  {/* Water Surface Hairline with Non-Scaling Stroke */}
+                  {testClickY !== null && (
+                    <g>
+                      <line
+                        x1="0"
+                        y1={testClickY}
+                        x2="100%"
+                        y2={testClickY}
+                        stroke="#06b6d4"
+                        strokeWidth="1.5"
+                        strokeDasharray="6 3"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <rect
+                        x="0"
+                        y={testClickY}
+                        width="100%"
+                        height="100%"
+                        fill="url(#waterSurfaceGrad)"
+                      />
+                    </g>
+                  )}
+                </svg>
+
+                {/* New Precision Water Level Caliper Probe with Counter-Scale */}
                 {testClickY !== null && (
                   <div
-                    className="absolute inset-x-0 pointer-events-none border-b-2 border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] flex items-center justify-between px-4"
-                    style={{ top: `${testClickY}px` }}
+                    className="absolute pointer-events-none z-10 flex flex-col items-center"
+                    style={{
+                      left: `${testClickPos?.x ?? ((point1?.x ?? 200) + (point2?.x ?? 200)) / 2}px`,
+                      top: `${testClickY}px`,
+                      transform: `translate(-50%, -100%) scale(${uiScale})`,
+                      transformOrigin: 'bottom center',
+                    }}
                   >
-                    <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full -translate-y-3">
-                      ผิวน้ำที่ทดสอบคลิก
-                    </span>
-                    <span className="text-xs font-mono font-bold bg-white text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400 -translate-y-3 shadow">
-                      {testMeasuredLevel} เมตร
-                    </span>
+                    {/* Floating Glassmorphic Water Level Badge */}
+                    <div className="mb-1 flex items-center space-x-1.5 bg-slate-950/92 backdrop-blur-md border border-cyan-400/90 px-2.5 py-1 rounded-xl shadow-2xl text-white select-none whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                      <Waves className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
+                      <span className="text-[10px] text-slate-300 font-medium">ผิวน้ำทดสอบ:</span>
+                      <span className="font-mono font-black text-cyan-300 text-xs tracking-wider">
+                        {testMeasuredLevel} ม.
+                      </span>
+                    </div>
+
+                    {/* Precision Pointer Arrow pointing down to the line */}
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-cyan-400 -mt-1 shadow-md" />
+                    </div>
                   </div>
                 )}
               </div>

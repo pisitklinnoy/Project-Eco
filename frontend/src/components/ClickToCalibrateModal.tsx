@@ -20,8 +20,8 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 }) => {
   const [point1, setPoint1] = useState<CalibrationPoint | null>(null);
   const [point2, setPoint2] = useState<CalibrationPoint | null>(null);
-  const [val1, setVal1] = useState<number>(4.0);
-  const [val2, setVal2] = useState<number>(2.0);
+  const [val1, setVal1] = useState<number>(2.0);
+  const [val2, setVal2] = useState<number>(1.0);
   const [testClickY, setTestClickY] = useState<number | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -47,7 +47,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     }
   };
 
-  // Calculate pixels per meter
+  // Calculate pixels per meter and linear interpolation
   let pixelsPerMeter: number | null = null;
   let testMeasuredLevel: number | null = null;
 
@@ -57,9 +57,10 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
     pixelsPerMeter = pixelDistance / meterDistance;
 
     if (testClickY !== null) {
-      // Linear formula: higher y means lower water level
-      const deltaFromP1 = (point1.y - testClickY) / pixelsPerMeter;
-      testMeasuredLevel = Number((point1.value_m + deltaFromP1).toFixed(2));
+      // Linear interpolation between (point1.y, val1) and (point2.y, val2)
+      // v(y) = val1 + (val2 - val1) * (y - point1.y) / (point2.y - point1.y)
+      const calculatedLevel = val1 + ((val2 - val1) * (testClickY - point1.y)) / (point2.y - point1.y);
+      testMeasuredLevel = Number(calculatedLevel.toFixed(2));
     }
   }
 
@@ -79,7 +80,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
         point1: { ...point1, value_m: val1 },
         point2: { ...point2, value_m: val2 },
         pixels_per_meter: pixelsPerMeter,
-        formula_str: `Level = ${val1} + (${point1.y} - y) / ${pixelsPerMeter.toFixed(2)}`,
+        formula_str: `Level = ${val1} + (${(val2 - val1).toFixed(2)}) * (y - ${point1.y}) / (${point2.y - point1.y})`,
       });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -129,9 +130,9 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                 <Info className="w-4 h-4 text-sky-600 shrink-0" />
                 <span>
                   {!point1
-                    ? 'ขั้นตอนที่ 1: คลิกที่ขีดตัวเลขบนเสาด้านบน (เช่น ขีด 4.0 ม.)'
+                    ? 'ขั้นตอนที่ 1: คลิกที่ขีดตัวเลขบนเสาด้านบน (เช่น ขีด 2.0 ม.)'
                     : !point2
-                    ? 'ขั้นตอนที่ 2: คลิกที่ขีดตัวเลขบนเสาด้านล่าง (เช่น ขีด 2.0 ม.)'
+                    ? 'ขั้นตอนที่ 2: คลิกที่ขีดตัวเลขบนเสาด้านล่าง (เช่น ขีด 1.0 ม.)'
                     : 'ปรับเทียบสำเร็จ! ลองคลิกที่ผิวน้ำเพื่อทดสอบอ่านค่าระดับน้ำ'}
                 </span>
               </div>
@@ -243,7 +244,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   type="number"
                   step="0.1"
                   value={val1}
-                  onChange={(e) => setVal1(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value) || 0;
+                    setVal1(v);
+                    if (point1) setPoint1({ ...point1, value_m: v });
+                  }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
@@ -260,7 +265,11 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                   type="number"
                   step="0.1"
                   value={val2}
-                  onChange={(e) => setVal2(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value) || 0;
+                    setVal2(v);
+                    if (point2) setPoint2({ ...point2, value_m: v });
+                  }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>

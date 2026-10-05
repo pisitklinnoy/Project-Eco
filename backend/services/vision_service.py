@@ -13,7 +13,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 from core.vision.pole_coordinates import PoleCoordinateManager
 from core.vision.scale_calibrator import PiecewiseScaleCalibrator
 from core.vision.water_surface_detector import WaterSurfaceDetector
-from core.vision.dashboard_builder import build_dashboard, render_cctv_frame, render_gauge_overlay
+from core.vision.dashboard_builder import build_dashboard, render_cctv_frame, render_gauge_overlay, render_model_v2_detection_view
 from core.vision.auto_localizer import StaffGaugeAutoLocalizer
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +49,20 @@ class VisionService:
         self._cached_dashboards: Dict[str, Tuple[float, bytes]] = {}  # {code: (timestamp, jpeg_bytes)}
         self._cached_metadata: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self.cache_ttl_seconds = 15.0
-        self.localizer = StaffGaugeAutoLocalizer()
+
+        # โหลดโมเดล model_best_v2.pt โดยตรงตามคำขอ
+        v2_candidates = [
+            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.pt"),
+            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.pt",
+            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.onnx"),
+            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.onnx"
+        ]
+        target_model = None
+        for p in v2_candidates:
+            if os.path.exists(p):
+                target_model = p
+                break
+        self.localizer = StaffGaugeAutoLocalizer(model_path=target_model)
         self._load_configs()
 
     def _load_configs(self):
@@ -241,50 +254,52 @@ class VisionService:
             return None
 
         try:
-            # 1. Stage 1: YOLO Segmentation & Auto-Localizer
-            loc_res = self.localizer.localize(frame, cfg)
-            if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
-                bx1, by1, bx2, by2 = loc_res["bbox"]
-                cfg["staff_gauge_bbox"]["x1"] = bx1
-                cfg["staff_gauge_bbox"]["x2"] = bx2
+            # 1. ตรวจจับโดยตรงด้วย YOLO model_best_v2.pt
+            raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
 
-            pole_mgr = PoleCoordinateManager(cfg)
-            rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
-            calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
-            detector = WaterSurfaceDetector(calibrator, cfg)
-
-            # 2. Stage 2: Sub-pixel Waterline Analysis
-            water_info = detector.detect_waterline(enhanced)
-
-            # 3. เรนเดอร์ภาพตามโหมดมุมมอง (view: 'cctv' | 'gauge' | 'composite')
-            if view == "gauge":
-                img_out = render_gauge_overlay(
-                    enhanced_gauge=enhanced,
-                    water_info=water_info,
-                    calibrator=calibrator,
-                    cfg=cfg
-                )
-            elif view == "composite":
-                img_out = build_dashboard(
+            if view == "cctv":
+                # โหมดมุมมองกล้อง CCTV: ใช้เฉพาะ model_best_v2.pt ตรวจจับเสาตรงไปตรงมาตามคำขอ
+                stn_name = cfg.get("thai_name") or cfg.get("station_name") or station_code
+                img_out = render_model_v2_detection_view(
                     frame=frame,
-                    enhanced_gauge=enhanced,
-                    water_info=water_info,
-                    pole_mgr=pole_mgr,
-                    calibrator=calibrator,
-                    cfg=cfg,
-                    yolo_info=loc_res,
+                    station_name=stn_name,
+                    raw_detections=raw_detections,
+                    model_name="model_best_v2.pt",
                     overlay_mode=overlay
                 )
-            else:  # view == "cctv" (default: 16:9 CCTV Feed with Bounding Box)
-                img_out = render_cctv_frame(
-                    frame=frame,
-                    water_info=water_info,
-                    pole_mgr=pole_mgr,
-                    calibrator=calibrator,
-                    cfg=cfg,
-                    yolo_info=loc_res,
-                    overlay_mode=overlay
-                )
+            else:
+                loc_res = self.localizer.localize(frame, cfg)
+                if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
+                    bx1, by1, bx2, by2 = loc_res["bbox"]
+                    cfg["staff_gauge_bbox"]["x1"] = bx1
+                    cfg["staff_gauge_bbox"]["x2"] = bx2
+
+                pole_mgr = PoleCoordinateManager(cfg)
+                rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
+                calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
+                detector = WaterSurfaceDetector(calibrator, cfg)
+
+                # 2. Stage 2: Sub-pixel Waterline Analysis
+                water_info = detector.detect_waterline(enhanced)
+
+                if view == "gauge":
+                    img_out = render_gauge_overlay(
+                        enhanced_gauge=enhanced,
+                        water_info=water_info,
+                        calibrator=calibrator,
+                        cfg=cfg
+                    )
+                else:  # view == "composite"
+                    img_out = build_dashboard(
+                        frame=frame,
+                        enhanced_gauge=enhanced,
+                        water_info=water_info,
+                        pole_mgr=pole_mgr,
+                        calibrator=calibrator,
+                        cfg=cfg,
+                        yolo_info=loc_res,
+                        overlay_mode=overlay
+                    )
 
             # Encode JPEG
             ret, buf = cv2.imencode(".jpg", img_out, [cv2.IMWRITE_JPEG_QUALITY, 85])

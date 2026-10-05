@@ -281,3 +281,100 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
     cv2.putText(out, status_text, (30, fh - 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 120), 2, cv2.LINE_AA)
 
     return out
+
+
+def render_model_v2_detection_view(
+    frame: np.ndarray,
+    station_name: str,
+    raw_detections: list,
+    model_name: str = "model_best_v2.pt",
+    overlay_mode: str = "bbox"
+) -> np.ndarray:
+    """
+    เรนเดอร์เฉพาะผลการตรวจจับจากโมเดล YOLO (model_best_v2.pt) แบบตรงไปตรงมา
+    เพื่อแสดงให้เห็นชัดเจนว่าโมเดลหาเสาวัดระดับน้ำเจอมั้ย และตรวจจับผิวน้ำได้ที่ไหนบ้าง
+    ไม่มีการวาดกรอบจำลอง fallback หรือค่าพิกัดคงที่
+    """
+    out = frame.copy()
+    fh, fw = out.shape[:2]
+
+    gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+    waters = [d for d in raw_detections if d.get("name") == "Water-Area"]
+
+    # 1. วาดตรวจจับผิวน้ำ (Water-Area) ก่อน เพื่อให้เสาอยู่ด้านบน
+    for w in waters:
+        poly = w.get("polygon")
+        conf = w.get("confidence", 0.0)
+        if poly is not None and len(poly) >= 3:
+            overlay = out.copy()
+            cv2.fillPoly(overlay, [poly], (220, 160, 40))  # ฟ้าคราม
+            cv2.addWeighted(overlay, 0.16, out, 0.84, 0, out)
+            cv2.polylines(out, [poly], True, (255, 180, 50), 2, cv2.LINE_AA)
+        elif "bbox" in w:
+            bx1, by1, bx2, by2 = w["bbox"]
+            cv2.rectangle(out, (bx1, by1), (bx2, by2), (255, 180, 50), 1)
+
+    # 2. วาดตรวจจับเสาวัดน้ำ (Staff Gauge)
+    for g in gauges:
+        bx1, by1, bx2, by2 = g["bbox"]
+        conf = g.get("confidence", 0.0)
+        poly = g.get("polygon")
+
+        # วาด Polygon ถ้ามี
+        if poly is not None and len(poly) >= 3:
+            overlay = out.copy()
+            cv2.fillPoly(overlay, [poly], (40, 220, 80))  # เขียวมรกตโปร่งแสง
+            cv2.addWeighted(overlay, 0.35, out, 0.65, 0, out)
+            cv2.polylines(out, [poly], True, (0, 255, 100), 3, cv2.LINE_AA)
+
+        # วาดกรอบสี่เหลี่ยม Bounding Box เขียว
+        cv2.rectangle(out, (bx1, by1), (bx2, by2), (0, 255, 100), 3)
+
+        # เพิ่ม Corner brackets สำหรับความคมชัด
+        c_len = min(20, max(6, (bx2 - bx1) // 3))
+        cv2.line(out, (bx1, by1), (bx1 + c_len, by1), (255, 255, 255), 4)
+        cv2.line(out, (bx1, by1), (bx1, by1 + c_len), (255, 255, 255), 4)
+        cv2.line(out, (bx2, by2), (bx2 - c_len, by2), (255, 255, 255), 4)
+        cv2.line(out, (bx2, by2), (bx2, by2 - c_len), (255, 255, 255), 4)
+
+        # Badge กำกับเสา
+        badge_txt = f"Staff Gauge: {conf*100:.1f}%"
+        (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        by_top = max(0, by1 - th - 12)
+        cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), (0, 160, 60), -1)
+        cv2.putText(out, badge_txt, (bx1 + 6, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+
+    # 3. Top HUD Banner (ป้ายสถานะโมเดลด้านบนซ้าย)
+    has_gauge = len(gauges) > 0
+    hud_w = min(fw - 40, 780)
+    hud_h = 96
+    overlay = out.copy()
+    cv2.rectangle(overlay, (20, 20), (20 + hud_w, 20 + hud_h), (15, 23, 42), -1)
+    cv2.addWeighted(overlay, 0.88, out, 0.12, 0, out)
+    cv2.rectangle(out, (20, 20), (20 + hud_w, 20 + hud_h), (60, 85, 120), 2)
+
+    # วงกลมไฟสถานะ
+    dot_color = (50, 255, 120) if has_gauge else (50, 70, 255)
+    cv2.circle(out, (42, 45), 8, dot_color, -1)
+
+    # บรรทัด 1: ชื่อโมเดลและสถานี
+    cv2.putText(out, f"AI Vision: {model_name} (YOLOv8-Seg) - {station_name}", (60, 49),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (220, 235, 255), 2, cv2.LINE_AA)
+
+    # บรรทัด 2: สถานะการค้นหาเสา
+    if has_gauge:
+        best_g = max(gauges, key=lambda x: x["confidence"])
+        gx1, gy1, gx2, gy2 = best_g["bbox"]
+        g_conf = best_g["confidence"]
+        txt_res = f"[DETECTED] Found Staff Gauge | Conf: {g_conf*100:.1f}%"
+        cv2.putText(out, txt_res, (40, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (50, 255, 120), 2, cv2.LINE_AA)
+        txt_sub = f"BBox: [{gx1}, {gy1}, {gx2}, {gy2}] (W={gx2-gx1}px, H={gy2-gy1}px) | Water: {len(waters)} areas"
+        cv2.putText(out, txt_sub, (40, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (180, 210, 240), 1, cv2.LINE_AA)
+    else:
+        txt_res = "[NOT DETECTED] Staff Gauge Not Found"
+        cv2.putText(out, txt_res, (40, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (50, 100, 255), 2, cv2.LINE_AA)
+        txt_sub = f"Water-Area: {len(waters)} areas | Staff gauge obscured or below threshold"
+        cv2.putText(out, txt_sub, (40, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (180, 210, 240), 1, cv2.LINE_AA)
+
+    return out
+

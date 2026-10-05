@@ -51,10 +51,11 @@ class StaffGaugeAutoLocalizer:
             project_roots.append(p)
             p = os.path.dirname(p)
 
-        search_names = ["model_muangkong_seg.onnx", "model_muangkong_seg.pt"]
+        search_names = ["model_best_v2.pt", "model_best_v2.onnx", "model_muangkong_seg.onnx", "model_muangkong_seg.pt"]
         search_dirs = []
         for root in project_roots:
             search_dirs.extend([
+                os.path.join(root, "non_time_series", "models"),
                 os.path.join(root, "models"),
                 os.path.join(root, "workers", "vision", "models"),
                 os.path.join(root, "backend", "models"),

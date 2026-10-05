@@ -277,7 +277,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <p className="text-[11px] text-slate-500 font-medium">
                 {viewMode === 'live'
                   ? (isHatyai ? 'สตรีมสด Axis Camera (ที่ว่าการ อ.หาดใหญ่)' : 'ภาพกล้องถ่ายทอดสดแบบเรียลไทม์ (LIVE CCTV)')
-                  : 'การวิเคราะห์ AI Realtime: เสาที่ Crop สด + ไม้บรรทัดดิจิทัล + ตีกรอบเสา'}
+                  : 'ตรวจจับตำแหน่งเสาวัดน้ำด้วยโมเดล AI (model_best_v2.pt) แบบ Realtime'}
               </p>
             </div>
           </div>
@@ -309,6 +309,72 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* AI Staff Gauge Scenario Ribbon - When in AI Dashboard Mode */}
+        {viewMode === 'ai_dashboard' && (
+          <div className="px-5 py-2 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 border-b border-slate-700/60 flex flex-wrap items-center justify-between gap-2 text-xs text-white">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-bold text-sky-200 text-[11px] flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>โมเดล AI: <code className="bg-white/10 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[10px]">model_best_v2.pt</code></span>
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-1 bg-black/40 p-0.5 rounded-xl border border-white/15 text-[11px]">
+              <button
+                onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  aiScenario === 'daytime'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="ทดสอบตรวจจับเสาในภาพเวลากลางวัน (Daytime)"
+              >
+                <Sun className="w-3 h-3 text-amber-200 shrink-0" />
+                <span>กลางวัน</span>
+              </button>
+              <button
+                onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  aiScenario === 'nighttime'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="ทดสอบตรวจจับเสาในภาพเวลากลางคืน (Nighttime)"
+              >
+                <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
+                <span>กลางคืน</span>
+              </button>
+              {isHatyai && (
+                <button
+                  onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                    aiScenario === 'flood'
+                      ? 'bg-rose-600 text-white shadow-xs font-black'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="ทดสอบตรวจจับเสาในภาพสภาวะน้ำท่วม (Flood Simulation)"
+                >
+                  <Waves className="w-3 h-3 text-rose-200 shrink-0" />
+                  <span>น้ำท่วม</span>
+                </button>
+              )}
+              <button
+                onClick={() => { setAiScenario('live'); handleResetZoom(); }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  aiScenario === 'live'
+                    ? 'bg-emerald-600 text-white shadow-xs font-black'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="ตรวจจับสดจากกล้อง CCTV ปัจจุบันแบบ Realtime"
+              >
+                <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
+                <span>สด (Live)</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Hatyai Axis Camera Dedicated Ribbon - Only in Live Mode */}
         {isHatyai && viewMode === 'live' && (

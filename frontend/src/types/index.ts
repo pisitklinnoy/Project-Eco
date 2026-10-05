@@ -165,3 +165,64 @@ export interface OnDemandPredictResponse {
   scale_cm_per_pixel?: number | null;
 }
 
+export interface TimeSeriesRetrainHistoryItem {
+  id: string;
+  model_version: string;
+  trigger_type: string;
+  challenger_mae: number;
+  champion_mae: number;
+  improvement_pct: number;
+  promoted: boolean;
+  train_samples: number;
+  timestamp: string;
+  status: string;
+  mlflow_run_id: string;
+}
+
+export interface TimeSeriesRetrainStatus {
+  current_model_name: string;
+  current_model_version: string;
+  last_mae_meters: number;
+  last_retrained_at: string;
+  training_samples: number;
+  flood_sample_weight_multiplier: number;
+  gatekeeper_policy: string;
+  is_retraining: boolean;
+  mlflow_tracking_uri?: string;
+  history: TimeSeriesRetrainHistoryItem[];
+}
+
+export interface TimeSeriesRetrainTriggerResponse {
+  status: string;
+  message: string;
+  result: {
+    status: string;
+    promoted: boolean;
+    model_version: string;
+    challenger_mae: number;
+    champion_mae: number;
+    improvement_pct: number;
+    mlflow_run_id: string;
+    timestamp: string;
+    trigger_type: string;
+  };
+}
+
+export interface SensorDriftStatus {
+  overall_status: string;
+  telemetry_source: string;
+  quality_gate: string;
+  max_rate_of_rise_threshold_m_per_h: number;
+  checked_at: string;
+  stations: Record<
+    string,
+    {
+      name: string;
+      status: string;
+      is_suspicious: boolean;
+      reasons: string[];
+    }
+  >;
+}
+
+

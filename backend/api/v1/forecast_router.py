@@ -122,3 +122,30 @@ def simulate(station_code: str = "STN-BANGSALA", rain_surge_mm: float = Query(0,
         "context_json": {"mode": "simulation", "operational_ready": False, "current_level_m": current}
     }
 
+
+@router.get("/retrain-status")
+def get_timeseries_retrain_status():
+    """สถานะปัจจุบันของโมเดล Time-Series LightGBM และประวัติการ Retrain"""
+    from services.timeseries_retrain_service import timeseries_retrain_service
+    return timeseries_retrain_service.get_retrain_status()
+
+
+@router.post("/trigger-retrain")
+def trigger_timeseries_retrain(force_promote: bool = Query(False)):
+    """สั่งฝึกฝนโมเดล Time-Series LightGBM ใหม่ พร้อมประเมิน Champion vs Challenger"""
+    from services.timeseries_retrain_service import timeseries_retrain_service
+    result = timeseries_retrain_service.execute_retrain_job(trigger_type="MANUAL_OVERRIDE", force_promote=force_promote)
+    return {
+        "status": "success",
+        "message": "Time-Series Model Retraining completed successfully!",
+        "result": result
+    }
+
+
+@router.get("/drift-status")
+def get_sensor_drift_status(db: Session = Depends(get_db)):
+    """ตรวจสอบสถานะ Sensor Drift และความผิดปกติทางชลศาสตร์ของทั้ง 3 สถานี"""
+    from services.timeseries_retrain_service import timeseries_retrain_service
+    return timeseries_retrain_service.get_drift_and_anomaly_status(db=db)
+
+

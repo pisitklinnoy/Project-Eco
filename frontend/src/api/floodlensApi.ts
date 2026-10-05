@@ -1,4 +1,16 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse, OnDemandPredictResponse } from '../types';
+import type { 
+  Station, 
+  WaterMeasurement, 
+  ForecastRecord, 
+  AlertEvent, 
+  ReviewPackage, 
+  RetrainStatus, 
+  RetrainTriggerResponse, 
+  OnDemandPredictResponse,
+  TimeSeriesRetrainStatus,
+  TimeSeriesRetrainTriggerResponse,
+  SensorDriftStatus
+} from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -183,6 +195,27 @@ export const floodlensApi = {
       if (err.message) throw err;
       throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อ');
     }
+  },
+
+  // 9. Time Series MLOps Lifecycle
+  getTimeSeriesRetrainStatus: async (): Promise<TimeSeriesRetrainStatus> => {
+    const res = await fetch(`${API_BASE}/forecast/retrain-status`);
+    if (!res.ok) throw new Error('Failed to fetch Time-Series retrain status');
+    return res.json();
+  },
+
+  triggerTimeSeriesRetrain: async (): Promise<TimeSeriesRetrainTriggerResponse> => {
+    const res = await fetch(`${API_BASE}/forecast/trigger-retrain`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to trigger Time-Series retrain');
+    return res.json();
+  },
+
+  getSensorDriftStatus: async (): Promise<SensorDriftStatus> => {
+    const res = await fetch(`${API_BASE}/forecast/drift-status`);
+    if (!res.ok) throw new Error('Failed to fetch sensor drift status');
+    return res.json();
   },
 };
 

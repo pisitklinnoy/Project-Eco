@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from minio import Minio
-from vision.mock_detector import mock_detector
+from vision.waterline_detector import waterline_detector
 from vision.quality_gate import QualityGate
 from datetime import datetime
 
@@ -36,7 +36,7 @@ async def process_vision_task(ctx, payload: dict):
         return {"status": "error", "message": str(e)}
 
     # รันโมเดลตรวจวัดผิวน้ำ
-    detect_res = mock_detector.detect_water_level(img_bytes, station_code=station_code)
+    detect_res = waterline_detector.detect_water_level(img_bytes, station_code=station_code)
     
     # ตรวจสอบผ่าน Quality Gate
     q_eval = QualityGate.evaluate(img_bytes, detect_res, station_code=station_code)

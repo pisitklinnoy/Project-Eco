@@ -296,7 +296,6 @@ def render_model_v2_detection_view(
     ไม่มีการวาดกรอบจำลอง fallback หรือค่าพิกัดคงที่
     """
     out = frame.copy()
-    fh, fw = out.shape[:2]
 
     gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
 
@@ -323,37 +322,6 @@ def render_model_v2_detection_view(
         cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), (0, 160, 60), -1)
         cv2.putText(out, badge_txt, (bx1 + 6, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
 
-    # 2. Top HUD Banner (ป้ายสถานะโมเดลด้านบนซ้าย)
-    has_gauge = len(gauges) > 0
-    hud_w = min(fw - 40, 780)
-    hud_h = 96
-    overlay = out.copy()
-    cv2.rectangle(overlay, (20, 20), (20 + hud_w, 20 + hud_h), (15, 23, 42), -1)
-    cv2.addWeighted(overlay, 0.88, out, 0.12, 0, out)
-    cv2.rectangle(out, (20, 20), (20 + hud_w, 20 + hud_h), (60, 85, 120), 2)
-
-    # วงกลมไฟสถานะ
-    dot_color = (50, 255, 120) if has_gauge else (50, 70, 255)
-    cv2.circle(out, (42, 45), 8, dot_color, -1)
-
-    # บรรทัด 1: ชื่อโมเดลและสถานี
-    cv2.putText(out, f"AI Vision: {model_name} (YOLOv8-Seg) - {station_name}", (60, 49),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (220, 235, 255), 2, cv2.LINE_AA)
-
-    # บรรทัด 2: สถานะการค้นหาเสา
-    if has_gauge:
-        best_g = max(gauges, key=lambda x: x["confidence"])
-        gx1, gy1, gx2, gy2 = best_g["bbox"]
-        g_conf = best_g["confidence"]
-        txt_res = f"[DETECTED] Found Staff Gauge | Conf: {g_conf*100:.1f}%"
-        cv2.putText(out, txt_res, (40, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (50, 255, 120), 2, cv2.LINE_AA)
-        txt_sub = f"BBox: [{gx1}, {gy1}, {gx2}, {gy2}] (W={gx2-gx1}px, H={gy2-gy1}px)"
-        cv2.putText(out, txt_sub, (40, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (180, 210, 240), 1, cv2.LINE_AA)
-    else:
-        txt_res = "[NOT DETECTED] Staff Gauge Not Found"
-        cv2.putText(out, txt_res, (40, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (50, 100, 255), 2, cv2.LINE_AA)
-        txt_sub = "ไม่พบเสาวัดระดับน้ำในภาพ (Confidence ต่ำกว่าเกณฑ์)"
-        cv2.putText(out, txt_sub, (40, 101), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 200, 220), 1, cv2.LINE_AA)
     return out
 
 

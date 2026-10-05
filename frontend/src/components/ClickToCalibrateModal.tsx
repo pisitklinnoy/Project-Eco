@@ -188,10 +188,10 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xl animate-fade-in">
-      <div className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[32px] sm:rounded-[36px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/60 backdrop-blur-xl animate-fade-in">
+      <div className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[32px] sm:rounded-[36px] w-full max-w-6xl xl:max-w-7xl max-h-[94vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="px-6 py-5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-4 sm:py-5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-sm">
               <Target className="w-5 h-5" />
@@ -214,9 +214,9 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-transparent">
-          {/* Left Canvas/Image Area (8 Cols) */}
-          <div className="lg:col-span-8 flex flex-col space-y-3">
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 bg-transparent">
+          {/* Left Canvas/Image Area (8-9 Cols) */}
+          <div className="lg:col-span-8 xl:col-span-9 flex flex-col space-y-3">
             {/* Compact Step Bar & Zoom Controls */}
             <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2 text-xs shadow-xs">
               {/* Left: Step Indicators with Tooltip on Hover */}
@@ -510,13 +510,6 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 
                 {/* Calibration Scale Line Overlay & Water Surface in SVG */}
                 <svg className="absolute inset-0 pointer-events-none w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="waterSurfaceGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
-                    </linearGradient>
-                  </defs>
-
                   {/* Connecting Dashed Line with Non-Scaling Stroke */}
                   {point1 && point2 && (
                     <g>
@@ -536,31 +529,22 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                     </g>
                   )}
 
-                  {/* Water Surface Hairline with Non-Scaling Stroke */}
+                  {/* Orange Dashed Water Surface Line Only - No Shaded Area */}
                   {testClickY !== null && (
-                    <g>
-                      <line
-                        x1="0"
-                        y1={testClickY}
-                        x2="100%"
-                        y2={testClickY}
-                        stroke="#06b6d4"
-                        strokeWidth="1.5"
-                        strokeDasharray="6 3"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                      <rect
-                        x="0"
-                        y={testClickY}
-                        width="100%"
-                        height="100%"
-                        fill="url(#waterSurfaceGrad)"
-                      />
-                    </g>
+                    <line
+                      x1="0"
+                      y1={testClickY}
+                      x2="100%"
+                      y2={testClickY}
+                      stroke="#f97316"
+                      strokeWidth="2"
+                      strokeDasharray="6 4"
+                      vectorEffect="non-scaling-stroke"
+                    />
                   )}
                 </svg>
 
-                {/* New Precision Water Level Caliper Probe with Counter-Scale */}
+                {/* Precision Water Level Caliper Probe with Counter-Scale */}
                 {testClickY !== null && (
                   <div
                     className="absolute pointer-events-none z-10 flex flex-col items-center"
@@ -572,18 +556,18 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                     }}
                   >
                     {/* Floating Glassmorphic Water Level Badge */}
-                    <div className="mb-1 flex items-center space-x-1.5 bg-slate-950/92 backdrop-blur-md border border-cyan-400/90 px-2.5 py-1 rounded-xl shadow-2xl text-white select-none whitespace-nowrap">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                      <Waves className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
+                    <div className="mb-1 flex items-center space-x-1.5 bg-slate-950/92 backdrop-blur-md border border-orange-500/80 px-2.5 py-1 rounded-xl shadow-2xl text-white select-none whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping shrink-0" />
+                      <Waves className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                       <span className="text-[10px] text-slate-300 font-medium">ผิวน้ำทดสอบ:</span>
-                      <span className="font-mono font-black text-cyan-300 text-xs tracking-wider">
+                      <span className="font-mono font-black text-orange-300 text-xs tracking-wider">
                         {testMeasuredLevel} ม.
                       </span>
                     </div>
 
-                    {/* Precision Pointer Arrow pointing down to the line */}
+                    {/* Precision Pointer Arrow pointing down to the orange line */}
                     <div className="relative flex items-center justify-center">
-                      <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-cyan-400 -mt-1 shadow-md" />
+                      <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-orange-500 -mt-1 shadow-md" />
                     </div>
                   </div>
                 )}
@@ -599,8 +583,8 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
             </div>
           </div>
 
-          {/* Right Parameters & Readout Area (4 Cols) */}
-          <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
+          {/* Right Parameters & Readout Area (4-3 Cols) */}
+          <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between space-y-4">
             <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
               <h3 className="text-xs font-bold font-display text-slate-900 uppercase tracking-wider">
                 กำหนดค่าความสูงจุดอ้างอิงบนเสา

@@ -13,6 +13,7 @@ import { CameraViewer } from './components/CameraViewer';
 import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
+import { OnDemandPredictorModal } from './components/OnDemandPredictorModal';
 import { ReviewHub } from './components/ReviewHub';
 import { Waves } from 'lucide-react';
 
@@ -29,6 +30,7 @@ export const App: React.FC = () => {
   const [triggeringForecast, setTriggeringForecast] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
+  const [isOnDemandOpen, setIsOnDemandOpen] = useState<boolean>(false);
 
   // Active section tracking for floating navbar & sidebar
   const [activeSection, setActiveSection] = useState<string>('hero');
@@ -185,6 +187,7 @@ export const App: React.FC = () => {
         onNavigate={handleNavigate}
         onOpenReview={() => setIsReviewOpen(true)}
         onOpenCalibrate={() => setIsCalibrateOpen(true)}
+        onOpenOnDemand={() => setIsOnDemandOpen(true)}
         onRefresh={loadStationData}
         loading={loading}
       />
@@ -198,6 +201,7 @@ export const App: React.FC = () => {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         alertCount={alerts.filter((a) => a.severity_level === 'CRITICAL').length}
+        onOpenOnDemand={() => setIsOnDemandOpen(true)}
       />
 
       {/* Main Workspace with generous spacing & Bento architecture */}
@@ -258,6 +262,7 @@ export const App: React.FC = () => {
                 measurement={measurement}
                 onOpenReview={() => setIsReviewOpen(true)}
                 onOpenCalibrate={() => setIsCalibrateOpen(true)}
+                onOpenOnDemand={() => setIsOnDemandOpen(true)}
               />
             </div>
           </div>
@@ -329,6 +334,12 @@ export const App: React.FC = () => {
         onClose={() => setIsCalibrateOpen(false)}
         station={selectedStation}
         onCalibrationSaved={loadStationData}
+      />
+
+      {/* On-Demand Water Level Image Predictor Modal */}
+      <OnDemandPredictorModal
+        isOpen={isOnDemandOpen}
+        onClose={() => setIsOnDemandOpen(false)}
       />
 
       {/* Mobile Floating Bottom Bar */}

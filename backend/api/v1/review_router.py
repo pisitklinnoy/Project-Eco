@@ -24,9 +24,9 @@ def submit_human_correction(payload: HumanReviewSubmit, db: Session = Depends(ge
     )
 
 @router.get("/retrain-status")
-def get_retrain_status():
+def get_retrain_status(db: Session = Depends(get_db)):
     """ส่งคืนสถานะตัวนับการตรวจทาน (0/20) ข้อมูลโมเดลปัจจุบัน และประวัติการ Retrain"""
-    return review_service.get_retrain_status()
+    return review_service.get_retrain_status(db=db)
 
 @router.post("/trigger-retrain")
 def trigger_manual_retrain(background_tasks: BackgroundTasks):

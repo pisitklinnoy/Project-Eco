@@ -126,3 +126,43 @@ def get_vision_metadata(station_code: str):
     return meta
 
 
+@router.get("/{station_code}/raw-frame.jpg")
+def get_station_raw_frame(station_code: str):
+    """
+    ส่งคืนภาพต้นฉบับแท้ๆ (100% Clean Raw Image) ปราศจากการวาด Bounding Box หรือ Text Overlay
+    เหมาะสำหรับนำไปใช้งานใน On-Demand Predictor และ Label Studio
+    """
+    import os
+    import cv2
+    from fastapi.responses import Response
+    from services.vision_service import vision_service, BASE_DIR
+
+    stn_key = vision_service._resolve_station_key(station_code)
+    station_num = "station1_muangkong" if "MUANGKONG" in stn_key or "173A" in stn_key else \
+                  "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
+                  "station3_hatyainai"
+
+    candidates = [
+        os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+        os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+        os.path.join(BASE_DIR, "sample_images", f"{station_num}_flood.png"),
+    ]
+    frame = None
+    for p in candidates:
+        if os.path.exists(p):
+            frame = cv2.imread(p)
+            if frame is not None:
+                break
+
+    if frame is None:
+        frame = vision_service.fetch_live_frame(station_code)
+
+    if frame is None:
+        raise HTTPException(status_code=404, detail="Raw frame not available")
+
+    ret, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    return Response(content=buf.tobytes(), media_type="image/jpeg", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+    })
+
+

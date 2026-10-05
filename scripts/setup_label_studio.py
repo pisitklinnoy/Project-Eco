@@ -5,12 +5,31 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-TOKEN = "622ed18f589798a243b037045ee9296eeb67a17f"
-LABEL_STUDIO_URL = "http://localhost:8085"
+LABEL_STUDIO_URL = os.getenv("LABEL_STUDIO_URL", "http://localhost:8085")
+REFRESH_TOKEN = os.getenv(
+    "LABEL_STUDIO_REFRESH_TOKEN",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6ODA5ODQwNzY2OCwiaWF0IjoxNzkxMjA3NjY4LCJqdGkiOiJiZmFhY2M3ZjY3Zjc0OWVlOTRkNzI1OGRlNThhYzNhNyIsInVzZXJfaWQiOiIxIn0.ugSEf5ihVeP2R3-66enxOgp4xiOZHJ7p9pNAXLkgNX4"
+)
+API_KEY = os.getenv("LABEL_STUDIO_API_KEY", "622ed18f589798a243b037045ee9296eeb67a17f")
 
-HEADERS = {
-    "Authorization": f"Token {TOKEN}",
-}
+def get_auth_headers():
+    if REFRESH_TOKEN:
+        try:
+            req = urllib.request.Request(
+                f"{LABEL_STUDIO_URL}/api/token/refresh/",
+                data=json.dumps({"refresh": REFRESH_TOKEN}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req) as resp:
+                access = json.loads(resp.read().decode("utf-8")).get("access")
+                if access:
+                    return {"Authorization": f"Bearer {access}"}
+        except Exception as e:
+            print(f"[Notice] Refresh token exchange failed ({e}), falling back to API Key")
+    prefix = "Bearer" if API_KEY.startswith("eyJ") else "Token"
+    return {"Authorization": f"{prefix} {API_KEY}"}
+
+HEADERS = get_auth_headers()
 
 LABEL_CONFIG = """<View>
   <Image name="image" value="$image"/>

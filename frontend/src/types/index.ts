@@ -115,3 +115,16 @@ export interface RetrainTriggerResponse {
     trigger_type: string;
   };
 }
+
+export interface OnDemandPredictResponse {
+  status: string;
+  calculated_water_level_m: number;
+  pixel_water_y_cropped: number;
+  pixel_water_y_original: number;
+  confidence_score: number;
+  preview_image_base64: string;
+  label_studio_task_id?: number | null;
+  minio_image_path?: string | null;
+  scale_cm_per_pixel?: number | null;
+}
+

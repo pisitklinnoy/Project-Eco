@@ -14,6 +14,7 @@ class MinIOService:
         self._buckets_checked = False
 
     def init_buckets(self):
+        import json
         buckets = [
             settings.bucket_raw_images,
             settings.bucket_processed_images,
@@ -24,6 +25,27 @@ class MinIOService:
                 if not self.client.bucket_exists(b):
                     self.client.make_bucket(b)
                     print(f"[MinIO] Created bucket: {b}")
+
+                # Ensure public read policy for images so Label Studio & frontend can load directly
+                if b in [settings.bucket_raw_images, settings.bucket_processed_images]:
+                    policy = {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Principal": {"AWS": ["*"]},
+                                "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+                                "Resource": [f"arn:aws:s3:::{b}"]
+                            },
+                            {
+                                "Effect": "Allow",
+                                "Principal": {"AWS": ["*"]},
+                                "Action": ["s3:GetObject"],
+                                "Resource": [f"arn:aws:s3:::{b}/*"]
+                            }
+                        ]
+                    }
+                    self.client.set_bucket_policy(b, json.dumps(policy))
             except Exception as e:
                 print(f"[MinIO] Bucket check warning ({b}): {e}")
 

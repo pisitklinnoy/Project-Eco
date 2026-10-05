@@ -1,4 +1,4 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse } from '../types';
+import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse, OnDemandPredictResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -107,6 +107,34 @@ export const floodlensApi = {
     });
     if (!res.ok) throw new Error('Failed to trigger manual retrain');
     return res.json();
+  },
+
+  // 8. On-Demand Water Level Image Predictor
+  predictCustomImage: async (formData: FormData): Promise<OnDemandPredictResponse> => {
+    try {
+      const res = await fetch(`${API_BASE}/vision/predict-custom-image`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        let msg = 'เกิดข้อผิดพลาดในการประมวลผลภาพระดับน้ำ';
+        try {
+          const errorData = await res.json();
+          msg = errorData.detail || msg;
+        } catch {
+          if (res.status === 502 || res.status === 503) {
+            msg = 'ระบบ Backend กำลังรีสตาร์ตหรือเชื่อมต่อชั่วคราว กรุณากดลองอีกครั้ง';
+          } else {
+            msg = `เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ (HTTP ${res.status})`;
+          }
+        }
+        throw new Error(msg);
+      }
+      return res.json();
+    } catch (err: any) {
+      if (err.message) throw err;
+      throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อ');
+    }
   },
 };
 

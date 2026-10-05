@@ -282,11 +282,23 @@ class ReviewService:
             print(f"[ReviewService] State save error: {e}")
 
     @classmethod
-    def get_retrain_status(cls) -> Dict[str, Any]:
-        """คืนค่าสถานะสำหรับหน้า Frontend /review-hub"""
+    def get_retrain_status(cls, db: Optional[Session] = None) -> Dict[str, Any]:
+        """คืนค่าสถานะสำหรับหน้า Frontend /review-hub โดยซิงค์กับฐานข้อมูลจริงของ Label Studio"""
+        from sqlalchemy import text
         state = cls.load_retrain_state()
-        pending = state.get("pending_count", 0)
         target = state.get("target_count", 20)
+
+        if db is not None:
+            try:
+                count_query = text("SELECT COUNT(*) FROM task_completion WHERE was_cancelled = FALSE")
+                real_count = db.execute(count_query).scalar()
+                if real_count is not None:
+                    state["pending_count"] = real_count % target
+                    cls.save_retrain_state(state)
+            except Exception as e:
+                pass
+
+        pending = state.get("pending_count", 0)
         progress = min(100.0, round((pending / max(1, target)) * 100, 1))
         state["progress_percent"] = progress
         return state

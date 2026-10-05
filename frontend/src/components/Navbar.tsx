@@ -1,5 +1,5 @@
 import React from 'react';
-import { Waves, Radio, MapPin, ChevronDown, Bell } from 'lucide-react';
+import { Waves, Radio, MapPin, ChevronDown, Bell, Sparkles } from 'lucide-react';
 import type { Station } from '../types';
 
 interface NavbarProps {
@@ -10,6 +10,7 @@ interface NavbarProps {
   activeSection?: string;
   onNavigate?: (sectionId: string) => void;
   alertCount?: number;
+  onOpenOnDemand?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -20,6 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeSection = 'hero',
   onNavigate = () => {},
   alertCount = 0,
+  onOpenOnDemand,
 }) => {
   const navLinks = [
     { id: 'hero', label: 'ภาพรวม' },
@@ -106,6 +108,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </select>
             <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 pointer-events-none" />
           </div>
+
+          {/* On-Demand Water Level Predictor Button */}
+          {onOpenOnDemand && (
+            <button
+              onClick={onOpenOnDemand}
+              title="ตรวจวัดระดับน้ำจากภาพถ่ายแบบอิสระ (On-Demand AI & Active Learning)"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-gradient-to-r from-blue-600 via-sky-600 to-blue-700 text-white shadow-sm hover:shadow-md hover:brightness-105 transition-all cursor-pointer border border-white/30 active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span className="hidden sm:inline">ตรวจวัดภาพถ่าย</span>
+              <span className="sm:hidden">AI ตรวจวัด</span>
+            </button>
+          )}
 
           {/* Alert Notification Indicator */}
           <button

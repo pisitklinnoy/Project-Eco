@@ -9,6 +9,7 @@ import {
   Target,
   RefreshCw,
   Cpu,
+  Sparkles,
 } from 'lucide-react';
 import { IconButton } from './ui/IconButton';
 
@@ -17,6 +18,7 @@ interface FloatingSidebarProps {
   onNavigate: (sectionId: string) => void;
   onOpenReview: () => void;
   onOpenCalibrate: () => void;
+  onOpenOnDemand?: () => void;
   onRefresh: () => void;
   loading?: boolean;
 }
@@ -26,6 +28,7 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
   onNavigate,
   onOpenReview,
   onOpenCalibrate,
+  onOpenOnDemand,
   onRefresh,
   loading = false,
 }) => {
@@ -78,6 +81,17 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
 
       {/* Quick Human-in-the-Loop & Inspection Actions */}
       <div className="flex flex-col items-center space-y-2">
+        {onOpenOnDemand && (
+          <IconButton
+            onClick={onOpenOnDemand}
+            tooltip="ตรวจวัดระดับน้ำจากภาพถ่าย (On-Demand AI)"
+            size="md"
+            className="text-sky-600 hover:!bg-sky-50 hover:!text-sky-700"
+          >
+            <Sparkles className="w-4 h-4" />
+          </IconButton>
+        )}
+
         <IconButton
           onClick={onOpenReview}
           tooltip="ตรวจทานผลวัดน้ำ (Human-in-the-Loop)"

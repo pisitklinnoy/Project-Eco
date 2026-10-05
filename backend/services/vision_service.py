@@ -187,8 +187,10 @@ class VisionService:
             if frame is None:
                 # Fallback to sample if camera is offline
                 sample_candidates = [
-                    os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
-                    os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}.jpg"),
+                    os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                    os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+                    os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_daytime.jpg"),
+                    os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}.jpg"),
                 ]
                 for p in sample_candidates:
                     if p and os.path.exists(p):
@@ -197,7 +199,8 @@ class VisionService:
                             break
         elif mode == "nighttime":
             sample_candidates = [
-                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_nighttime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_nighttime.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_nighttime.jpg"),
             ]
             for p in sample_candidates:
                 if os.path.exists(p):
@@ -206,8 +209,10 @@ class VisionService:
                         break
         elif mode == "flood":
             sample_candidates = [
-                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_flood.png"),
-                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_flood.png"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_flood.png"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_daytime.jpg"),
             ]
             for p in sample_candidates:
                 if os.path.exists(p):
@@ -216,8 +221,10 @@ class VisionService:
                         break
         else:  # daytime
             sample_candidates = [
-                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}_daytime.jpg"),
-                os.path.join(BASE_DIR, "..", "non_time_series", "sample_images", f"{station_num}.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}.jpg"),
             ]
             for p in sample_candidates:
                 if os.path.exists(p):

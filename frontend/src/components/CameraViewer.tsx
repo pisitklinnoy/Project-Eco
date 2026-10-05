@@ -26,6 +26,7 @@ interface CameraViewerProps {
   measurement: WaterMeasurement | null;
   onOpenReview: () => void;
   onOpenCalibrate?: () => void;
+  onOpenOnDemand?: () => void;
 }
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
@@ -33,6 +34,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   measurement,
   onOpenReview,
   onOpenCalibrate,
+  onOpenOnDemand,
 }) => {
   const [imgError, setImgError] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
@@ -417,6 +419,17 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
           {/* Action buttons right */}
           <div className="flex items-center space-x-2 shrink-0">
+            {onOpenOnDemand && (
+              <button
+                onClick={onOpenOnDemand}
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 px-2.5 py-1 rounded-lg border border-blue-200/80 font-bold transition flex items-center space-x-1 text-[11px] shadow-sm"
+                title="ตรวจวัดระดับน้ำจากภาพถ่ายแบบอิสระ (On-Demand AI)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                <span>วัดภาพถ่าย AI</span>
+              </button>
+            )}
+
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}

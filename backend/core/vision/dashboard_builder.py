@@ -245,6 +245,9 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
     conf_display = f"{yolo_conf*100:.1f}%" if has_yolo else "92.0%"
 
     # 2. วาดกรอบ Bounding Box (สีเขียว หนา 3-4 px ชัดเจน ไม่รกตา)
+    if overlay_mode == "none":
+        return out
+
     if overlay_mode == "polygon" and yolo_info and yolo_info.get("gauge_polygon") is not None:
         g_poly = yolo_info["gauge_polygon"].astype(np.int32)
         overlay_g = out.copy()

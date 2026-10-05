@@ -33,6 +33,7 @@ data/
 mlruns/
 .mlflow/
 workers/vision/output/
+non_time_series/output/
 
 # IDE
 .idea/

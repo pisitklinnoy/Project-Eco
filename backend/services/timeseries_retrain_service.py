@@ -168,7 +168,7 @@ class TimeSeriesRetrainService:
         is_mlflow_available = False
         try:
             import urllib.request
-            with urllib.request.urlopen(f"{tracking_uri}/api/2.0/mlflow/experiments/list", timeout=1.2) as _:
+            with urllib.request.urlopen(f"{tracking_uri}/health", timeout=2.0) as _:
                 is_mlflow_available = True
         except Exception:
             is_mlflow_available = False

@@ -1,13 +1,26 @@
 {
   "current_model_name": "Unified-LightGBM-Forecaster",
-  "current_model_version": "v1.2",
+  "current_model_version": "v1.3",
   "last_mae_meters": 0.0699,
-  "last_retrained_at": "2026-10-05T18:41:55.146399+00:00",
+  "last_retrained_at": "2026-10-05T18:55:16.139412+00:00",
   "training_samples": 1170,
   "flood_sample_weight_multiplier": 2.5,
   "gatekeeper_policy": "Champion vs Challenger (< +5% MAE)",
   "is_retraining": false,
   "history": [
+    {
+      "id": "ts-retrain-1791226516",
+      "model_version": "v1.3",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "challenger_mae": 0.0699,
+      "champion_mae": 0.0699,
+      "improvement_pct": -0.04,
+      "promoted": true,
+      "train_samples": 1170,
+      "timestamp": "2026-10-05T18:55:16.139412+00:00",
+      "status": "PROMOTED_CHAMPION",
+      "mlflow_run_id": "6946793d53614eb29b8ed87b783140a8"
+    },
     {
       "id": "ts-retrain-1791225715",
       "model_version": "v1.2",

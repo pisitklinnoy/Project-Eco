@@ -1043,6 +1043,47 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               )}
 
             </div>
+
+            {/* Fullscreen AI Vision Inspection HUD Overlay (แสดงเฉพาะตอนขยายเต็มจอตามความต้องการ) */}
+            {showOverlays && viewMode === 'ai_dashboard' && (
+              <div className="absolute top-4 left-4 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl text-white max-w-sm sm:max-w-md pointer-events-none select-none">
+                <div className="flex items-center space-x-2.5 mb-2">
+                  <span className={`w-3 h-3 rounded-full shrink-0 ${
+                    detectionStatus?.detected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping'
+                  }`} />
+                  <span className="font-extrabold text-xs text-sky-200">
+                    AI Vision: <code className="text-amber-300 font-mono">model_best_v2.pt</code> (YOLOv8-Seg) &bull; {station.name}
+                  </span>
+                </div>
+
+                {detectionStatus?.detected ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                      <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>[DETECTED] Found Staff Gauge | Conf: {(detectionStatus.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    {detectionStatus.bbox && detectionStatus.bbox.length === 4 && (
+                      <div className="font-mono text-[11px] text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 flex items-center justify-between">
+                        <span>BBox: [{detectionStatus.bbox.join(', ')}]</span>
+                        <span className="text-sky-300 ml-2 font-bold">
+                          (W={detectionStatus.bbox[2] - detectionStatus.bbox[0]}px, H={detectionStatus.bbox[3] - detectionStatus.bbox[1]}px)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>[NOT DETECTED] Staff Gauge Not Found</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">
+                      ไม่พบเสาวัดระดับน้ำในภาพ (Confidence ต่ำกว่าเกณฑ์)
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

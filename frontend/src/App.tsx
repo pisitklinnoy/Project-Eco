@@ -1,26 +1,30 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Station, WaterMeasurement, RainfallMeasurement, ForecastRecord, AlertEvent } from './types';
 import { floodlensApi } from './api/floodlensApi';
-import { Navbar } from './components/Navbar';
+import { Navbar, type UserRole } from './components/Navbar';
 import { FloatingSidebar } from './components/FloatingSidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { HeroSection } from './components/HeroSection';
 import { SectionHeader } from './components/ui/SectionHeader';
 import { StationMap } from './components/StationMap';
 import { TelemetryCard } from './components/TelemetryCard';
-import { ForecastChart } from './components/ForecastChart';
-import { ForecastHistory } from './components/ForecastHistory';
 import { StationOverview } from './components/StationOverview';
 import { CameraViewer } from './components/CameraViewer';
-import { AlertsList } from './components/AlertsList';
+import { PublicForecastView } from './components/PublicForecastView';
+import { ReviewHub } from './components/ReviewHub';
+import { AdminCalibrationHub } from './components/AdminCalibrationHub';
+import { AdminObservability } from './components/AdminObservability';
 import { ReviewModal } from './components/ReviewModal';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
 import { OnDemandPredictorModal } from './components/OnDemandPredictorModal';
 import { ManualBBoxModal } from './components/ManualBBoxModal';
-import { ReviewHub } from './components/ReviewHub';
-import { Waves } from 'lucide-react';
+import { Waves, Cpu, Sparkles, Camera } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Role & Navigation Page State
+  const [role, setRole] = useState<UserRole>('public');
+  const [activePage, setActivePage] = useState<string>('overview');
+
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [measurement, setMeasurement] = useState<WaterMeasurement | null>(null);
@@ -38,13 +42,12 @@ export const App: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [triggeringForecast, setTriggeringForecast] = useState<boolean>(false);
+
+  // Admin Modals
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
   const [isOnDemandOpen, setIsOnDemandOpen] = useState<boolean>(false);
   const [isManualBBoxOpen, setIsManualBBoxOpen] = useState<boolean>(false);
-
-  // Active section tracking for floating navbar & sidebar
-  const [activeSection, setActiveSection] = useState<string>('hero');
 
   const selectStation = useCallback((station: Station) => {
     stationCodeRef.current = station.station_code;
@@ -118,6 +121,7 @@ export const App: React.FC = () => {
         }
       }
     } catch (err) {
+      console.error('Failed to refresh forecasts and telemetry', err);
       setStationErrors(
         Object.fromEntries(stations.map((s) => [s.station_code, err instanceof Error ? err.message : 'โหลดข้อมูลไม่ได้']))
       );
@@ -135,7 +139,7 @@ export const App: React.FC = () => {
     }
   }, [refreshAllStations, stations.length]);
 
-  // 1. Initial Load: Stations
+  // Initial Load: Stations
   useEffect(() => {
     floodlensApi
       .getStations()
@@ -150,7 +154,7 @@ export const App: React.FC = () => {
       .finally(() => setLoading(false));
   }, [loadAllStationMeasurements, selectStation]);
 
-  // 2. Fetch Station Specific Data
+  // Fetch Station Specific Data
   const loadStationData = useCallback(async () => {
     if (!selectedStation) return;
     const code = selectedStation.station_code;
@@ -172,7 +176,6 @@ export const App: React.FC = () => {
       setForecast(latestForecast);
       setAlerts(recentAlerts);
 
-      // Update in dictionary
       if (latestWater) {
         setStationMeasurements((prev) => ({
           ...prev,
@@ -195,39 +198,21 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [loadStationData, loadAllStationMeasurements, stations]);
 
-  // Handle section scrolling observer
-  useEffect(() => {
-    const handleScroll = () => {
-      const sections = ['hero', 'gis-cctv', 'cctv-inspector', 'forecast-alerts', 'review-hub'];
-      const scrollPos = window.scrollY + 200;
-
-      for (const sectionId of sections) {
-        const el = document.getElementById(sectionId);
-        if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(sectionId);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const handleNavigate = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const element = document.getElementById(sectionId);
-    if (element) {
-      const offsetTop = element.getBoundingClientRect().top + window.scrollY - 90;
-      window.scrollTo({
-        top: Math.max(0, offsetTop),
-        behavior: 'smooth',
-      });
+  // Role switching handler
+  const handleSwitchRole = (newRole: UserRole) => {
+    setRole(newRole);
+    if (newRole === 'public') {
+      setActivePage('overview');
+    } else {
+      setActivePage('admin-review');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Page navigation handler
+  const handleNavigate = (pageId: string) => {
+    setActivePage(pageId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Handle Manual Forecast Trigger
@@ -273,8 +258,10 @@ export const App: React.FC = () => {
 
       {/* Floating Desktop Sidebar Navigation Rail */}
       <FloatingSidebar
-        activeSection={activeSection}
+        role={role}
+        activePage={activePage}
         onNavigate={handleNavigate}
+        onSwitchRole={handleSwitchRole}
         onOpenReview={() => setIsReviewOpen(true)}
         onOpenCalibrate={() => setIsCalibrateOpen(true)}
         onOpenOnDemand={() => setIsOnDemandOpen(true)}
@@ -288,148 +275,205 @@ export const App: React.FC = () => {
         selectedStation={selectedStation}
         onSelectStation={selectStation}
         systemStatus="healthy"
-        activeSection={activeSection}
+        role={role}
+        onSwitchRole={handleSwitchRole}
+        activePage={activePage}
         onNavigate={handleNavigate}
         alertCount={alerts.filter((a) => a.severity_level === 'CRITICAL').length}
         onOpenOnDemand={() => setIsOnDemandOpen(true)}
       />
 
       {/* Main Workspace with generous spacing & Bento architecture */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-16 w-full lg:pl-24">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-12 w-full lg:pl-24">
         
-        {/* ========================================================= */}
-        {/* HERO SECTION: Editorial Luxury Spatial Overview           */}
-        {/* ========================================================= */}
-        <HeroSection
-          station={selectedStation}
-          measurement={measurement}
-          stations={stations}
-          stationMeasurements={stationMeasurements}
-          onExploreClick={() => handleNavigate('gis-cctv')}
-          onRetrainHubClick={() => handleNavigate('review-hub')}
-          onOpenReview={() => setIsReviewOpen(true)}
-          onSelectStation={selectStation}
-        />
+        {/* ========================================================================= */}
+        {/* 1. PUBLIC CITIZEN PORTAL (ศูนย์ข้อมูลประชาชน)                                */}
+        {/* ========================================================================= */}
+        {role === 'public' && (
+          <>
+            {/* PUBLIC PAGE 1: Overview & Live GIS Map */}
+            {activePage === 'overview' && (
+              <div className="space-y-12 animate-fadeIn">
+                {/* Hero Editorial Header */}
+                <HeroSection
+                  station={selectedStation}
+                  measurement={measurement}
+                  stations={stations}
+                  stationMeasurements={stationMeasurements}
+                  onExploreClick={() => {
+                    const el = document.getElementById('gis-map-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  onRetrainHubClick={() => handleNavigate('forecast')}
+                  onOpenReview={() => {}}
+                  onSelectStation={selectStation}
+                />
 
-        {/* ========================================================= */}
-        {/* SECTION 0: Multi-Station Live Overview (Cameras & Models) */}
-        {/* ========================================================= */}
-        <StationOverview
-          stations={stations}
-          measurements={stationMeasurements}
-          rain={stationRain}
-          forecasts={stationForecasts}
-          errors={stationErrors}
-          refreshing={refreshingAll}
-          onRefresh={refreshAllStations}
-          onSelect={selectStation}
-        />
+                {/* Multi-Station Live Cards */}
+                <StationOverview
+                  stations={stations}
+                  measurements={stationMeasurements}
+                  rain={stationRain}
+                  forecasts={stationForecasts}
+                  errors={stationErrors}
+                  refreshing={refreshingAll}
+                  onRefresh={refreshAllStations}
+                  onSelect={selectStation}
+                />
 
-        {/* ========================================================= */}
-        {/* SECTION 1: GIS Map & Real-Time Telemetry & CCTV Zoom      */}
-        {/* ========================================================= */}
-        <section className="space-y-6" id="gis-cctv">
-          <SectionHeader
-            number="01"
-            badge="GIS & AI Vision"
-            title="แผนที่ภูมิสารสนเทศ (GIS) และศูนย์ตรวจการณ์กล้อง AI Vision"
-            subtitle="ตรวจวัดระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามแนวลุ่มน้ำคลองอู่ตะเภา พร้อมระบบซูมตรวจสอบสเกลเสาวัดน้ำ"
-            actionLabel="อัปเดตอัตโนมัติ 30s"
-          />
+                {/* Citizen Science: Instant Water Level Check from Photo */}
+                <div className="rounded-[32px] bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-6 sm:p-8 text-white shadow-xl shadow-blue-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="space-y-2 z-10">
+                    <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold border border-white/30 backdrop-blur-md">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                      <span>Citizen Science &bull; ตรวจวัดระดับน้ำภาคประชาชน</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white">
+                      ไม่อยู่ใกล้สถานีหลัก? ถ่ายรูปวัดระดับน้ำจุดที่ท่านอยู่ได้ทันที
+                    </h3>
+                    <p className="text-xs sm:text-sm text-sky-100 max-w-2xl leading-relaxed">
+                      หากท่านอยู่ใกล้คลองสาขา ซอย หรือสะพานที่ไม่มีกล้อง CCTV ของรัฐ สามารถถ่ายภาพผิวน้ำหรือเสาวัดน้ำ
+                      ส่งให้ระบบ AI ช่วยคำนวณและประเมินระดับน้ำในจุดที่ท่านอยู่ได้ทันที
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsOnDemandOpen(true)}
+                    className="z-10 shrink-0 flex items-center space-x-2.5 px-5 py-3 rounded-2xl bg-white hover:bg-sky-50 text-blue-900 font-extrabold text-sm shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Camera className="w-5 h-5 text-blue-600" />
+                    <span>ถ่ายรูปหรืออัปโหลดภาพ</span>
+                  </button>
+                </div>
 
-          {/* Strategic Telemetry Summary Ribbon */}
-          <TelemetryCard
-            station={selectedStation}
-            measurement={measurement}
-            loading={loading}
-            onRefresh={loadStationData}
-            onOpenReview={() => setIsReviewOpen(true)}
-          />
+                {/* GIS Map & Clean Public CCTV Viewer */}
+                <section className="space-y-6" id="gis-map-section">
+                  <SectionHeader
+                    number="01"
+                    badge="GIS & Live Surveillance"
+                    title="แผนที่ภูมิสารสนเทศ (GIS) & ศูนย์ตรวจการณ์กล้องสด"
+                    subtitle="ตรวจวัดระดับน้ำแบบเรียลไทม์ (ม. รทก.) ตามแนวลุ่มน้ำคลองอู่ตะเภา พร้อมกล้อง CCTV ประจำสถานี"
+                    actionLabel="อัปเดตอัตโนมัติ 30s"
+                  />
 
-          {/* Bento Row: GIS Map (50%) & CCTV Live Stream with Zoom (50%) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch" id="cctv-inspector">
-            {/* GIS Map with Accurate 'ม. รทก.' & Color-coded Risk Dots */}
-            <div className="h-[540px]">
-              <StationMap
+                  {/* Public Telemetry Card (Clean without admin buttons) */}
+                  <TelemetryCard
+                    station={selectedStation}
+                    measurement={measurement}
+                    loading={loading}
+                    onRefresh={loadStationData}
+                  />
+
+                  {/* Bento Row: GIS Map (50%) & CCTV Stream (50%) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                    <div className="h-[540px]">
+                      <StationMap
+                        stations={stations}
+                        selectedStation={selectedStation}
+                        onSelectStation={selectStation}
+                        latestWater={measurement}
+                        measurementsByStation={stationMeasurements}
+                      />
+                    </div>
+
+                    <div className="h-[540px]">
+                      <CameraViewer
+                        station={selectedStation}
+                        measurement={measurement}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* PUBLIC PAGE 2: Forecast & Early Warnings */}
+            {activePage === 'forecast' && (
+              <PublicForecastView
                 stations={stations}
-                selectedStation={selectedStation}
+                station={selectedStation}
                 onSelectStation={selectStation}
-                latestWater={measurement}
-                measurementsByStation={stationMeasurements}
-              />
-            </div>
-
-            {/* High-Definition Zoomable CCTV Live Camera & Staff Gauge Inspector */}
-            <div className="h-[540px]">
-              <CameraViewer
-                station={selectedStation}
-                measurement={measurement}
-                onOpenReview={() => setIsReviewOpen(true)}
-                onOpenCalibrate={() => setIsCalibrateOpen(true)}
-                onOpenOnDemand={() => setIsOnDemandOpen(true)}
-                onOpenManualBBox={() => setIsManualBBoxOpen(true)}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECTION 2: Forecast Horizon & Emergency Alerts Feed       */}
-        {/* ========================================================= */}
-        <section className="space-y-6" id="forecast-alerts">
-          <SectionHeader
-            number="02"
-            badge="Early Warning Horizon"
-            title="ระบบพยากรณ์ระดับน้ำล่วงหน้า 1–3 ชม. และศูนย์แจ้งเตือนภัยฉุกเฉิน"
-            subtitle="ประเมินแนวโน้มมวลน้ำด้วยแบบจำลอง AI และระบบส่งข้อความเตือนภัยเข้าสู่ LINE Messaging Outbox"
-            actionLabel="3h Prediction"
-          />
-
-          {/* Bento Asymmetric Row: Forecast Chart (8 Cols) & Alerts Feed (4 Cols) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 space-y-6">
-              <ForecastChart
-                station={selectedStation}
                 history={history}
                 forecast={forecast}
-                onTriggerForecast={handleTriggerForecast}
-                triggering={triggeringForecast}
-                error={forecastError}
-              />
-              <ForecastHistory
-                stationCode={selectedStation?.station_code ?? null}
-                refreshKey={forecast?.id ?? 0}
-              />
-            </div>
-
-            <div className="lg:col-span-4">
-              <AlertsList
                 alerts={alerts}
-                selectedStation={selectedStation}
+                forecastError={forecastError}
+                triggeringForecast={triggeringForecast}
+                onTriggerForecast={handleTriggerForecast}
                 onAlertCreated={loadStationData}
+                stationMeasurements={stationMeasurements}
               />
-            </div>
-          </div>
-        </section>
+            )}
+          </>
+        )}
 
-        {/* ========================================================= */}
-        {/* SECTION 3: Continuous Learning & Auto Retrain Hub         */}
-        {/* ========================================================= */}
-        <section className="space-y-6" id="review-hub">
-          <SectionHeader
-            number="03"
-            badge="Active Learning Hub"
-            title="ศูนย์ตรวจทานภาพ (Label Studio) & ฝึกฝน AI อัตโนมัติ"
-            subtitle="ระบบบันทึกภาพตรวจทานจากผู้เชี่ยวชาญ และส่งเข้าสู่กระบวนการ Re-train อัตโนมัติเมื่อครบ 20 ภาพ"
-            actionLabel="20 Images Batch Quota"
-          />
+        {/* ========================================================================= */}
+        {/* 2. ADMIN & OPERATOR PORTAL (ศูนย์ปฏิบัติการเจ้าหน้าที่ & MLOps)                 */}
+        {/* ========================================================================= */}
+        {role === 'admin' && (
+          <>
+            {/* ADMIN PAGE 1: Active Learning & Retrain Hub */}
+            {activePage === 'admin-review' && (
+              <div className="space-y-8 animate-fadeIn">
+                <SectionHeader
+                  number="ADMIN 01"
+                  badge="Active Learning & Auto Retrain"
+                  title="ศูนย์ตรวจทานภาพ (Label Studio) & ฝึกฝน AI อัตโนมัติ"
+                  subtitle="ระบบบันทึกผลเฉลยจากผู้เชี่ยวชาญ เปรียบเทียบความคลาดเคลื่อน AI และสั่ง Retrain โมเดลใหม่อัตโนมัติเมื่อครบ 20 ภาพ"
+                  actionLabel="20 Images Batch Quota"
+                />
 
-          <ReviewHub onRefreshTelemetry={loadStationData} />
-        </section>
+                {/* Review Package Trigger Header */}
+                <div className="rounded-[28px] bg-white/80 backdrop-blur-xl border border-white/90 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                      <Cpu className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900">
+                        ตรวจทานผลการวัดน้ำสถานี {selectedStation?.name}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        เปิดหน้าต่างตรวจสอบหลักฐานภาพย้อนหลัง 1 ชม. และป้อนค่าน้ำจริงเข้าสู่กระบวนการ Retrain
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsReviewOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <span>เปิดแบบฟอร์มตรวจทาน (Human Review)</span>
+                  </button>
+                </div>
+
+                <ReviewHub onRefreshTelemetry={loadStationData} />
+              </div>
+            )}
+
+            {/* ADMIN PAGE 2: Vision Calibration & Staff Gauge Tools */}
+            {activePage === 'admin-calibration' && (
+              <AdminCalibrationHub
+                stations={stations}
+                station={selectedStation}
+                onSelectStation={selectStation}
+                measurement={measurement}
+                onOpenManualBBox={() => setIsManualBBoxOpen(true)}
+                onOpenCalibrate={() => setIsCalibrateOpen(true)}
+                onOpenOnDemand={() => setIsOnDemandOpen(true)}
+                onOpenReview={() => setIsReviewOpen(true)}
+              />
+            )}
+
+            {/* ADMIN PAGE 3: System Architecture & Observability */}
+            {activePage === 'admin-observability' && (
+              <AdminObservability />
+            )}
+          </>
+        )}
 
       </main>
 
-      {/* Review Agent Modal */}
+      {/* Admin Modals */}
       <ReviewModal
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
@@ -438,7 +482,6 @@ export const App: React.FC = () => {
         onReviewSubmitted={loadStationData}
       />
 
-      {/* Click to Calibrate Modal */}
       <ClickToCalibrateModal
         isOpen={isCalibrateOpen}
         onClose={() => setIsCalibrateOpen(false)}
@@ -446,7 +489,6 @@ export const App: React.FC = () => {
         onCalibrationSaved={loadStationData}
       />
 
-      {/* Manual Staff Gauge BBox Modal */}
       <ManualBBoxModal
         isOpen={isManualBBoxOpen}
         onClose={() => setIsManualBBoxOpen(false)}
@@ -454,7 +496,6 @@ export const App: React.FC = () => {
         onSaved={loadStationData}
       />
 
-      {/* On-Demand Water Level Image Predictor Modal */}
       <OnDemandPredictorModal
         isOpen={isOnDemandOpen}
         onClose={() => setIsOnDemandOpen(false)}
@@ -482,12 +523,14 @@ export const App: React.FC = () => {
 
       {/* Mobile Floating Bottom Bar */}
       <MobileBottomNav
-        activeSection={activeSection}
+        role={role}
+        activePage={activePage}
         onNavigate={handleNavigate}
+        onSwitchRole={handleSwitchRole}
         alertCount={alerts.filter((a) => a.severity_level === 'CRITICAL').length}
       />
 
-      {/* Floating Glass Footer Capsule */}
+      {/* Floating Glass Footer */}
       <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-16 lg:mb-6 lg:pl-24">
         <div className="rounded-[32px] bg-white/70 backdrop-blur-xl border border-white/80 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 shadow-sm">
           <div className="flex items-center space-x-3">
@@ -499,9 +542,14 @@ export const App: React.FC = () => {
               <span>ศูนย์ข้อมูลน้ำท่วมเทศบาลนครหาดใหญ่ &bull; ลุ่มน้ำคลองอู่ตะเภา จ.สงขลา</span>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-[11px] font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-700">ระบบเฝ้าระวังอัตโนมัติทำงานปกติ</span>
+          <div className="flex items-center space-x-3">
+            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold border border-slate-200">
+              โหมดปัจจุบัน: {role === 'public' ? '🌐 ภาคประชาชน' : '🔒 เจ้าหน้าที่/Admin'}
+            </span>
+            <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-emerald-600">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>ระบบทำงานปกติ</span>
+            </div>
           </div>
         </div>
       </footer>

@@ -12,7 +12,9 @@ import type {
   ManualBBoxResponse,
   TimeSeriesRetrainStatus,
   TimeSeriesRetrainTriggerResponse,
-  SensorDriftStatus
+  SensorDriftStatus,
+  IngestionQueueItem,
+  ForecastDriftReport
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -214,6 +216,86 @@ export const floodlensApi = {
   getSensorDriftStatus: async (): Promise<SensorDriftStatus> => {
     const res = await fetch(`${API_BASE}/forecast/drift-status`);
     if (!res.ok) throw new Error('Failed to fetch sensor drift status');
+    return res.json();
+  },
+
+  // 10. Time Series Human-in-the-Loop (HITL) Validation
+  getIngestionQueue: async (): Promise<IngestionQueueItem[]> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/ingestion-queue`);
+    if (!res.ok) throw new Error('Failed to fetch ingestion review queue');
+    return res.json();
+  },
+
+  applyIngestionOverride: async (payload: {
+    review_id: string;
+    selected_choice: string;
+    verified_water_level: number;
+    reviewer_name: string;
+    reviewer_notes?: string;
+  }): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/ingestion-override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to apply ingestion override');
+    return res.json();
+  },
+
+  simulateIngestionAnomaly: async (payload: {
+    station_code: string;
+    station_name: string;
+    vision_water_level: number;
+    sensor_water_level: number;
+  }): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/ingestion-simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to simulate ingestion anomaly');
+    return res.json();
+  },
+
+  getForecastDriftReport: async (): Promise<ForecastDriftReport> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/forecast-drift`);
+    if (!res.ok) throw new Error('Failed to fetch forecast drift report');
+    return res.json();
+  },
+
+  triggerDriftRetrain: async (payload: {
+    reviewer_name: string;
+    reviewer_notes?: string;
+  }): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/trigger-drift-retrain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to trigger retrain from drift alert');
+    return res.json();
+  },
+
+  acknowledgeDrift: async (payload: {
+    reviewer_name: string;
+    reviewer_notes?: string;
+  }): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/acknowledge-drift`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to acknowledge drift alert');
+    return res.json();
+  },
+
+  simulateForecastDrift: async (residual_error: number = 0.65): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/simulate-drift`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ residual_error }),
+    });
+    if (!res.ok) throw new Error('Failed to simulate forecast drift');
     return res.json();
   },
 };

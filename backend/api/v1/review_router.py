@@ -2,9 +2,18 @@ from fastapi import APIRouter, Depends, Body, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from core.database import get_db
-from schemas.review import ReviewPackageResponse, HumanReviewSubmit
+from schemas.review import (
+    ReviewPackageResponse,
+    HumanReviewSubmit,
+    IngestionOverrideSubmit,
+    IngestionSimulateRequest,
+    DriftRetrainRequest,
+    DriftAcknowledgeRequest,
+    DriftSimulateRequest
+)
 from schemas.measurement import WaterMeasurementResponse
 from services.review_service import review_service
+from services.timeseries_hitl_service import timeseries_hitl_service
 
 router = APIRouter(prefix="/review", tags=["Human-in-the-Loop & Review Agent"])
 
@@ -84,3 +93,64 @@ async def label_studio_webhook(payload: dict = Body(...), db: Session = Depends(
     evaluation["retrain_signal"] = retrain_signal
 
     return evaluation
+
+
+# =============================================================================
+# Time Series Human-in-the-Loop (HITL) Validation Routes
+# =============================================================================
+
+# 1. ด่านตรวจสอบข้อมูลนำเข้า (Data Ingestion Verification - Cross-Validation)
+@router.get("/timeseries/ingestion-queue")
+def get_ingestion_queue():
+    """ดึงรายการข้อมูลที่ถูกระงับชั่วคราว (Quarantined) จากการ Cross-Validation ระหว่าง Vision AI vs RID Sensor"""
+    return timeseries_hitl_service.get_ingestion_queue()
+
+@router.post("/timeseries/ingestion-override")
+def apply_ingestion_override(payload: IngestionOverrideSubmit, db: Session = Depends(get_db)):
+    """ผู้เชี่ยวชาญ Review และทำ Manual Override ยืนยันค่าจริงหน้างาน พร้อมปลดสถานะระงับ"""
+    return timeseries_hitl_service.apply_ingestion_override(
+        db=db,
+        review_id=payload.review_id,
+        selected_choice=payload.selected_choice,
+        verified_water_level=payload.verified_water_level,
+        reviewer_name=payload.reviewer_name,
+        reviewer_notes=payload.reviewer_notes or "Manual override applied"
+    )
+
+@router.post("/timeseries/ingestion-simulate")
+def simulate_ingestion_discrepancy(payload: IngestionSimulateRequest):
+    """จำลองข้อมูลนำเข้าที่ผิดปกติเกินเกณฑ์ความปลอดภัย เพื่อทดสอบระบบ Quarantined"""
+    return timeseries_hitl_service.check_and_quarantine_ingestion(
+        station_code=payload.station_code,
+        station_name=payload.station_name,
+        vision_val=payload.vision_water_level,
+        sensor_val=payload.sensor_water_level
+    )
+
+# 2. ด่านประเมินผลการพยากรณ์ (Forecast Drift & Retrain Trigger)
+@router.get("/timeseries/forecast-drift")
+def get_forecast_drift(db: Session = Depends(get_db)):
+    """รายงานการเปรียบเทียบค่าจริง vs ผลพยากรณ์ล่วงหน้าของ LightGBM พร้อม Residual Error และ Drift Status"""
+    return timeseries_hitl_service.get_forecast_drift_report(db=db)
+
+@router.post("/timeseries/trigger-drift-retrain")
+def trigger_drift_retrain(payload: DriftRetrainRequest):
+    """ผู้เชี่ยวชาญสั่ง Retrain โมเดลใหม่ทันทีผ่านไปป์ไลน์ MLOps เมื่อตรวจพบ Forecast Drift"""
+    return timeseries_hitl_service.trigger_drift_retrain(
+        reviewer_name=payload.reviewer_name,
+        reviewer_notes=payload.reviewer_notes or "Retrain triggered from drift alert"
+    )
+
+@router.post("/timeseries/acknowledge-drift")
+def acknowledge_drift(payload: DriftAcknowledgeRequest):
+    """ผู้เชี่ยวชาญรับทราบการแจ้งเตือน Forecast Drift (Acknowledge)"""
+    return timeseries_hitl_service.acknowledge_drift_alert(
+        reviewer_name=payload.reviewer_name,
+        reviewer_notes=payload.reviewer_notes or "Acknowledged"
+    )
+
+@router.post("/timeseries/simulate-drift")
+def simulate_forecast_drift(payload: DriftSimulateRequest):
+    """จำลองเหตุการณ์ Forecast Drift สำหรับทดสอบบนหน้า Dashboard"""
+    return timeseries_hitl_service.simulate_drift_event(residual_error=payload.residual_error)
+

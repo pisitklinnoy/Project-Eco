@@ -459,7 +459,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                   src={imageUrl}
                   alt={station.name}
                   draggable={false}
-                  className="w-full h-full object-cover pointer-events-auto"
+                  className="w-full h-full object-contain pointer-events-auto"
                 />
 
                 {/* SVG Layer for Drawing and Coordinates */}

@@ -17,7 +17,6 @@ import {
   CheckCircle,
   Sun,
   Moon,
-  Waves,
   Columns,
   AlertTriangle,
   Flag,
@@ -255,9 +254,8 @@ export function getStationFlagInfo(station: Station | null, currentLevel: number
 interface CameraViewerProps {
   station: Station | null;
   measurement: WaterMeasurement | null;
-  onOpenReview: () => void;
+  onOpenReview?: () => void;
   onOpenCalibrate?: () => void;
-  onOpenOnDemand?: () => void;
   onOpenManualBBox?: () => void;
 }
 
@@ -266,7 +264,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   measurement,
   onOpenReview,
   onOpenCalibrate,
-  onOpenOnDemand,
   onOpenManualBBox,
 }) => {
   const [imgError, setImgError] = useState<boolean>(false);
@@ -275,14 +272,17 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // View Mode: 'live' = Realtime CCTV Feed with AI Bounding Box | 'ai_dashboard' = Realtime AI Staff Gauge Cropped Inspection
   const [viewMode, setViewMode] = useState<'live' | 'ai_dashboard'>('live');
 
-  // AI Scenario: 'daytime' | 'nighttime' | 'flood' | 'live'
-  const [aiScenario, setAiScenario] = useState<'daytime' | 'nighttime' | 'flood' | 'live'>('live');
+  // AI Scenario: 'daytime' | 'nighttime' | 'live'
+  const [aiScenario, setAiScenario] = useState<'daytime' | 'nighttime' | 'live'>('live');
 
   // AI View Mode: 'cctv' = Full 16:9 CCTV view with Bounding Box | 'gauge' = High-Res Staff Gauge Scale Ruler | 'composite' = Stitched dual view
   const [aiViewType, setAiViewType] = useState<'cctv' | 'gauge' | 'composite'>('cctv');
 
   // Overlay Mode: 'bbox' = Green rectangular Bounding Box as preferred
   const overlayMode = 'bbox';
+
+  // Aspect Ratio Fit Mode: 'contain' = สัดส่วนจริง ไม่ตัดขอบ (Default) | 'cover' = เต็มพื้นที่กรอบ
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
 
   // AI Staff Gauge Detection Status
   interface DetectionStatus {
@@ -308,15 +308,12 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // คำนวณระดับน้ำปัจจุบันและสถานะธงเตือนภัยตามเกณฑ์ของสถานี
   // ลำดับความสำคัญ:
   // 1. หาก detectionStatus มีค่าระดับน้ำจากการตรวจจับ AI ของกล้องนี้ ให้ใช้ค่านั้นก่อน เพราะตรงกับสิ่งที่ AI วัดได้บนภาพกล้องสดขณะนั้นจริงๆ
-  // 2. หากอยู่ในโหมด ai_dashboard จำลองสถานการณ์ (flood, daytime, nighttime) ให้ใช้ระดับน้ำของสถานการณ์นั้น
-  // 3. หากมีข้อมูล measurement ล่าสุด (จากการวัดรอบใหม่ หรือ On-Demand AI) ให้ใช้ measurement.water_level
+  // 2. หากอยู่ในโหมด ai_dashboard แสดงผล Benchmark ให้ใช้ระดับน้ำตามสภาพแสง (daytime / nighttime)
+  // 3. หากมีข้อมูล measurement ล่าสุด ให้ใช้ measurement.water_level
   // 4. สำรองด้วย station.normal_level
   let currentWaterLevel: number;
   if (detectionStatus?.water_level != null) {
     currentWaterLevel = detectionStatus.water_level;
-  } else if (viewMode === 'ai_dashboard' && aiScenario === 'flood') {
-    const code = (station?.station_code || '').toUpperCase();
-    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 16.90 : code.includes('BANGSALA') || code.includes('90') ? 9.80 : 8.50;
   } else if (viewMode === 'ai_dashboard' && aiScenario === 'nighttime') {
     const code = (station?.station_code || '').toUpperCase();
     currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.40 : code.includes('BANGSALA') || code.includes('90') ? 2.95 : 0.80;
@@ -351,9 +348,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     // Reset zoom when switching station
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
-    if (aiScenario === 'flood' && !station?.station_code.toUpperCase().includes('HATYAI') && !station?.station_code.toUpperCase().includes('X.44')) {
-      setAiScenario('daytime');
-    }
     if (isHatyai) {
       setHatyaiSource('backend_proxy');
     }
@@ -432,7 +426,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // Dynamic vs static fallback AI dashboard URLs
   const getAiDashboardUrls = (
     code: string,
-    scenario: 'daytime' | 'nighttime' | 'flood' | 'live',
+    scenario: 'daytime' | 'nighttime' | 'live',
     overlay: 'bbox' | 'polygon',
     viewType: 'cctv' | 'gauge' | 'composite'
   ) => {
@@ -442,8 +436,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                      'STN-HATYAINAI';
 
     let fallbackFilename = `${normCode}.jpg`;
-    if (scenario === 'flood') fallbackFilename = `${normCode}_flood.jpg`;
-    else if (scenario === 'nighttime') fallbackFilename = `${normCode}_night.jpg`;
+    if (scenario === 'nighttime') fallbackFilename = `${normCode}_night.jpg`;
 
     const dynamicUrl = `/api/v1/stations/${encodeURIComponent(code)}/cctv-analysis.jpg?mode=${scenario}&overlay=${overlay}&view=${viewType}&t=${refreshKey}`;
     const staticUrl = `/ai_dashboards/${fallbackFilename}?t=${refreshKey}`;
@@ -771,17 +764,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
           {/* Action buttons right */}
           <div className="flex items-center space-x-2 shrink-0">
-            {onOpenOnDemand && (
-              <button
-                onClick={onOpenOnDemand}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 px-2.5 py-1 rounded-lg border border-blue-200/80 font-bold transition flex items-center space-x-1 text-[11px] shadow-sm"
-                title="ตรวจวัดระดับน้ำจากภาพถ่ายแบบอิสระ (On-Demand AI)"
-              >
-                <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                <span>วัดภาพถ่าย AI</span>
-              </button>
-            )}
-
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}
@@ -804,13 +786,33 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </button>
             )}
 
+            {onOpenReview && (
+              <button
+                onClick={onOpenReview}
+                className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer"
+                title="ตรวจทานภาพและยืนยันระดับน้ำ"
+              >
+                <Eye className="w-3 h-3 shrink-0" />
+                <span>ตรวจทาน</span>
+              </button>
+            )}
+
+            {/* Aspect Ratio Fit Mode Toggle Button */}
             <button
-              onClick={onOpenReview}
-              className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm"
-              title="ตรวจทานภาพและยืนยันระดับน้ำ"
+              onClick={() => setFitMode((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm border ${
+                fitMode === 'contain'
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
+              }`}
+              title={
+                fitMode === 'contain'
+                  ? 'แสดงผลสัดส่วนจริง (16:9 / ไม้บรรทัดเต็มเสา ไม่ตัดขอบ) - คลิกเพื่อขยายเต็มกรอบ'
+                  : 'แสดงผลเต็มกรอบ (Cover) - คลิกเพื่อเปลี่ยนเป็นสัดส่วนจริง'
+              }
             >
-              <Eye className="w-3 h-3 shrink-0" />
-              <span>ตรวจทาน</span>
+              <Move className="w-3 h-3 shrink-0" />
+              <span>{fitMode === 'contain' ? 'สัดส่วนจริง' : 'เต็มกรอบ'}</span>
             </button>
 
             <button
@@ -850,7 +852,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   {renderNotDetectedRecommendation(false)}
                 </div>
               ) : (
-                <div className="relative w-full h-full flex items-center justify-center">
+                <div className="relative w-full h-full flex items-center justify-center p-1">
                   <img
                     key={`${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
                     src={aiDashboardUrl}
@@ -862,19 +864,25 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                         target.src = staticFallbackUrl;
                       }
                     }}
-                    className="w-full h-full object-cover object-center pointer-events-none"
+                    className={`max-w-full max-h-full ${
+                      aiViewType === 'gauge' || fitMode === 'contain'
+                        ? 'object-contain'
+                        : 'w-full h-full object-cover'
+                    } object-center pointer-events-none drop-shadow-md transition-all`}
                   />
                 </div>
               )
             ) : (
               /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Video Feed) */
               streamUrl && !imgError ? (
-                <div className="relative w-full h-full flex items-center justify-center">
+                <div className="relative w-full h-full flex items-center justify-center p-1">
                   <img
                     src={streamUrl}
                     alt={station.name}
                     onError={handleImageError}
-                    className="w-full h-full object-cover object-center pointer-events-none"
+                    className={`max-w-full max-h-full ${
+                      fitMode === 'contain' ? 'object-contain' : 'w-full h-full object-cover'
+                    } object-center pointer-events-none drop-shadow-md transition-all`}
                   />
                 </div>
               ) : (
@@ -1025,18 +1033,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
                   <span>🌙 กลางคืน (Nighttime)</span>
                 </button>
-                {isHatyai && (
-                  <button
-                    onClick={() => { setAiScenario('flood'); handleResetZoom(); }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                      aiScenario === 'flood' ? 'bg-rose-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="ผลลัพธ์จำลองสถานการณ์น้ำท่วมสูง (Flood Simulation)"
-                  >
-                    <Waves className="w-3 h-3 text-rose-200 shrink-0" />
-                    <span>🌊 จำลองน้ำท่วม (Flood)</span>
-                  </button>
-                )}
                 <button
                   onClick={() => { setAiScenario('live'); handleResetZoom(); }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${

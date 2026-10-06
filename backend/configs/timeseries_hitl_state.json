@@ -1,0 +1,220 @@
+{
+  "ingestion_queue": [
+    {
+      "id": "ING-BANGSALA-1791295052",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา",
+      "timestamp": "2026-10-06T13:57:32.847012+00:00",
+      "vision_water_level": 14.8,
+      "sensor_water_level": 2.45,
+      "discrepancy_m": 12.35,
+      "status": "RELEASED",
+      "flag_reason": "ค่าระดับน้ำจากกล้อง (14.80 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.45 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 12.35 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": "2026-10-06T13:57:32.972525+00:00",
+      "resolved_by": "API Tester",
+      "resolution_type": "MANUAL",
+      "verified_water_level": 3.15,
+      "resolution_notes": "Override via test suite"
+    },
+    {
+      "id": "ING-BANGSALA-1791295052",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา",
+      "timestamp": "2026-10-06T13:57:32.818303+00:00",
+      "vision_water_level": 20.0,
+      "sensor_water_level": 2.0,
+      "discrepancy_m": 18.0,
+      "status": "QUARANTINED",
+      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolution_type": null,
+      "verified_water_level": null,
+      "resolution_notes": null
+    },
+    {
+      "id": "ING-BANGSALA-1791294509",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา",
+      "timestamp": "2026-10-06T13:48:29.193317+00:00",
+      "vision_water_level": 14.8,
+      "sensor_water_level": 2.45,
+      "discrepancy_m": 12.35,
+      "status": "RELEASED",
+      "flag_reason": "ค่าระดับน้ำจากกล้อง (14.80 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.45 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 12.35 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": "2026-10-06T13:48:29.383536+00:00",
+      "resolved_by": "API Tester",
+      "resolution_type": "MANUAL",
+      "verified_water_level": 3.15,
+      "resolution_notes": "Override via test suite"
+    },
+    {
+      "id": "ING-BANGSALA-1791294509",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา",
+      "timestamp": "2026-10-06T13:48:29.160851+00:00",
+      "vision_water_level": 20.0,
+      "sensor_water_level": 2.0,
+      "discrepancy_m": 18.0,
+      "status": "QUARANTINED",
+      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolution_type": null,
+      "verified_water_level": null,
+      "resolution_notes": null
+    },
+    {
+      "id": "ING-BANGSALA-1791294465",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา",
+      "timestamp": "2026-10-06T13:47:45.485825+00:00",
+      "vision_water_level": 20.0,
+      "sensor_water_level": 2.0,
+      "discrepancy_m": 18.0,
+      "status": "RELEASED",
+      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": "2026-10-06T13:47:45.609241+00:00",
+      "resolved_by": "API Tester",
+      "resolution_type": "MANUAL",
+      "verified_water_level": 3.15,
+      "resolution_notes": "Override via test suite"
+    },
+    {
+      "id": "ING-BANGSALA-01",
+      "station_code": "STN-BANGSALA",
+      "station_name": "บ้านบางศาลา (กลางน้ำ - คลองอู่ตะเภา)",
+      "timestamp": "2026-10-06T12:00:00Z",
+      "vision_water_level": 14.8,
+      "sensor_water_level": 2.45,
+      "discrepancy_m": 12.35,
+      "status": "QUARANTINED",
+      "flag_reason": "ค่าที่อ่านได้จากภาพกล้อง (14.80 ม.) แตกต่างจากเซ็นเซอร์ชลประทาน RID (2.45 ม.) ผิดปกติเกินเกณฑ์ (ส่วนต่าง 12.35 ม.)",
+      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบภาพเสาวัดน้ำหน้ากล้องว่ามีคราบตะไคร่หรือแสงสะท้อนผิวน้ำรบกวนหรือไม่ หรือเซ็นเซอร์ทุ่นชลประทานติดขัด",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolution_type": null,
+      "verified_water_level": null,
+      "resolution_notes": null
+    },
+    {
+      "id": "ING-HATYAINAI-02",
+      "station_code": "STN-HATYAINAI",
+      "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง)",
+      "timestamp": "2026-10-06T13:30:00Z",
+      "vision_water_level": 5.2,
+      "sensor_water_level": 4.1,
+      "discrepancy_m": 1.1,
+      "status": "QUARANTINED",
+      "flag_reason": "ความต่างระหว่างกล้อง (5.20 ม.) กับเซ็นเซอร์ (4.10 ม.) เกินเกณฑ์ความปลอดภัย 0.80 ม.",
+      "image_url": "/api/v1/stations/STN-HATYAINAI/raw-frame.jpg",
+      "suggested_action": "ตรวจสอบระดับน้ำหน้างานจริงเพื่อทำ Manual Override",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolution_type": null,
+      "verified_water_level": null,
+      "resolution_notes": null
+    }
+  ],
+  "drift_monitor": {
+    "safety_threshold_m": 0.4,
+    "last_evaluated_at": "2026-10-06T13:57:33.015024+00:00",
+    "drift_detected": false,
+    "max_residual_m": 0.75,
+    "mean_residual_m": 0.56,
+    "alert_status": "ACKNOWLEDGED",
+    "alert_message": "รับทราบการแจ้งเตือนแล้วโดย API Operator: API test acknowledge",
+    "current_model": {
+      "name": "Unified-LightGBM-Forecaster",
+      "version": "v1.0",
+      "champion_mae": 0.0699
+    },
+    "matched_evaluations": [
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (X.90)",
+        "target_time": "2026-10-06T13:00:00Z",
+        "horizon": "+1h",
+        "predicted_level": 6.8,
+        "actual_level": 7.42,
+        "residual_error": 0.62,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (X.44)",
+        "target_time": "2026-10-06T13:00:00Z",
+        "horizon": "+2h",
+        "predicted_level": 4.5,
+        "actual_level": 4.95,
+        "residual_error": 0.45,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-06T13:00:00Z",
+        "horizon": "+1h",
+        "predicted_level": 11.2,
+        "actual_level": 11.32,
+        "residual_error": 0.12,
+        "is_exceeded": false
+      }
+    ],
+    "history": [
+      {
+        "id": "drift-ack-1791295053",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "API Operator",
+        "notes": "API test acknowledge",
+        "timestamp": "2026-10-06T13:57:33.015024+00:00"
+      },
+      {
+        "id": "drift-ack-1791295052",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "Operator Somchai",
+        "notes": "Under observation during high rain",
+        "timestamp": "2026-10-06T13:57:32.926206+00:00"
+      },
+      {
+        "id": "drift-ack-1791294509",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "API Operator",
+        "notes": "API test acknowledge",
+        "timestamp": "2026-10-06T13:48:29.420320+00:00"
+      },
+      {
+        "id": "drift-ack-1791294509",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "Operator Somchai",
+        "notes": "Under observation during high rain",
+        "timestamp": "2026-10-06T13:48:29.278953+00:00"
+      },
+      {
+        "id": "drift-ack-1791294465",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "API Operator",
+        "notes": "API test acknowledge",
+        "timestamp": "2026-10-06T13:47:45.645530+00:00"
+      },
+      {
+        "id": "drift-ack-1791294465",
+        "action": "ACKNOWLEDGED",
+        "triggered_by": "Operator Somchai",
+        "notes": "Under observation during high rain",
+        "timestamp": "2026-10-06T13:47:45.537318+00:00"
+      }
+    ]
+  }
+}

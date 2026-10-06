@@ -1,0 +1,35 @@
+{
+  "station_code": "STN-BANGSALA",
+  "station_key": "STN-BANGSALA",
+  "timestamp": "2026-10-06T12:16:43.984817",
+  "source": "cctv_live_frame",
+  "mode": "live",
+  "label": "Staff Gauge",
+  "bbox_xyxy": [
+    1737,
+    460,
+    1798,
+    1150
+  ],
+  "frame_resolution": [
+    3200,
+    1800
+  ],
+  "crop_resolution": [
+    61,
+    690
+  ],
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.552344,
+    "y_center": 0.447222,
+    "width": 0.019062,
+    "height": 0.383333
+  },
+  "full_image_file": "stn-bangsala_live_20261006_121643.jpg",
+  "cropped_image_file": "stn-bangsala_live_20261006_121643_crop.jpg",
+  "txt_file": "stn-bangsala_live_20261006_121643.txt",
+  "notes": "Live CCTV frame annotation for สะพานบางศาลา (คลองอู่ตะเภา X.90) (19:16:25 น.)",
+  "status": "ready_for_retrain"
+}

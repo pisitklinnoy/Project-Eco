@@ -1,4 +1,19 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse, OnDemandPredictResponse, DetectionStatus, ManualBBoxPayload, ManualBBoxResponse } from '../types';
+import type { 
+  Station, 
+  WaterMeasurement, 
+  ForecastRecord, 
+  AlertEvent, 
+  ReviewPackage, 
+  RetrainStatus, 
+  RetrainTriggerResponse, 
+  OnDemandPredictResponse,
+  DetectionStatus,
+  ManualBBoxPayload,
+  ManualBBoxResponse,
+  TimeSeriesRetrainStatus,
+  TimeSeriesRetrainTriggerResponse,
+  SensorDriftStatus
+} from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -29,6 +44,13 @@ export const floodlensApi = {
     return res.json();
   },
 
+  getLatestRain: async (stationCode: string) => {
+    const res = await fetch(`${API_BASE}/water/rain/latest?station_code=${encodeURIComponent(stationCode)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error('Failed to fetch latest rainfall');
+    return res.json();
+  },
+
   // 3. Forecast
   getLatestForecast: async (stationCode: string): Promise<ForecastRecord> => {
     const res = await fetch(`${API_BASE}/forecast/latest?station_code=${encodeURIComponent(stationCode)}`);
@@ -41,6 +63,24 @@ export const floodlensApi = {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to trigger forecast');
+    return res.json();
+  },
+
+  refreshAllForecasts: async (): Promise<{ stations: { station_code: string; forecast: ForecastRecord | null; error: string | null }[]; ingestion_error: string | null }> => {
+    const res = await fetch(`${API_BASE}/forecast/refresh-all`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to refresh forecasts');
+    return res.json();
+  },
+
+  getForecastHistory: async (stationCode: string, mode: 'shadow' | 'replay' = 'shadow'): Promise<ForecastRecord[]> => {
+    const res = await fetch(`${API_BASE}/forecast/history?station_code=${encodeURIComponent(stationCode)}&mode=${mode}&limit=30`);
+    if (!res.ok) throw new Error('Failed to fetch forecast history');
+    return res.json();
+  },
+
+  getForecastComparison: async (id: number) => {
+    const res = await fetch(`${API_BASE}/forecast/${id}/comparison`);
+    if (!res.ok) throw new Error('Failed to fetch forecast comparison');
     return res.json();
   },
 
@@ -154,6 +194,27 @@ export const floodlensApi = {
       if (err.message) throw err;
       throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อ');
     }
+  },
+
+  // 9. Time Series MLOps Lifecycle
+  getTimeSeriesRetrainStatus: async (): Promise<TimeSeriesRetrainStatus> => {
+    const res = await fetch(`${API_BASE}/forecast/retrain-status`);
+    if (!res.ok) throw new Error('Failed to fetch Time-Series retrain status');
+    return res.json();
+  },
+
+  triggerTimeSeriesRetrain: async (): Promise<TimeSeriesRetrainTriggerResponse> => {
+    const res = await fetch(`${API_BASE}/forecast/trigger-retrain`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to trigger Time-Series retrain');
+    return res.json();
+  },
+
+  getSensorDriftStatus: async (): Promise<SensorDriftStatus> => {
+    const res = await fetch(`${API_BASE}/forecast/drift-status`);
+    if (!res.ok) throw new Error('Failed to fetch sensor drift status');
+    return res.json();
   },
 };
 

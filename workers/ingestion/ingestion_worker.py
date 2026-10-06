@@ -1,8 +1,9 @@
 import os
 import io
+import asyncio
+import requests
 from datetime import datetime
 from minio import Minio
-import psycopg2
 from ingestion.camera_fetcher import camera_fetcher
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
@@ -20,11 +21,24 @@ REAL_STATIONS = [
     {"code": "STN-HATYAINAI", "cam": "CAM-HATYAINAI", "name": "หาดใหญ่ใน"},
 ]
 
+
+def ingest_rid_telemetry():
+    base = os.getenv("BACKEND_API_URL", "http://backend:8000").rstrip("/")
+    try:
+        response = requests.post(base + "/api/v1/water/ingest-telemetry", timeout=(5, 180))
+        response.raise_for_status()
+        return response.json()
+    except (requests.RequestException, ValueError) as exc:
+        print(f"[Ingestion Worker] RID telemetry unavailable: {exc}")
+        return {"status": "unavailable", "reason": str(exc)}
+
 async def run_ingestion_cycle(ctx, station_code: str = None):
     """
     Task handler สำหรับการดึงข้อมูลภาพกล้อง CCTV สดและข้อมูลฝนของทั้ง 3 สถานี
     """
     targets = [s for s in REAL_STATIONS if s["code"] == station_code] if station_code else REAL_STATIONS
+    # Always ingest all upstream stations before camera processing; forecasting uses these hourly reports.
+    telemetry_result = await asyncio.to_thread(ingest_rid_telemetry)
 
     print(f"\n[Ingestion Worker] 📥 Starting ingestion cycle for {len(targets)} station(s)...")
 
@@ -61,19 +75,7 @@ async def run_ingestion_cycle(ctx, station_code: str = None):
         except Exception as e:
             print(f"[Ingestion Worker] MinIO upload error for {stn_code}: {e}")
 
-        # 3. บันทึกข้อมูลปริมาณน้ำฝนลง PostgreSQL
-        try:
-            conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, dbname=DB_NAME)
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO rainfall_measurements (station_code, timestamp, rain_amount_1h, rain_amount_24h, created_at)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (stn_code, datetime.utcnow(), 4.2, 28.5, datetime.utcnow()))
-            conn.commit()
-            cur.close()
-            conn.close()
-        except Exception as e:
-            print(f"[Ingestion Worker] DB error: {e}")
+        # Verified HII hourly rain was ingested above, independently of camera processing.
 
         # 4. ส่งต่อให้ Vision Worker ประมวลผลภาพทันที
         from vision.vision_worker import process_vision_task
@@ -85,4 +87,4 @@ async def run_ingestion_cycle(ctx, station_code: str = None):
         results.append(task_res)
 
     print(f"\n[Ingestion Worker] ✅ Ingestion cycle completed for all {len(targets)} stations.")
-    return {"status": "success", "processed_stations": len(results)}
+    return {"status": "success", "processed_stations": len(results), "telemetry": telemetry_result}

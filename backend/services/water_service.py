@@ -1,55 +1,30 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from models.measurement import WaterMeasurement, RainfallMeasurement
-from datetime import datetime, timedelta
-import random
+from datetime import datetime, timedelta, timezone
+from models.measurement import WaterMeasurement
+from services.timeseries_inputs import station_codes, VERIFIED_WATER_SOURCE
+
 
 class WaterService:
     @staticmethod
-    def get_latest_measurement(db: Session, station_code: str):
-        meas = db.query(WaterMeasurement).filter(
-            WaterMeasurement.station_code == station_code
-        ).order_by(desc(WaterMeasurement.timestamp)).first()
-        
-        if not meas:
-            from models.station import Station
-            stn = db.query(Station).filter(Station.station_code == station_code).first()
-            base = stn.normal_level if stn else 3.0
-            # Seed initial current measurement
-            meas = WaterMeasurement(
-                station_code=station_code,
-                timestamp=datetime.utcnow(),
-                water_level=round(base + random.uniform(-0.1, 0.2), 2),
-                source_type="CAMERA_VISION",
-                vision_confidence=0.92
-            )
-            db.add(meas)
-            db.commit()
-            db.refresh(meas)
-        return meas
+    def get_latest_measurement(db, station_code):
+        ecosystem, _ = station_codes(station_code)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        return db.query(WaterMeasurement).filter(
+            WaterMeasurement.station_code == ecosystem,
+            WaterMeasurement.source_type == VERIFIED_WATER_SOURCE,
+            WaterMeasurement.timestamp <= now,
+        ).order_by(WaterMeasurement.timestamp.desc(), WaterMeasurement.created_at.desc(), WaterMeasurement.id.desc()).first()
 
     @staticmethod
-    def get_historical_measurements(db: Session, station_code: str, hours: int = 24):
-        since = datetime.utcnow() - timedelta(hours=hours)
+    def get_historical_measurements(db, station_code, hours=24):
+        ecosystem, _ = station_codes(station_code)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         records = db.query(WaterMeasurement).filter(
-            WaterMeasurement.station_code == station_code,
-            WaterMeasurement.timestamp >= since
-        ).order_by(WaterMeasurement.timestamp.asc()).all()
+            WaterMeasurement.station_code == ecosystem,
+            WaterMeasurement.source_type == VERIFIED_WATER_SOURCE,
+            WaterMeasurement.timestamp >= now - timedelta(hours=hours), WaterMeasurement.timestamp <= now,
+        ).order_by(WaterMeasurement.timestamp.asc(), WaterMeasurement.created_at.asc(), WaterMeasurement.id.asc()).all()
+        latest_revision = {record.timestamp: record for record in records}
+        return list(latest_revision.values())
 
-        if not records:
-            from models.station import Station
-            stn = db.query(Station).filter(Station.station_code == station_code).first()
-            base_level = stn.normal_level if stn else 3.0
-            now = datetime.utcnow()
-            for i in range(hours, 0, -1):
-                t = now - timedelta(hours=i)
-                w = round(base_level + (random.uniform(-0.15, 0.15)), 2)
-                records.append(WaterMeasurement(
-                    station_code=station_code,
-                    timestamp=t,
-                    water_level=w,
-                    source_type="API"
-                ))
-        return records
 
 water_service = WaterService()

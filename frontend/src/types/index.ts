@@ -25,6 +25,18 @@ export interface WaterMeasurement {
   is_reviewed_by_human: boolean;
 }
 
+export interface RainfallMeasurement {
+  station_code: string;
+  rain_station_code: string;
+  timestamp: string;
+  rain_amount_1h: number;
+  rain_amount_24h: number | null;
+  unit: 'mm';
+  age_minutes: number;
+  source_type: string;
+  source_url: string;
+}
+
 export interface ForecastRecord {
   id: number;
   station_code: string;
@@ -36,6 +48,24 @@ export interface ForecastRecord {
   model_version: string;
   input_mode: string;
   data_quality_status: string;
+  created_at?: string;
+  context_json?: {
+    mode: 'shadow' | 'replay';
+    issue_time?: string;
+    current_level_m?: number;
+    input_quality?: string;
+    missing_features?: string[];
+    rain_available?: boolean;
+    rain_input_summary?: { used_count: number; total_count: number; missing_features: string[] };
+    operational_ready: boolean;
+    predictions?: { horizon_h: number; target_time: string; level_m: number }[];
+  };
+}
+
+export interface ForecastComparison {
+  forecast_id: number;
+  station_code: string;
+  items: { lead_time_hours: number; target_time: string; predicted_level: number; actual_level: number | null; mae_error: number | null }[];
 }
 
 export interface AlertEvent {
@@ -132,6 +162,7 @@ export interface DetectionStatus {
   detected: boolean;
   is_manual?: boolean;
   confidence: number;
+  water_level?: number | null;
   bbox: [number, number, number, number] | null;
   station_code?: string;
   station_name?: string;
@@ -159,3 +190,62 @@ export interface ManualBBoxResponse {
   message: string;
 }
 
+export interface TimeSeriesRetrainHistoryItem {
+  id: string;
+  model_version: string;
+  trigger_type: string;
+  challenger_mae: number;
+  champion_mae: number;
+  improvement_pct: number;
+  promoted: boolean;
+  train_samples: number;
+  timestamp: string;
+  status: string;
+  mlflow_run_id: string;
+}
+
+export interface TimeSeriesRetrainStatus {
+  current_model_name: string;
+  current_model_version: string;
+  last_mae_meters: number;
+  last_retrained_at: string;
+  training_samples: number;
+  flood_sample_weight_multiplier: number;
+  gatekeeper_policy: string;
+  is_retraining: boolean;
+  mlflow_tracking_uri?: string;
+  history: TimeSeriesRetrainHistoryItem[];
+}
+
+export interface TimeSeriesRetrainTriggerResponse {
+  status: string;
+  message: string;
+  result: {
+    status: string;
+    promoted: boolean;
+    model_version: string;
+    challenger_mae: number;
+    champion_mae: number;
+    improvement_pct: number;
+    mlflow_run_id: string;
+    timestamp: string;
+    trigger_type: string;
+  };
+}
+
+export interface SensorDriftStatus {
+  overall_status: string;
+  telemetry_source: string;
+  quality_gate: string;
+  max_rate_of_rise_threshold_m_per_h: number;
+  checked_at: string;
+  stations: Record<
+    string,
+    {
+      name: string;
+      status: string;
+      is_suspicious: boolean;
+      reasons: string[];
+    }
+  >;
+}

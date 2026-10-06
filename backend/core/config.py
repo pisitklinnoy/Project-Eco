@@ -1,4 +1,6 @@
 import os
+from typing import Literal
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -12,9 +14,16 @@ class Settings(BaseSettings):
     postgres_host: str = os.getenv("POSTGRES_HOST", "postgres")
     postgres_port: int = int(os.getenv("POSTGRES_PORT", 5432))
     
+    database_url_override: str = Field(default="", validation_alias="DATABASE_URL")
+    forecast_max_age_minutes: int = Field(default=120, ge=1, le=1440)
+    forecast_model_family: Literal["delta", "level"] = "delta"
+    forecast_model_dir: str | None = None
+    
     @property
     def database_url(self) -> str:
-        return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        if self.database_url_override:
+            return self.database_url_override.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     # Redis
     redis_host: str = os.getenv("REDIS_HOST", "redis")

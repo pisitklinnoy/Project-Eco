@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 class WaterMeasurementBase(BaseModel):
     station_code: str
@@ -18,18 +18,26 @@ class WaterMeasurementResponse(WaterMeasurementBase):
     id: int
     created_at: datetime
 
+    @field_serializer("timestamp", "created_at")
+    def serialize_utc(self, value: datetime):
+        return value.replace(tzinfo=timezone.utc).isoformat() if value.tzinfo is None else value.isoformat()
+
     class Config:
         from_attributes = True
 
 class RainfallMeasurementBase(BaseModel):
     station_code: str
     timestamp: datetime
-    rain_amount_1h: float = 0.0
-    rain_amount_24h: float = 0.0
+    rain_amount_1h: Optional[float] = 0.0
+    rain_amount_24h: Optional[float] = 0.0
 
 class RainfallMeasurementResponse(RainfallMeasurementBase):
     id: int
     created_at: datetime
+
+    @field_serializer("timestamp", "created_at")
+    def serialize_utc(self, value: datetime):
+        return value.replace(tzinfo=timezone.utc).isoformat() if value.tzinfo is None else value.isoformat()
 
     class Config:
         from_attributes = True

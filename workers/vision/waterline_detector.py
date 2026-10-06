@@ -193,4 +193,5 @@ class WaterlineDetector:
         }
 
 
-mock_detector = WaterlineDetector()
+waterline_detector = WaterlineDetector()
+mock_detector = waterline_detector

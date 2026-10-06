@@ -44,8 +44,8 @@
     "warning_m": 5.5,
     "critical_flood_m": 6.0
   },
-  "baseline_water_level_m": 0.0,
-  "baseline_water_y_px": 2252,
-  "baseline_y": 2252,
+  "baseline_water_level_m": 0.60,
+  "baseline_water_y_px": 2140,
+  "baseline_y": 2140,
   "calibration_bias_m": 0.0
 }

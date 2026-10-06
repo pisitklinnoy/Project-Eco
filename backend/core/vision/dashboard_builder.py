@@ -193,7 +193,6 @@ def build_dashboard(
 
     return canvas
 
-
 def render_gauge_overlay(enhanced_gauge, water_info, calibrator, cfg):
     """
     เรนเดอร์เฉพาะภาพสเกลเสา Enhanced พร้อมไม้บรรทัดดิจิทัลและขีดระดับน้ำ (Dark Theme + Golden Ticks)
@@ -455,4 +454,3 @@ def render_gauge_not_detected_image(
                 (bx1 + 75, rec_y1 + 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 245, 255), 1, cv2.LINE_AA)
 
     return canvas
-

@@ -867,8 +867,8 @@ class VisionService:
                         cancelled_annotations, comment_count, unresolved_comment_count, is_labeled
                     )
                     VALUES (
-                        :data, 2, NOW(), NOW(), 
-                        1, COALESCE((SELECT MAX(inner_id) FROM task WHERE project_id = 2), 0) + 1, 
+                        :data, 1, NOW(), NOW(), 
+                        1, COALESCE((SELECT MAX(inner_id) FROM task WHERE project_id = 1), 0) + 1, 
                         1, 1, 0, 0, 0, TRUE
                     )
                     RETURNING id;
@@ -881,7 +881,7 @@ class VisionService:
                         INSERT INTO prediction (
                             task_id, project_id, result, score, model_version, mislabeling, created_at, updated_at
                         )
-                        VALUES (:tid, 2, :result, 1.0, 'Manual-BBox-Crop', 0.0, NOW(), NOW())
+                        VALUES (:tid, 1, :result, 1.0, 'Manual-BBox-Crop', 0.0, NOW(), NOW())
                         RETURNING id;
                     """)
                     pred_res = db.execute(insert_pred_sql, {
@@ -898,7 +898,7 @@ class VisionService:
                             created_at, updated_at
                         )
                         VALUES (
-                            :tid, 2, :result, FALSE, TRUE,
+                            :tid, 1, :result, FALSE, TRUE,
                             :rc, 1, :pred_id, gen_random_uuid(),
                             NOW(), NOW()
                         );
@@ -910,7 +910,7 @@ class VisionService:
                         "pred_id": pred_id
                     })
                     db.commit()
-                    label_studio_url = f"http://localhost:8085/projects/2/data?task={label_studio_task_id}"
+                    label_studio_url = f"http://localhost:8085/projects/1/data?task={label_studio_task_id}"
                     print(f"[VisionService] 🎯 Synced Manual Crop to Label Studio Task #{label_studio_task_id} successfully!")
             except Exception as e:
                 db.rollback()

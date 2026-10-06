@@ -2,11 +2,10 @@ import React from 'react';
 import type { Station, WaterMeasurement } from '../types';
 import {
   Sparkles,
-  ArrowUpRight,
   ShieldCheck,
   Layers,
-  Camera,
   MapPin,
+  Waves,
 } from 'lucide-react';
 import { PillButton } from './ui/PillButton';
 import { GlassCard } from './ui/GlassCard';
@@ -67,9 +66,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Giant Editorial Typography (64-92px desktop) */}
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-slate-950 tracking-tight leading-[1.08] font-sans">
-              Intelligent <br />
+              Hatyai <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600">
-                Water Defense.
+                Floodlen.
               </span>
             </h1>
 
@@ -243,28 +242,33 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
             </GlassCard>
 
-            {/* FLOATING CARD 2: AI CCTV INSPECTOR QUICK TEASER */}
-            <div
-              onClick={onExploreClick}
-              className="cursor-pointer group rounded-3xl bg-slate-900/90 backdrop-blur-xl text-white p-4.5 border border-white/10 shadow-xl flex items-center justify-between hover:bg-slate-900 transition-all hover:scale-[1.01]"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-400/30">
-                  <Camera className="w-5 h-5 text-sky-300" />
+            {/* DECORATIVE VISUAL CARD: FLOOD SCENARIO ILLUSTRATION */}
+            <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 shadow-lg bg-slate-950 select-none">
+              <div className="relative aspect-[16/8] sm:aspect-[16/7] w-full overflow-hidden">
+                <img
+                  src="/aerial-bridge_1753037i.webp"
+                  alt="ภาพจำลองสถานการณ์น้ำท่วม"
+                  className="w-full h-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-slate-950/30 pointer-events-none" />
+
+                {/* Decorative Pill Badge */}
+                <div className="absolute top-3 left-3 pointer-events-none">
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-white text-[11px] font-semibold border border-white/20 shadow-sm">
+                    <Waves className="w-3.5 h-3.5 text-sky-400" />
+                    <span>ภาพจำลองสถานการณ์น้ำท่วม</span>
+                  </span>
                 </div>
-                <div>
-                  <h4 className="text-xs font-black tracking-tight text-white flex items-center space-x-1.5">
-                    <span>AI Staff Gauge Visual Analysis</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  </h4>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    ตรวจสอบภาพเสาความละเอียดเต็ม พร้อมสเกลไม้บรรทัดดิจิทัล 100%
+
+                {/* Bottom Decorative Caption */}
+                <div className="absolute bottom-2.5 left-3.5 right-3.5 pointer-events-none text-white">
+                  <p className="text-xs font-bold text-white drop-shadow-md">
+                    แบบจำลองทัศนียภาพเมื่อเกิดอุทกภัย
+                  </p>
+                  <p className="text-[10px] text-slate-300 drop-shadow mt-0.5">
+                    จำลองสภาวะระดับน้ำเอ่อล้นเข้าท่วมพื้นที่และเส้นทางคมนาคม
                   </p>
                 </div>
-              </div>
-
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:bg-blue-600 transition-colors shrink-0">
-                <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </div>
             </div>
 

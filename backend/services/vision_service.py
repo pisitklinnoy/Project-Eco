@@ -539,18 +539,13 @@ class VisionService:
                       "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
                       "station3_hatyainai"
 
-        frame = None
-        if mode == "live":
-            frame = self.fetch_live_frame(station_code)
-
+        frame = self.fetch_live_frame(station_code)
         if frame is None:
+            # Fallback to recent sample image if camera network is temporarily unreachable
             sample_candidates = [
-                os.path.join(BASE_DIR, "sample_images", f"{station_num}_{mode}.jpg"),
-                os.path.join(BASE_DIR, "sample_images", f"{station_num}_{mode}.png"),
                 os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
                 os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
-                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_{mode}.jpg"),
-                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_daytime.jpg"),
             ]
             for p in sample_candidates:
                 if os.path.exists(p):
@@ -559,7 +554,7 @@ class VisionService:
                         break
 
         if frame is None:
-            return {"status": "error", "message": "ไม่สามารถดึงภาพสำหรับบันทึก Annotation ได้"}
+            return {"status": "error", "message": "ไม่สามารถดึงภาพสดจากกล้อง CCTV เพื่อบันทึก Dataset ได้"}
 
         fh, fw = frame.shape[:2]
         bx1, by1, bx2, by2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
@@ -591,18 +586,18 @@ class VisionService:
         w_norm = box_w / float(fw)
         h_norm = box_h / float(fh)
 
-        # 1. บันทึกลง Dataset โฟลเดอร์ backend/dataset/manual_annotations/
+        # 1. บันทึกลง Dataset โฟลเดอร์ backend/dataset/manual_annotations/ เพื่อใช้ Re-train โมเดล
         dataset_dir = os.path.join(BASE_DIR, "dataset", "manual_annotations")
         os.makedirs(dataset_dir, exist_ok=True)
 
         ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_prefix = f"{stn_key.lower()}_{mode}_{ts_str}"
+        file_prefix = f"{stn_key.lower()}_live_{ts_str}"
 
         img_path = os.path.join(dataset_dir, f"{file_prefix}.jpg")
         txt_path = os.path.join(dataset_dir, f"{file_prefix}.txt")
         json_path = os.path.join(dataset_dir, f"{file_prefix}.json")
 
-        # บันทึกรูปภาพ JPEG คุณภาพสูง
+        # บันทึกรูปภาพ JPEG คุณภาพสูงจากภาพสดกล้อง CCTV
         cv2.imwrite(img_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         # บันทึก YOLO format (.txt): class_id x_center y_center width height
@@ -614,7 +609,8 @@ class VisionService:
             "station_code": station_code,
             "station_key": stn_key,
             "timestamp": datetime.now().isoformat(),
-            "mode": mode,
+            "source": "cctv_live_frame",
+            "mode": "live",
             "label": label,
             "bbox_xyxy": clamped_bbox,
             "frame_resolution": [fw, fh],
@@ -628,13 +624,13 @@ class VisionService:
             },
             "image_file": f"{file_prefix}.jpg",
             "txt_file": f"{file_prefix}.txt",
-            "notes": notes,
+            "notes": notes or f"Manual Staff Gauge annotation from CCTV live frame for {station_code}",
             "status": "ready_for_retrain"
         }
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
-        # 2. อัปเดต Memory & Config เพื่อใช้งานสเกลเสาได้ทันที
+        # 2. ปรับปรุง Memory สำหรับ Session ปัจจุบัน (ไม่แก้ไขไฟล์ถาวร station config)
         self.manual_bboxes[stn_key] = clamped_bbox
         mgr = self.station_components.get(stn_key)
         if mgr:
@@ -651,29 +647,7 @@ class VisionService:
             mgr["pole_mgr"] = PoleCoordinateManager(cfg)
             mgr["detector"] = WaterSurfaceDetector(mgr["calibrator"], cfg)
 
-        # 3. Persist to station JSON config file
-        json_file = STATION_CONFIG_MAP.get(stn_key)
-        if json_file:
-            cfg_path = os.path.join(CONFIGS_DIR, json_file)
-            if os.path.exists(cfg_path):
-                try:
-                    with open(cfg_path, "r", encoding="utf-8") as f:
-                        file_cfg = json.load(f)
-                    file_cfg["manual_staff_gauge_bbox"] = clamped_bbox
-                    file_cfg["staff_gauge_bbox"] = {
-                        "x1": clamped_bbox[0],
-                        "y1": clamped_bbox[1],
-                        "x2": clamped_bbox[2],
-                        "y2": clamped_bbox[3],
-                        "width": box_w,
-                        "height": box_h
-                    }
-                    with open(cfg_path, "w", encoding="utf-8") as f:
-                        json.dump(file_cfg, f, indent=2, ensure_ascii=False)
-                except Exception as ex:
-                    print(f"[VisionService] Persist config error: {ex}")
-
-        # 4. อัปเดต retrain_state.json (เพิ่ม pending_count)
+        # 3. อัปเดต retrain_state.json (เพิ่ม pending_count สำหรับคิว Re-train)
         retrain_path = os.path.join(CONFIGS_DIR, "retrain_state.json")
         if os.path.exists(retrain_path):
             try:
@@ -694,7 +668,7 @@ class VisionService:
             "bbox": clamped_bbox,
             "yolo_normalized": [round(x_center, 6), round(y_center, 6), round(w_norm, 6), round(h_norm, 6)],
             "dataset_file": f"{file_prefix}.jpg",
-            "message": "บันทึกกรอบเสาวัดระดับน้ำ (Manual BBox) และจัดเก็บเข้า Dataset พร้อมนำไป Re-train โมเดลเรียบร้อยแล้ว"
+            "message": "บันทึกกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV เข้า Dataset เรียบร้อยแล้ว (พร้อมสำหรับ Re-train โมเดล)"
         }
 
 

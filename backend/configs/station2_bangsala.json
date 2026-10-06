@@ -6,16 +6,13 @@
   "location": "Bangsala Bridge, Khlong U-Tapao, Khlong Hoi Khong, Songkhla",
   "station_id": 478,
   "station_group_id": 1269,
-  "reference_frame_resolution": [
-    3200,
-    1800
-  ],
+  "reference_frame_resolution": [3200, 1800],
   "staff_gauge_bbox": {
-    "x1": 1850,
+    "x1": 1855,
     "y1": 480,
-    "x2": 1920,
+    "x2": 1910,
     "y2": 1100,
-    "width": 70,
+    "width": 55,
     "height": 620
   },
   "enhanced_roi": {
@@ -24,50 +21,17 @@
     "height": 1860
   },
   "piecewise_anchors": [
-    [
-      12.0,
-      42
-    ],
-    [
-      11.0,
-      246
-    ],
-    [
-      10.0,
-      456
-    ],
-    [
-      9.0,
-      632
-    ],
-    [
-      8.0,
-      807
-    ],
-    [
-      7.0,
-      981
-    ],
-    [
-      6.0,
-      1152
-    ],
-    [
-      5.0,
-      1326
-    ],
-    [
-      4.0,
-      1506
-    ],
-    [
-      3.0,
-      1686
-    ],
-    [
-      2.0,
-      1860
-    ]
+    [12.0, 42],
+    [11.0, 246],
+    [10.0, 456],
+    [9.0, 632],
+    [8.0, 807],
+    [7.0, 981],
+    [6.0, 1152],
+    [5.0, 1326],
+    [4.0, 1506],
+    [3.0, 1686],
+    [2.0, 1860]
   ],
   "unit": "meters",
   "datum": "R.T.K.",
@@ -78,11 +42,5 @@
   },
   "baseline_y": 1730,
   "flood_threshold_score": 20.0,
-  "calibration_bias_m": 0.04,
-  "manual_staff_gauge_bbox": [
-    1850,
-    480,
-    1920,
-    1100
-  ]
+  "calibration_bias_m": 0.04
 }

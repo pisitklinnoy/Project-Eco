@@ -1,0 +1,30 @@
+{
+  "station_code": "STN-BANGSALA",
+  "station_key": "STN-BANGSALA",
+  "timestamp": "2026-10-06T12:47:25.702295",
+  "source": "cctv_live_frame",
+  "mode": "live",
+  "label": "Staff Gauge",
+  "bbox_xyxy": [
+    1850,
+    480,
+    1920,
+    1100
+  ],
+  "frame_resolution": [
+    3200,
+    1800
+  ],
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.589063,
+    "y_center": 0.438889,
+    "width": 0.021875,
+    "height": 0.344444
+  },
+  "image_file": "stn-bangsala_live_20261006_124725.jpg",
+  "txt_file": "stn-bangsala_live_20261006_124725.txt",
+  "notes": "Live CCTV snapshot test",
+  "status": "ready_for_retrain"
+}

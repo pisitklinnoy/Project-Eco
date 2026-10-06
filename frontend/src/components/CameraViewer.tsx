@@ -297,10 +297,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       <div className="w-full bg-amber-950/40 border border-amber-600/30 rounded-2xl p-3.5 mb-5 text-left text-xs text-amber-100">
         <div className="flex items-center space-x-2 text-amber-300 font-extrabold text-xs mb-1">
           <Sliders className="w-4 h-4 shrink-0 text-amber-400" />
-          <span>คำแนะนำสำหรับเจ้าหน้าที่ / ผู้ดูแลระบบ:</span>
+          <span>คำแนะนำเมื่อกล้อง CCTV ไม่พบเสาวัดน้ำ ณ ขณะนี้:</span>
         </div>
         <p className="text-[11px] text-amber-200/90 leading-normal">
-          กรุณาใช้ฟีเจอร์ <strong>"วาดกรอบเสาด้วยมือ" (Manual BBox)</strong> เพื่อกำหนดตำแหน่งเสาจริงในภาพนี้ ระบบจะจัดเก็บภาพและพิกัดเข้า <strong>Retrain Dataset</strong> ทันที พร้อมทั้งเปิดใช้งานการแสดงสเกลเสาวัดน้ำได้ทันทีโดยไม่ต้องรอเทรนโมเดลใหม่
+          กรุณาใช้ฟีเจอร์ <strong>"วาดกรอบเสาจากภาพสด" (Manual BBox)</strong> เพื่อมาร์กตำแหน่งเสาวัดระดับน้ำบนภาพกล้องสด ณ เวลานี้ ระบบจะนำภาพสดพร้อมพิกัดเสาไปจัดเก็บเป็น Label เพิ่มเติมใน <strong>Retrain Dataset</strong> เพื่อเพิ่มจำนวนข้อมูลฝึกสอนให้โมเดล AI ฉลาดขึ้นในอนาคต
         </p>
       </div>
 
@@ -314,7 +314,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             className="flex-1 w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-orange-500/25 transition flex items-center justify-center space-x-2 cursor-pointer"
           >
             <Sliders className="w-4 h-4" />
-            <span>วาดกรอบเสาด้วยมือ (Manual BBox)</span>
+            <span>วาดกรอบเสาจากภาพสด (Manual BBox)</span>
           </button>
         )}
 
@@ -536,10 +536,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <button
                 onClick={onOpenManualBBox}
                 className="bg-amber-50 hover:bg-amber-100 text-amber-800 hover:text-amber-900 px-2.5 py-1 rounded-lg border border-amber-300 font-bold transition flex items-center space-x-1 text-[11px] shadow-xs cursor-pointer"
-                title="วาดกรอบเสาวัดระดับน้ำด้วยตนเอง (Manual BBox) และจัดเก็บเข้า Retrain Dataset"
+                title="วาดกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV ณ ขณะนี้เพื่อจัดเก็บเข้า Retrain Dataset"
               >
                 <Sliders className="w-3 h-3 text-amber-600 shrink-0" />
-                <span>วาดกรอบเสา</span>
+                <span>วาดกรอบเสาภาพสด</span>
               </button>
             )}
 

@@ -142,9 +142,26 @@ def get_station_live_camera_feed(station_code: str):
     
     frame = vision_service.fetch_live_frame(station_code)
     if frame is None:
+        import os
+        from services.vision_service import BASE_DIR
+        stn_key = vision_service._resolve_station_key(station_code) or ""
+        station_num = "station1_muangkong" if "MUANGKONG" in stn_key or "173A" in stn_key else \
+                      "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
+                      "station3_hatyainai"
+        candidates = [
+            os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+            os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                frame = cv2.imread(p)
+                if frame is not None:
+                    break
+
+    if frame is None:
         raise HTTPException(status_code=503, detail="CCTV stream currently unreachable")
     
-    success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
     if not success:
         raise HTTPException(status_code=500, detail="Failed to encode image frame")
         

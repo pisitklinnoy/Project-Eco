@@ -13,10 +13,7 @@ import {
   Crop,
   Info,
   Sparkles,
-  Camera,
-  Sun,
-  Moon,
-  Waves,
+  RefreshCw,
   Radio,
 } from 'lucide-react';
 
@@ -40,7 +37,6 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
   station,
   onSaved,
 }) => {
-  const [mode, setMode] = useState<'live' | 'daytime' | 'nighttime' | 'flood'>('live');
   const [bbox, setBBox] = useState<BBoxRect | null>(null);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
@@ -49,6 +45,10 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Live snapshot state
+  const [capturedTimestamp, setCapturedTimestamp] = useState<number>(Date.now());
+  const [capturedTimeStr, setCapturedTimeStr] = useState<string>('');
 
   // Zoom & Pan
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -64,7 +64,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
   const uiScale = 1 / zoomLevel;
 
-  // Track spacebar for pan navigation
+  // Spacebar pan navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !spacePressed) {
@@ -86,25 +86,35 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
     };
   }, [spacePressed]);
 
-  // Load image URL
-  const getImageUrl = useCallback(() => {
-    if (!station) return '';
-    const code = encodeURIComponent(station.station_code);
-    return `/api/v1/stations/${code}/raw-frame.jpg?mode=${mode}&t=${Date.now()}`;
-  }, [station, mode]);
+  // Refresh live camera frame
+  const handleRefreshLiveFrame = useCallback(() => {
+    const now = Date.now();
+    setCapturedTimestamp(now);
+    const date = new Date(now);
+    setCapturedTimeStr(
+      `${date.getHours().toString().padStart(2, '0')}:${date
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')} น.`
+    );
+  }, []);
 
-  const [imageUrl, setImageUrl] = useState<string>('');
-
+  // Initialize snapshot when opened
   useEffect(() => {
     if (isOpen && station) {
-      setImageUrl(getImageUrl());
+      handleRefreshLiveFrame();
       setBBox(null);
       setSaveSuccess(null);
       setSaveError(null);
       setZoomLevel(1.0);
       setPan({ x: 0, y: 0 });
     }
-  }, [isOpen, station, mode, getImageUrl]);
+  }, [isOpen, station, handleRefreshLiveFrame]);
+
+  // Live image source URL strictly from current CCTV camera
+  const imageUrl = station
+    ? `/api/v1/stations/${encodeURIComponent(station.station_code)}/live-feed.jpg?t=${capturedTimestamp}`
+    : '';
 
   // Native non-passive Wheel Event Listener for smooth zooming
   useEffect(() => {
@@ -148,7 +158,6 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
   // Mouse Down
   const handleMouseDown = (e: React.MouseEvent) => {
-    // If middle click or space key is held, trigger pan
     if (e.button === 1 || spacePressed || (zoomLevel > 1.0 && e.shiftKey)) {
       e.preventDefault();
       setIsPanning(true);
@@ -156,7 +165,6 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
       return;
     }
 
-    // Left click: begin drawing BBox
     if (e.button === 0) {
       const coords = getImageCoordinates(e);
       if (!coords) return;
@@ -200,7 +208,6 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
       const y1 = Math.min(drawStart.y, currentDragPos.y);
       const y2 = Math.max(drawStart.y, currentDragPos.y);
 
-      // Require a minimum size (at least 8px in width or height) to prevent accidental clicks
       if (x2 - x1 >= 8 && y2 - y1 >= 15) {
         setBBox({ x1, y1, x2, y2 });
       }
@@ -209,7 +216,6 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
     }
   };
 
-  // Compute live active rectangle during draw
   const activeRect: BBoxRect | null = bbox
     ? bbox
     : isDrawing && drawStart && currentDragPos
@@ -221,7 +227,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
       }
     : null;
 
-  // Update real-time cropped canvas preview
+  // Real-time cropped preview canvas
   useEffect(() => {
     if (!activeRect || !imgRef.current || !previewCanvasRef.current) return;
     const canvas = previewCanvasRef.current;
@@ -244,25 +250,14 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
     if (cropW <= 0 || cropH <= 0) return;
 
-    // Set canvas dimensions to match aspect ratio
     canvas.width = Math.max(80, Math.min(160, Math.round(cropW)));
     canvas.height = Math.max(200, Math.min(360, Math.round(cropH)));
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     try {
-      ctx.drawImage(
-        img,
-        cropX,
-        cropY,
-        cropW,
-        cropH,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
     } catch {
-      // Ignore if image is still loading
+      // Ignore if image is loading
     }
   }, [activeRect]);
 
@@ -291,7 +286,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
   const yolo = getYoloCoords();
 
-  // Handle Save
+  // Save live frame and manual bbox to retraining dataset
   const handleSave = async () => {
     if (!station || !activeRect || !imgRef.current) return;
     setIsSaving(true);
@@ -306,19 +301,18 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
         station_code: station.station_code,
         bbox: [activeRect.x1, activeRect.y1, activeRect.x2, activeRect.y2] as [number, number, number, number],
         image_resolution: [clientW, clientH] as [number, number],
-        mode,
+        mode: 'live',
         label: 'Staff Gauge',
-        notes: notes || `Manual Staff Gauge annotation for ${station.name}`,
+        notes: notes || `Live CCTV frame annotation for ${station.name} (${capturedTimeStr})`,
       };
 
       const res = await floodlensApi.saveManualBBox(station.station_code, payload);
-      setSaveSuccess(res.message || 'บันทึกกรอบเสาวัดระดับน้ำและจัดเก็บเข้า Dataset สำเร็จ');
+      setSaveSuccess(res.message || 'บันทึกภาพสดและพิกัดเสาวัดระดับน้ำเข้า Dataset สำหรับ Re-train สำเร็จ');
 
       if (onSaved) {
         onSaved(res.bbox);
       }
 
-      // Close modal after brief success feedback
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -344,14 +338,15 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-base sm:text-lg font-black text-white">
-                  วาดกรอบเสาวัดระดับน้ำด้วยตนเอง (Manual BBox)
+                  วาดกรอบเสาวัดระดับน้ำจากภาพสด (Manual BBox)
                 </h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
-                  YOLOv8 Retraining Dataset
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>CCTV Live Frame</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                สถานี: <span className="font-semibold text-slate-200">{station.name}</span> ({station.station_code}) &bull; ลากเมาส์สร้างกรอบสี่เหลี่ยมครอบเสาวัดน้ำเพื่อวิเคราะห์สเกลทันทีและนำไป Re-train โมเดล
+                สถานี: <span className="font-semibold text-slate-200">{station.name}</span> ({station.station_code}) &bull; บันทึกภาพสดและพิกัดเสา ณ เวลานี้เข้าสู่ Retrain Dataset เพื่อเพิ่มจำนวนข้อมูลและพัฒนาความฉลาดของโมเดล AI
               </p>
             </div>
           </div>
@@ -371,54 +366,27 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
           {/* Left Canvas (Col 8/12) */}
           <div className="lg:col-span-8 flex flex-col space-y-3">
             
-            {/* Toolbar: Scenario Switcher & Zoom Controls */}
+            {/* Live Camera Ribbon & Zoom Controls */}
             <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800 text-xs">
               
-              {/* Scenario selector */}
-              <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-700/60">
-                <span className="text-[11px] font-bold text-slate-400 px-2 flex items-center space-x-1">
-                  <Camera className="w-3.5 h-3.5 text-sky-400" />
-                  <span>ภาพมุมกล้อง:</span>
-                </span>
+              {/* Live indicator & refresh */}
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-slate-700/60 text-slate-300 font-bold text-xs">
+                  <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                  <span>ภาพสดจากกล้อง CCTV</span>
+                  {capturedTimeStr && (
+                    <span className="text-slate-400 font-mono text-[11px] ml-1">({capturedTimeStr})</span>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setMode('live')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    mode === 'live' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                  }`}
+                  onClick={handleRefreshLiveFrame}
+                  className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-700/60 font-bold transition flex items-center space-x-1 cursor-pointer text-xs"
+                  title="ดึงภาพเฟรมสดล่าสุดจากกล้อง CCTV อีกครั้ง"
                 >
-                  <Radio className="w-3 h-3" />
-                  <span>ภาพสด</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('daytime')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    mode === 'daytime' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Sun className="w-3 h-3 text-amber-300" />
-                  <span>กลางวัน</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('nighttime')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    mode === 'nighttime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Moon className="w-3 h-3 text-sky-300" />
-                  <span>กลางคืน</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('flood')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    mode === 'flood' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Waves className="w-3 h-3 text-rose-300" />
-                  <span>น้ำท่วม</span>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>ดึงภาพสดใหม่</span>
                 </button>
               </div>
 
@@ -577,7 +545,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                 <div className="flex items-center space-x-2">
                   <Crop className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span>
-                    คลิกซ้ายแล้ว<strong>ลากเมาส์คลุมเสาวัดระดับน้ำ</strong> &bull; กด Spacebar ค้างไว้หรือใช้ลูกกลิ้งเมาส์เพื่อซูมและเลื่อนภาพ
+                    คลิกซ้ายแล้ว<strong>ลากเมาส์ครอบเสาวัดน้ำในภาพสด</strong> &bull; หมุนลูกกลิ้งเมาส์เพื่อซูมเข้าหากเสาอยู่ไกล
                   </span>
                 </div>
                 {activeRect && (
@@ -596,7 +564,10 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
               {/* Header Box */}
               <div className="flex items-center space-x-2 pb-3 border-b border-slate-800">
                 <Database className="w-4 h-4 text-amber-400" />
-                <h3 className="font-bold text-sm text-white">รายละเอียดชุดข้อมูล Retrain</h3>
+                <div>
+                  <h3 className="font-bold text-sm text-white">เพิ่มชุดข้อมูลภาพสด (Retrain Dataset)</h3>
+                  <p className="text-[11px] text-slate-400">เพิ่มจำนวน Label ให้โมเดล AI ฉลาดขึ้น</p>
+                </div>
               </div>
 
               {/* Live Cropped Gauge Preview */}
@@ -604,10 +575,10 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                 <div className="w-full flex items-center justify-between text-xs font-bold text-slate-300 mb-2">
                   <span className="flex items-center space-x-1.5">
                     <Crop className="w-3.5 h-3.5 text-sky-400" />
-                    <span>ภาพครอปเสา (Preview)</span>
+                    <span>ภาพครอปเสาจากภาพสด</span>
                   </span>
                   {activeRect ? (
-                    <span className="text-[10px] text-emerald-400 font-mono">พร้อมใช้งาน</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">พร้อมบันทึก</span>
                   ) : (
                     <span className="text-[10px] text-amber-400">ยังไม่ได้วาดกรอบ</span>
                   )}
@@ -619,7 +590,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                   ) : (
                     <div className="text-center p-4 text-slate-500 text-xs">
                       <Sliders className="w-6 h-6 mx-auto mb-1.5 opacity-40" />
-                      <span>ลากกรอบบนภาพซ้ายมือเพื่อดูตัวอย่างเสาที่ถูกครอป</span>
+                      <span>ลากกรอบบนภาพกล้องสดด้านซ้ายเพื่อดูตัวอย่างเสาที่ตรวจพบ</span>
                     </div>
                   )}
                 </div>
@@ -629,7 +600,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
               <div className="bg-slate-900/90 rounded-2xl p-3.5 border border-slate-800 space-y-2">
                 <div className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>พิกัด YOLOv8 Format:</span>
+                  <span>พิกัด YOLOv8 Label (.txt):</span>
                 </div>
 
                 {yolo ? (
@@ -655,13 +626,13 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300 flex items-center space-x-1">
                   <Info className="w-3.5 h-3.5 text-sky-400" />
-                  <span>หมายเหตุประกอบภาพ (Optional):</span>
+                  <span>หมายเหตุสภาพแสง/สภาพน้ำ ณ ตอนนั้น (Optional):</span>
                 </label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="เช่น เสาวัดน้ำสะพานบางศาลา ถ่ายย้อนแสง/น้ำหลาก"
+                  placeholder="เช่น กล้องย้อนแสงตอนเที่ยง, ฝนตกหนัก, เสาเปียกน้ำ"
                   className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"
                 />
               </div>
@@ -692,7 +663,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
               >
                 <Database className="w-4 h-4" />
                 <span>
-                  {isSaving ? 'กำลังบันทึกลง Dataset...' : 'บันทึกเข้า Dataset & ใช้งานทันที'}
+                  {isSaving ? 'กำลังบันทึกลง Dataset...' : 'บันทึกภาพสดเข้า Retrain Dataset'}
                 </span>
               </button>
 

@@ -9,7 +9,7 @@ interface TelemetryCardProps {
   measurement: WaterMeasurement | null;
   loading: boolean;
   onRefresh: () => void;
-  onOpenReview: () => void;
+  onOpenReview?: () => void;
 }
 
 export const TelemetryCard: React.FC<TelemetryCardProps> = ({
@@ -200,15 +200,17 @@ export const TelemetryCard: React.FC<TelemetryCardProps> = ({
             </div>
           </div>
 
-          <PillButton
-            onClick={onOpenReview}
-            variant="glass"
-            size="sm"
-            icon={<ShieldCheck className="w-3.5 h-3.5 text-sky-600 shrink-0" />}
-            className="w-full justify-center !py-2.5 text-xs font-semibold"
-          >
-            ตรวจทานภาพเสาวัดน้ำ
-          </PillButton>
+          {onOpenReview && (
+            <PillButton
+              onClick={onOpenReview}
+              variant="glass"
+              size="sm"
+              icon={<ShieldCheck className="w-3.5 h-3.5 text-sky-600 shrink-0" />}
+              className="w-full justify-center !py-2.5 text-xs font-semibold"
+            >
+              ตรวจทานภาพเสาวัดน้ำ
+            </PillButton>
+          )}
         </div>
 
       </div>

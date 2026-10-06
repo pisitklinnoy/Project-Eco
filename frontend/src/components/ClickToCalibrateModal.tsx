@@ -441,7 +441,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                     src={station.camera_stream_url}
                     alt={station.name}
                     onClick={handleImageClick}
-                    className="w-full h-full object-cover pointer-events-auto"
+                    className="w-full h-full object-contain pointer-events-auto"
                     draggable={false}
                   />
                 ) : (

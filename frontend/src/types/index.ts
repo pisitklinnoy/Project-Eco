@@ -249,3 +249,59 @@ export interface SensorDriftStatus {
     }
   >;
 }
+
+export interface IngestionQueueItem {
+  id: string;
+  station_code: string;
+  station_name: string;
+  timestamp: string;
+  vision_water_level: number;
+  sensor_water_level: number;
+  discrepancy_m: number;
+  status: 'QUARANTINED' | 'RELEASED';
+  flag_reason: string;
+  image_url?: string;
+  suggested_action?: string;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolution_type?: string | null;
+  verified_water_level?: number | null;
+  resolution_notes?: string | null;
+}
+
+export interface ForecastDriftEvaluationItem {
+  station_code: string;
+  station_name: string;
+  target_time: string;
+  horizon: string;
+  predicted_level: number;
+  actual_level: number;
+  residual_error: number;
+  is_exceeded: boolean;
+}
+
+export interface ForecastDriftReport {
+  safety_threshold_m: number;
+  last_evaluated_at: string;
+  drift_detected: boolean;
+  max_residual_m: number;
+  mean_residual_m: number;
+  alert_status: string;
+  alert_message: string;
+  current_model: {
+    name: string;
+    version: string;
+    champion_mae: number;
+    is_retraining?: boolean;
+  };
+  matched_evaluations: ForecastDriftEvaluationItem[];
+  history: Array<{
+    id: string;
+    action: string;
+    triggered_by: string;
+    notes: string;
+    timestamp: string;
+    retrain_result?: any;
+  }>;
+}
+

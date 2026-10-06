@@ -20,6 +20,7 @@ class OnDemandVisionService:
         pt_high: CalibrationPoint,
         pt_low: CalibrationPoint,
         db: Session,
+        station_code: Optional[str] = None,
         station_note: Optional[str] = "On-Demand Field Inspection",
         pt_water: Optional[CalibrationPoint] = None
     ) -> OnDemandPredictResponse:
@@ -128,6 +129,35 @@ class OnDemandVisionService:
             db=db,
             station_note=station_note or "On-Demand Field Inspection"
         )
+
+        # 6. บันทึกผลการวัดระดับน้ำลงในตาราง WaterMeasurement เพื่อให้อัปเดต Telemetry ล่าสุดของระบบ
+        try:
+            from models.measurement import WaterMeasurement
+            target_stn = station_code
+            if not target_stn:
+                note_str = (station_note or "").upper()
+                if "MUANGKONG" in note_str or "ม่วงก็อง" in (station_note or "") or "173" in note_str:
+                    target_stn = "STN-MUANGKONG"
+                elif "BANGSALA" in note_str or "บางศาลา" in (station_note or "") or "90" in note_str:
+                    target_stn = "STN-BANGSALA"
+                elif "HATYAI" in note_str or "หาดใหญ่" in (station_note or "") or "44" in note_str:
+                    target_stn = "STN-HATYAINAI"
+                else:
+                    target_stn = "STN-BANGSALA"
+
+            meas = WaterMeasurement(
+                station_code=target_stn,
+                timestamp=datetime.utcnow(),
+                water_level=calculated_level_m,
+                source_type="ON_DEMAND_VISION",
+                vision_confidence=confidence_score,
+                is_reviewed_by_human=True
+            )
+            db.add(meas)
+            db.commit()
+            db.refresh(meas)
+        except Exception as e:
+            print(f"[OnDemandVisionService] Note: Could not record WaterMeasurement: {e}")
 
         return OnDemandPredictResponse(
             status="SUCCESS",

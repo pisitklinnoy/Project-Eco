@@ -13,20 +13,26 @@ import {
   Info,
   FileImage,
   Waves,
+  Flag,
 } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
-import type { OnDemandPredictResponse } from '../types';
+import type { OnDemandPredictResponse, Station } from '../types';
+import { getStationFlagInfo } from './CameraViewer';
 import { PillButton } from './ui/PillButton';
 import { IconButton } from './ui/IconButton';
 
 interface OnDemandPredictorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  station?: Station | null;
+  onPredicted?: (result: OnDemandPredictResponse) => void;
 }
 
 export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   isOpen,
   onClose,
+  station,
+  onPredicted,
 }) => {
   // Image & File State
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -46,7 +52,15 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   const [highMeter, setHighMeter] = useState<number>(0.90);
   const [lowMeter, setLowMeter] = useState<number>(0.60);
   const [waterMeter, setWaterMeter] = useState<number | null>(null);
-  const [stationNote, setStationNote] = useState<string>('หาดใหญ่ใน (ตรวจวัดแบบกำหนดเอง)');
+  const [stationNote, setStationNote] = useState<string>(
+    station ? `${station.name} (ตรวจวัดแบบกำหนดเอง)` : 'หาดใหญ่ใน (ตรวจวัดแบบกำหนดเอง)'
+  );
+
+  useEffect(() => {
+    if (station) {
+      setStationNote(`${station.name} (ตรวจวัดแบบกำหนดเอง)`);
+    }
+  }, [station]);
 
   // Drag-to-draw state for Bounding Box
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -478,10 +492,16 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
           })
         );
       }
+      if (station?.station_code) {
+        formData.append('station_code', station.station_code);
+      }
       formData.append('station_note', stationNote);
 
       const res = await floodlensApi.predictCustomImage(formData);
       setPredictionResult(res);
+      if (onPredicted) {
+        onPredicted(res);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการคำนวณระดับน้ำ');
     } finally {
@@ -931,7 +951,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                   </span>
                 </div>
 
-                {/* Primary Water Level Hero Metric */}
+                {/* Primary Water Level Hero Metric with Warning Flag Badge */}
                 <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-white/80 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs text-slate-500 font-bold block">ระดับน้ำที่คำนวณได้</span>
@@ -943,14 +963,29 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                     </div>
                   </div>
 
-                  {predictionResult.scale_cm_per_pixel && (
-                    <div className="text-right">
-                      <span className="text-[11px] text-slate-500 font-semibold block">สเกลภาพ</span>
-                      <span className="text-xs font-black text-slate-800">
-                        {predictionResult.scale_cm_per_pixel.toFixed(2)} ซม./px
+                  <div className="text-right flex flex-col items-end space-y-1.5">
+                    {(() => {
+                      const resFlag = getStationFlagInfo(station ?? null, predictionResult.calculated_water_level_m);
+                      return (
+                        <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl ${resFlag.containerBg} ${resFlag.containerBorder} border shadow-sm select-none`}>
+                          <Flag className={`w-3.5 h-3.5 ${resFlag.flagColorClass}`} />
+                          <span className={`text-xs font-black tracking-tight ${resFlag.flagTextClass}`}>
+                            {resFlag.flagName}
+                          </span>
+                          <span className="text-slate-400 text-xs font-light">|</span>
+                          <span className={`text-[11px] font-bold ${resFlag.flagTextClass}`}>
+                            {resFlag.statusTitle}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {predictionResult.scale_cm_per_pixel && (
+                      <span className="text-[11px] text-slate-500 font-semibold block">
+                        สเกล: {predictionResult.scale_cm_per_pixel.toFixed(2)} ซม./px
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Staff Gauge Cropped Preview with detected waterline */}

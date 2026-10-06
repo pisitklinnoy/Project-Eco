@@ -351,6 +351,26 @@ export const App: React.FC = () => {
       <OnDemandPredictorModal
         isOpen={isOnDemandOpen}
         onClose={() => setIsOnDemandOpen(false)}
+        station={selectedStation}
+        onPredicted={(res) => {
+          const newMeas: WaterMeasurement = {
+            id: Date.now(),
+            station_code: selectedStation?.station_code || 'STN-BANGSALA',
+            timestamp: new Date().toISOString(),
+            water_level: res.calculated_water_level_m,
+            source_type: 'ON_DEMAND_VISION',
+            vision_confidence: res.confidence_score,
+            is_reviewed_by_human: true,
+          };
+          setMeasurement(newMeas);
+          if (selectedStation) {
+            setStationMeasurements((prev) => ({
+              ...prev,
+              [selectedStation.station_code]: newMeas,
+            }));
+          }
+          loadStationData();
+        }}
       />
 
       {/* Mobile Floating Bottom Bar */}

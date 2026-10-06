@@ -15,6 +15,7 @@ async def predict_custom_image(
     point_high: str = Form(..., description='JSON string ของจุดเทียบสเกลสูง เช่น {"x": 120, "y": 70, "actual_meter": 0.90}'),
     point_low: str = Form(..., description='JSON string ของจุดเทียบสเกลต่ำ เช่น {"x": 120, "y": 280, "actual_meter": 0.60}'),
     point_water: Optional[str] = Form(None, description='JSON string ของจุดผิวน้ำที่ผู้ใช้ระบุ เช่น {"x": 120, "y": 180, "actual_meter": 0.75}'),
+    station_code: Optional[str] = Form(None, description="รหัสสถานี เช่น STN-BANGSALA"),
     station_note: Optional[str] = Form("On-Demand Field Inspection", description="บันทึกสถานที่หรือหมายเหตุ"),
     db: Session = Depends(get_db)
 ):
@@ -63,6 +64,7 @@ async def predict_custom_image(
             pt_high=parsed_pt_high,
             pt_low=parsed_pt_low,
             db=db,
+            station_code=station_code,
             station_note=station_note,
             pt_water=parsed_pt_water
         )

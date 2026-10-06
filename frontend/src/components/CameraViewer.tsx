@@ -289,6 +289,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     detected: boolean;
     is_manual?: boolean;
     confidence: number;
+    water_level?: number | null;
     bbox?: number[];
     station_code: string;
     station_name: string;
@@ -305,7 +306,32 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   );
 
   // คำนวณระดับน้ำปัจจุบันและสถานะธงเตือนภัยตามเกณฑ์ของสถานี
-  const currentWaterLevel = measurement ? measurement.water_level : (station?.normal_level ?? 0);
+  // ลำดับความสำคัญ:
+  // 1. หากอยู่ในโหมด ai_dashboard จำลองสถานการณ์ (flood, daytime, nighttime) ให้ใช้ระดับน้ำของสถานการณ์นั้น
+  // 2. หากมีข้อมูล measurement ล่าสุด (จากการวัดรอบใหม่ หรือ On-Demand AI) ให้ใช้ measurement.water_level
+  // 3. หากมี detectionStatus.water_level จากการรันตรวจจับ ให้ใช้ค่านั้น
+  // 4. สำรองด้วย station.normal_level
+  let currentWaterLevel: number;
+  if (viewMode === 'ai_dashboard' && (aiScenario === 'flood' || aiScenario === 'nighttime' || aiScenario === 'daytime')) {
+    if (detectionStatus?.water_level != null) {
+      currentWaterLevel = detectionStatus.water_level;
+    } else if (aiScenario === 'flood') {
+      const code = (station?.station_code || '').toUpperCase();
+      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 16.90 : code.includes('BANGSALA') || code.includes('90') ? 9.80 : 8.50;
+    } else if (aiScenario === 'nighttime') {
+      const code = (station?.station_code || '').toUpperCase();
+      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.40 : code.includes('BANGSALA') || code.includes('90') ? 2.95 : 0.80;
+    } else {
+      const code = (station?.station_code || '').toUpperCase();
+      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.20 : code.includes('BANGSALA') || code.includes('90') ? 2.75 : 0.60;
+    }
+  } else if (measurement?.water_level != null) {
+    currentWaterLevel = measurement.water_level;
+  } else if (detectionStatus?.water_level != null) {
+    currentWaterLevel = detectionStatus.water_level;
+  } else {
+    currentWaterLevel = station?.normal_level ?? 0;
+  }
   const flagInfo = getStationFlagInfo(station, currentWaterLevel);
 
   // Zoom & Pan state

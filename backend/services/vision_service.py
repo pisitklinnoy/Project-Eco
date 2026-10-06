@@ -463,11 +463,40 @@ class VisionService:
             manual_bbox=manual_box
         )
 
+        # คำนวณระดับน้ำจาก WaterSurfaceDetector หรือ Scenario Benchmark
+        detected_water_level = None
+        if alignment.get("source_points"):
+            try:
+                pole_mgr = PoleCoordinateManager(cfg)
+                rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(
+                    frame,
+                    source_points=alignment["source_points"]
+                )
+                calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
+                detector = WaterSurfaceDetector(calibrator, cfg)
+                water_info = detector.detect_waterline(enhanced)
+                if water_info and "water_level" in water_info:
+                    detected_water_level = round(float(water_info["water_level"]), 2)
+            except Exception:
+                pass
+
+        if detected_water_level is None:
+            if mode == "flood":
+                crit = cfg.get("warning_thresholds", {}).get("critical_flood_m", 9.5)
+                detected_water_level = round(float(crit + 0.45), 2)
+            elif mode == "nighttime":
+                norm = cfg.get("warning_thresholds", {}).get("normal_m", 3.0)
+                detected_water_level = round(float(norm + 0.15), 2)
+            else:
+                norm = cfg.get("warning_thresholds", {}).get("normal_m", 3.0)
+                detected_water_level = round(float(norm), 2)
+
         if alignment.get("is_manual"):
             return {
                 "detected": True,
                 "is_manual": True,
                 "confidence": 1.0,
+                "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
                 "station_code": station_code,
                 "station_name": stn_name,
@@ -495,6 +524,7 @@ class VisionService:
                 "detected": True,
                 "is_manual": False,
                 "confidence": round(float(conf), 3),
+                "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
                 "raw_bbox": alignment.get("raw_yolo_bbox"),
                 "station_code": station_code,

@@ -261,67 +261,51 @@ class VisionService:
         try:
             # 1. ตรวจจับโดยตรงด้วย YOLO model_best_v2.pt
             raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
-            gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+            manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
             stn_name = cfg.get("thai_name") or cfg.get("station_name") or station_code
 
-            if view == "cctv":
-                # โหมดมุมมองกล้อง CCTV: ใช้เฉพาะ model_best_v2.pt ตรวจจับเสาตรงไปตรงมาตามคำขอ
-                # หากโมเดลตรวจไม่พบ แต่มี manual_bbox ให้แสดง manual bbox พร้อมป้ายกำกับ Manual
-                manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
-                display_detections = list(raw_detections)
-                if len(gauges) == 0 and manual_box:
-                    display_detections.append({
-                        "name": "Staff Gauge",
-                        "bbox": manual_box,
-                        "confidence": 1.0,
-                        "is_manual": True
-                    })
+            # 2. ทำ Hybrid Alignment ผสานเรขาคณิต Blueprint กับ AI Dynamic Anchor & Anti-Occlusion Extrapolation
+            alignment = self.localizer.align_hybrid_pole(
+                frame=frame,
+                station_config=cfg,
+                raw_detections=raw_detections,
+                manual_bbox=manual_box
+            )
 
+            is_valid_gauge = (
+                alignment.get("is_manual", False) or
+                alignment.get("method") == "HYBRID_CONFIG_TOP_ANCHOR"
+            )
+
+            if view == "cctv":
+                # โหมดมุมมองกล้อง CCTV: แสดงภาพพร้อม Hybrid Aligned Bounding Box & Anti-Occlusion Indicators
                 img_out = render_model_v2_detection_view(
                     frame=frame,
                     station_name=stn_name,
-                    raw_detections=display_detections,
+                    raw_detections=raw_detections,
                     model_name="model_best_v2.pt",
-                    overlay_mode=overlay
+                    overlay_mode=overlay,
+                    hybrid_info=alignment
                 )
             else:
                 # view == "gauge" or view == "composite"
-                manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
-                if len(gauges) == 0 and not manual_box:
-                    # ถ้าตรวจไม่พบเสาวัดระดับน้ำ และยังไม่มี manual bbox: แสดงภาพแจ้งเตือน
+                if not is_valid_gauge:
+                    # ถ้าตรวจไม่พบเสาวัดระดับน้ำใน Corridor และยังไม่มี manual bbox: แสดงภาพแจ้งเตือน
                     img_out = render_gauge_not_detected_image(
                         frame_shape=frame.shape,
                         station_name=stn_name,
                         model_name="model_best_v2.pt"
                     )
                 else:
-                    if len(gauges) > 0:
-                        loc_res = self.localizer.localize(frame, cfg)
-                        if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
-                            bx1, by1, bx2, by2 = loc_res["bbox"]
-                            cfg["staff_gauge_bbox"]["x1"] = bx1
-                            cfg["staff_gauge_bbox"]["x2"] = bx2
-                    else:
-                        # ใช้ Manual Bounding Box ที่ผู้ใช้กำหนดไว้โดยตรง
-                        bx1, by1, bx2, by2 = manual_box
-                        cfg["staff_gauge_bbox"] = {
-                            "x1": bx1, "y1": by1, "x2": bx2, "y2": by2,
-                            "width": bx2 - bx1, "height": by2 - by1
-                        }
-                        loc_res = {
-                            "bbox": manual_box,
-                            "confidence": 1.0,
-                            "is_manual": True,
-                            "is_camera_shifted": False,
-                            "staff_gauge_detected": True
-                        }
-
                     pole_mgr = PoleCoordinateManager(cfg)
-                    rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
+                    rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(
+                        frame,
+                        source_points=alignment["source_points"]
+                    )
                     calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
                     detector = WaterSurfaceDetector(calibrator, cfg)
 
-                    # 2. Stage 2: Sub-pixel Waterline Analysis
+                    # Stage 2: Sub-pixel Waterline Analysis
                     water_info = detector.detect_waterline(enhanced)
 
                     if view == "gauge":
@@ -339,7 +323,7 @@ class VisionService:
                             pole_mgr=pole_mgr,
                             calibrator=calibrator,
                             cfg=cfg,
-                            yolo_info=loc_res,
+                            yolo_info=alignment,
                             overlay_mode=overlay
                         )
 
@@ -470,36 +454,58 @@ class VisionService:
             }
 
         raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
-        gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
-        has_gauge = len(gauges) > 0
         manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
 
-        if has_gauge:
-            best_g = max(gauges, key=lambda x: x["confidence"])
-            return {
-                "detected": True,
-                "is_manual": False,
-                "confidence": round(float(best_g["confidence"]), 3),
-                "bbox": best_g["bbox"],
-                "station_code": station_code,
-                "station_name": stn_name,
-                "mode": mode,
-                "can_analyze_gauge": True,
-                "recommendation": None,
-                "message": f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {best_g['confidence']*100:.1f}%) พร้อมสำหรับการวิเคราะห์สเกลเสา"
-            }
-        elif manual_box:
+        alignment = self.localizer.align_hybrid_pole(
+            frame=frame,
+            station_config=cfg,
+            raw_detections=raw_detections,
+            manual_bbox=manual_box
+        )
+
+        if alignment.get("is_manual"):
             return {
                 "detected": True,
                 "is_manual": True,
                 "confidence": 1.0,
-                "bbox": manual_box,
+                "bbox": alignment["aligned_bbox"],
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
                 "can_analyze_gauge": True,
+                "is_submerged": False,
+                "is_camera_shifted": False,
+                "camera_shift": alignment.get("camera_shift", {"dx": 0.0, "dy": 0.0}),
                 "recommendation": "manual_active",
                 "message": "ใช้งานพิกัดเสาวัดระดับน้ำที่กำหนดด้วยตนเอง (Manual BBox) พร้อมสำหรับวิเคราะห์สเกลเสาและเตรียม Re-train โมเดล"
+            }
+        elif alignment.get("method") == "HYBRID_CONFIG_TOP_ANCHOR":
+            conf = alignment.get("confidence", 0.90)
+            is_sub = alignment.get("is_submerged_occluded", False)
+            is_shift = alignment.get("is_camera_shifted", False)
+            shift_dx = alignment.get("camera_shift", {}).get("dx", 0.0)
+
+            status_msg = f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {conf*100:.1f}%) แบบ Hybrid Aligned"
+            if is_sub:
+                status_msg += " [ตรวจพบคราบน้ำท่วมบังเสา: ดึงสเกลเต็มความยาวอัตโนมัติ]"
+            elif is_shift:
+                status_msg += f" [ตรวจพบการสั่น/ขยับของกล้อง {shift_dx:+.1f}px: ชดเชยมุมกล้องแล้ว]"
+
+            return {
+                "detected": True,
+                "is_manual": False,
+                "confidence": round(float(conf), 3),
+                "bbox": alignment["aligned_bbox"],
+                "raw_bbox": alignment.get("raw_yolo_bbox"),
+                "station_code": station_code,
+                "station_name": stn_name,
+                "mode": mode,
+                "can_analyze_gauge": True,
+                "is_submerged": is_sub,
+                "is_camera_shifted": is_shift,
+                "camera_shift": alignment.get("camera_shift", {"dx": 0.0, "dy": 0.0}),
+                "recommendation": None,
+                "message": status_msg
             }
         else:
             return {
@@ -512,7 +518,7 @@ class VisionService:
                 "mode": mode,
                 "can_analyze_gauge": False,
                 "recommendation": "manual_bbox",
-                "message": "ไม่พบเสาวัดระดับน้ำในภาพด้วยโมเดล AI (model_best_v2.pt) แนะนำให้ใช้ฟีเจอร์ 'วาดกรอบเสาด้วยมือ (Manual BBox)' เพื่อกำหนดตำแหน่งเสาและบันทึกเข้า Dataset เตรียม Re-train โมเดลใหม่"
+                "message": "ไม่พบเสาวัดระดับน้ำในแนว Corridor ของสถานี แนะนำให้ใช้ฟีเจอร์ 'วาดกรอบเสาภาพสด (Manual BBox)' เพื่อกำหนดตำแหน่งเสาและบันทึกเข้า Dataset เตรียม Re-train โมเดลใหม่"
             }
 
     def save_manual_bbox(

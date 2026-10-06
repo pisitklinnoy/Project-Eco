@@ -53,45 +53,55 @@ def build_dashboard(
     scale_y = target_frame_h / float(fh)
 
     # 3. วาดการตรวจจับบนภาพ CCTV: โหมด Polygon vs โหมด กรอบ ROI
-    has_yolo = (yolo_info is not None and yolo_info.get("confidence") is not None and "YOLO" in str(yolo_info.get("method", "")))
+    has_yolo = (yolo_info is not None and yolo_info.get("confidence") is not None and ("YOLO" in str(yolo_info.get("method", "")) or "HYBRID" in str(yolo_info.get("method", ""))))
     yolo_conf = yolo_info.get("confidence", 0.85) if has_yolo else 0.85
     gauge_poly = yolo_info.get("gauge_polygon") if yolo_info else None
+    is_submerged = yolo_info.get("is_submerged_occluded", False) if yolo_info else False
+    is_manual = yolo_info.get("is_manual", False) if yolo_info else False
+    is_shifted = yolo_info.get("is_camera_shifted", False) if yolo_info else False
+    conf_display = f"{yolo_conf*100:.1f}%" if has_yolo else "85.0%"
 
-    # คำนวณพิกัดเสาและระดับน้ำใน frame_resized
-    if station_code == "X.44" and pole_mgr.has_polygon:
-        pts_src = pole_mgr.last_pts_src.copy()
+    # คำนวณพิกัดเสาใน frame_resized จาก source points ล่าสุดที่ผ่าน Hybrid Alignment
+    pts_src = pole_mgr.last_pts_src
+    if pts_src is not None:
         fx1 = int(round(pts_src[:, 0].min() * scale_x))
         fy1 = int(round(pts_src[:, 1].min() * scale_y))
         fx2 = int(round(pts_src[:, 0].max() * scale_x))
         fy2 = int(round(pts_src[:, 1].max() * scale_y))
     else:
-        pts = pole_mgr.last_pts_src
-        fx1, fy1 = int(round(pts[0][0] * scale_x)), int(round(pts[0][1] * scale_y))
-        fx2, fy2 = int(round(pts[2][0] * scale_x)), int(round(pts[2][1] * scale_y))
+        bb = cfg.get("staff_gauge_bbox", {"x1": 100, "y1": 100, "x2": 200, "y2": 500})
+        fx1 = int(round(bb["x1"] * scale_x))
+        fy1 = int(round(bb["y1"] * scale_y))
+        fx2 = int(round(bb["x2"] * scale_x))
+        fy2 = int(round(bb["y2"] * scale_y))
 
-    # คำนวณ water_y_frame
-    if station_code == "X.44" and pole_mgr.has_polygon:
-        rect_h = cfg.get("rectified_roi", {}).get("height", 1120)
-        enh_h = cfg.get("enhanced_roi", {}).get("height", 2240)
-        rect_w = cfg.get("rectified_roi", {}).get("width", 40)
-        poly = cfg.get("staff_gauge_polygon", {})
-        p_src = np.float32([poly["top_left"], poly["top_right"], poly["bottom_right"], poly["bottom_left"]])
-        p_dst = np.float32([[0, 0], [rect_w, 0], [rect_w, rect_h], [0, rect_h]])
-        M_inv = np.linalg.inv(cv2.getPerspectiveTransform(p_src, p_dst))
-        y_rect = float(water_y) * (float(rect_h) / float(enh_h))
-        pt_rect_center = np.array([[[float(rect_w) / 2.0, y_rect]]], dtype=np.float32)
-        frame_pt = cv2.perspectiveTransform(pt_rect_center, M_inv)[0][0]
-        water_x_frame = int(round(frame_pt[0] * scale_x))
-        water_y_frame = int(round(frame_pt[1] * scale_y))
-    else:
+    # คำนวณ water_x_frame, water_y_frame ผ่าน Inverse Homography Transform ของ pole_mgr โดยตรง
+    try:
+        cctv_x, cctv_y = pole_mgr.transform_gauge_to_cctv(pole_mgr.enh_w / 2.0, water_y)
+        water_x_frame = int(round(cctv_x * scale_x))
+        water_y_frame = int(round(cctv_y * scale_y))
+    except Exception:
         norm_y = water_y / float(gh)
         water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
         water_x_frame = int(round((fx1 + fx2) / 2.0))
 
+    if is_manual:
+        label_text = f"Manual BBox: Staff Gauge {station_code}"
+    elif is_submerged:
+        label_text = f"Hybrid: Extrapolated {station_code} ({conf_display})"
+    elif is_shifted:
+        label_text = f"Hybrid: Shift Aligned {station_code} ({conf_display})"
+    elif has_yolo:
+        label_text = f"Hybrid Aligned: Staff Gauge {station_code} ({conf_display})"
+    else:
+        label_text = f"ROI: Staff Gauge {station_code}"
+
     if overlay_mode == "polygon":
-        # 3.1 โหมด Polygon (YOLOv8-Seg)
+        # 3.1 โหมด Polygon (YOLOv8-Seg / 4-Point Homography Source)
         if gauge_poly is not None and len(gauge_poly) >= 3:
             g_scaled = (gauge_poly * np.array([scale_x, scale_y])).astype(np.int32)
+        elif pts_src is not None and len(pts_src) == 4:
+            g_scaled = (pts_src * np.array([scale_x, scale_y])).astype(np.int32).reshape(-1, 1, 2)
         else:
             # กรณีสภาพแสงมืดหรือกล้องอินฟราเรด สร้าง Polygon เสาส่วนที่โผล่เหนือน้ำถึงผิวน้ำจริง
             g_scaled = np.array([
@@ -107,8 +117,6 @@ def build_dashboard(
         cv2.polylines(frame_resized, [g_scaled], True, (0, 255, 0), 2, cv2.LINE_AA)
 
         min_gpt = g_scaled.reshape(-1, 2).min(axis=0)
-        conf_display = f"{yolo_conf*100:.1f}%" if has_yolo else "85.0%"
-        label_text = f"YOLOv8-Seg: Staff Gauge ({conf_display})"
         (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
         g_bx = max(10, int(min_gpt[0]))
         g_by = max(th + 14, int(min_gpt[1]))
@@ -119,7 +127,6 @@ def build_dashboard(
     else:
         # 3.2 โหมด กรอบ ROI (Rectangular Bounding Box)
         cv2.rectangle(frame_resized, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
-        label_text = f"ROI: Staff Gauge {station_code}"
         (tw, th), base = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
         badge_y1 = max(0, fy1 - th - base - 10)
         cv2.rectangle(frame_resized, (fx1 - 1, badge_y1), (fx1 + tw + 14, fy1), (0, 200, 0), -1)
@@ -127,15 +134,11 @@ def build_dashboard(
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
 
     # 3.3 วาดเส้นระดับน้ำสีส้มบนแม่น้ำ
-    if station_code == "X.44" and pole_mgr.has_polygon:
-        line_x1 = max(0, water_x_frame - 160)
-        line_x2 = min(target_frame_w, water_x_frame + 200)
-        cv2.line(frame_resized, (line_x1, water_y_frame), (line_x2, water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
-        cv2.putText(frame_resized, f"Water: {water_level:.2f} m", (line_x2 + 8, water_y_frame + 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 140, 255), 2, cv2.LINE_AA)
-    else:
-        cv2.line(frame_resized, (max(0, fx1 - 50), water_y_frame),
-                 (min(target_frame_w, fx2 + 70), water_y_frame), (0, 140, 255), 3, cv2.LINE_AA)
+    line_x1 = max(0, water_x_frame - 160)
+    line_x2 = min(target_frame_w, water_x_frame + 200)
+    cv2.line(frame_resized, (line_x1, water_y_frame), (line_x2, water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
+    cv2.putText(frame_resized, f"Water: {water_level:.2f} m", (min(target_frame_w - 200, line_x2 + 8), water_y_frame + 5),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 140, 255), 2, cv2.LINE_AA)
 
     # 4. แถบ Header Banner สีดำด้านบน
     banner_h = 100
@@ -223,41 +226,50 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
     water_y = water_info["water_y"]
 
     # 1. พิกัดเสา
-    if station_code == "X.44" and pole_mgr.has_polygon:
-        pts_src = pole_mgr.last_pts_src.copy()
+    if pole_mgr.last_pts_src is not None:
+        pts_src = pole_mgr.last_pts_src
         fx1 = int(round(pts_src[:, 0].min()))
         fy1 = int(round(pts_src[:, 1].min()))
         fx2 = int(round(pts_src[:, 0].max()))
         fy2 = int(round(pts_src[:, 1].max()))
+    elif yolo_info and "aligned_bbox" in yolo_info and yolo_info["aligned_bbox"]:
+        fx1, fy1, fx2, fy2 = yolo_info["aligned_bbox"]
+    elif yolo_info and "bbox" in yolo_info and yolo_info["bbox"]:
+        fx1, fy1, fx2, fy2 = yolo_info["bbox"]
     else:
-        if yolo_info and "bbox" in yolo_info and yolo_info["bbox"]:
-            fx1, fy1, fx2, fy2 = yolo_info["bbox"]
-        elif pole_mgr.last_pts_src is not None:
-            pts = pole_mgr.last_pts_src
-            fx1, fy1 = int(round(pts[0][0])), int(round(pts[0][1]))
-            fx2, fy2 = int(round(pts[2][0])), int(round(pts[2][1]))
-        else:
-            bb = cfg.get("staff_gauge_bbox", {"x1": 100, "y1": 100, "x2": 200, "y2": 500})
-            fx1, fy1, fx2, fy2 = bb["x1"], bb["y1"], bb["x2"], bb["y2"]
+        bb = cfg.get("staff_gauge_bbox", {"x1": 100, "y1": 100, "x2": 200, "y2": 500})
+        fx1, fy1, fx2, fy2 = bb["x1"], bb["y1"], bb["x2"], bb["y2"]
 
-    has_yolo = (yolo_info is not None and yolo_info.get("confidence") is not None and "YOLO" in str(yolo_info.get("method", "")))
+    has_yolo = (yolo_info is not None and yolo_info.get("confidence") is not None and ("YOLO" in str(yolo_info.get("method", "")) or "HYBRID" in str(yolo_info.get("method", ""))))
     yolo_conf = yolo_info.get("confidence", 0.90) if has_yolo else 0.90
     conf_display = f"{yolo_conf*100:.1f}%" if has_yolo else "92.0%"
+    is_submerged = yolo_info.get("is_submerged_occluded", False) if yolo_info else False
+    is_manual = yolo_info.get("is_manual", False) if yolo_info else False
+    is_shifted = yolo_info.get("is_camera_shifted", False) if yolo_info else False
 
     # 2. วาดกรอบ Bounding Box (สีเขียว หนา 3-4 px ชัดเจน ไม่รกตา)
     if overlay_mode == "none":
         return out
 
-    if overlay_mode == "polygon" and yolo_info and yolo_info.get("gauge_polygon") is not None:
-        g_poly = yolo_info["gauge_polygon"].astype(np.int32)
+    if is_manual:
+        badge_title = "Manual BBox: Staff Gauge"
+    elif is_submerged:
+        badge_title = f"Hybrid: Extrapolated ({conf_display})"
+    elif is_shifted:
+        badge_title = f"Hybrid: Shift Aligned ({conf_display})"
+    elif has_yolo:
+        badge_title = f"Hybrid Aligned: Staff Gauge ({conf_display})"
+    else:
+        badge_title = f"ROI: Staff Gauge"
+
+    if overlay_mode == "polygon" and pole_mgr.last_pts_src is not None and len(pole_mgr.last_pts_src) == 4:
+        g_poly = pole_mgr.last_pts_src.astype(np.int32)
         overlay_g = out.copy()
         cv2.fillPoly(overlay_g, [g_poly], (0, 255, 0))
         cv2.addWeighted(overlay_g, 0.25, out, 0.75, 0, out)
         cv2.polylines(out, [g_poly], True, (0, 255, 0), 3, cv2.LINE_AA)
-        badge_title = f"YOLOv8-Seg: Staff Gauge ({conf_display})"
     else:
         cv2.rectangle(out, (fx1, fy1), (fx2, fy2), (0, 255, 0), 3)
-        badge_title = f"YOLO: Staff Gauge ({conf_display})"
 
     # Badge เหนือเสา
     (tw, th), base = cv2.getTextSize(badge_title, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
@@ -267,13 +279,19 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2, cv2.LINE_AA)
 
     # 3. วาดเส้นระดับน้ำสีส้มบนแม่น้ำ
-    enh_h = cfg.get("enhanced_roi", {}).get("height", 2000)
-    norm_y = water_y / float(enh_h)
-    water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
+    try:
+        cctv_x, cctv_y = pole_mgr.transform_gauge_to_cctv(pole_mgr.enh_w / 2.0, water_y)
+        water_x_frame = int(round(cctv_x))
+        water_y_frame = int(round(cctv_y))
+    except Exception:
+        enh_h = cfg.get("enhanced_roi", {}).get("height", 2000)
+        norm_y = water_y / float(enh_h)
+        water_y_frame = int(round(fy1 + norm_y * (fy2 - fy1)))
+        water_x_frame = int(round((fx1 + fx2) / 2.0))
 
-    cv2.line(out, (max(0, fx1 - 120), water_y_frame), (min(fw, fx2 + 160), water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
+    cv2.line(out, (max(0, water_x_frame - 140), water_y_frame), (min(fw, water_x_frame + 180), water_y_frame), (0, 140, 255), 4, cv2.LINE_AA)
     water_str = f"Water: {water_level:.2f} m"
-    cv2.putText(out, water_str, (min(fw - 260, fx2 + 170), water_y_frame + 8),
+    cv2.putText(out, water_str, (min(fw - 260, water_x_frame + 190), water_y_frame + 8),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 140, 255), 2, cv2.LINE_AA)
 
     # 4. ป้ายกำกับล่างซ้าย
@@ -288,36 +306,106 @@ def render_model_v2_detection_view(
     station_name: str,
     raw_detections: list,
     model_name: str = "model_best_v2.pt",
-    overlay_mode: str = "bbox"
+    overlay_mode: str = "bbox",
+    hybrid_info: dict = None
 ) -> np.ndarray:
     """
-    เรนเดอร์เฉพาะผลการตรวจจับจากโมเดล YOLO (model_best_v2.pt) แบบตรงไปตรงมา
-    เพื่อแสดงให้เห็นชัดเจนว่าโมเดลหาเสาวัดระดับน้ำเจอมั้ย และตรวจจับผิวน้ำได้ที่ไหนบ้าง
-    ไม่มีการวาดกรอบจำลอง fallback หรือค่าพิกัดคงที่
+    เรนเดอร์ผลการตรวจจับเสาวัดน้ำแบบ Hybrid Aligned ระหว่างโมเดล YOLO และพิกัดโครงสร้าง Config
+    - ยึดหัวเสา (Top-Cap Anchor) และชดเชยการเลื่อนของกล้อง (Camera Shift)
+    - Anti-Occlusion Extrapolation: ดึงสเกลเต็มเสาลงสู่ใต้น้ำเมื่อเกิดน้ำท่วมบังเสาท่อนล่าง
+    - คัดกรองและติดป้าย AI Noise สำรวจจุดตรวจจับนอก Corridor ของเสา
     """
     out = frame.copy()
 
-    gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+    # กรณีมี hybrid_info ส่งเข้ามา
+    if hybrid_info:
+        method = hybrid_info.get("method", "")
+        is_manual = hybrid_info.get("is_manual", False)
+        is_submerged = hybrid_info.get("is_submerged_occluded", False)
+        is_shifted = hybrid_info.get("is_camera_shifted", False)
+        conf = hybrid_info.get("confidence", 0.90)
+        shift = hybrid_info.get("camera_shift", {})
+        dx = shift.get("dx", 0.0)
+        ax1, ay1, ax2, ay2 = hybrid_info["aligned_bbox"]
+        raw_box = hybrid_info.get("raw_yolo_bbox")
 
-    # 1. วาดเฉพาะ Bounding Box ของเสาวัดน้ำ (Staff Gauge) เท่านั้น
-    # ไม่วาด polygon หรือ bounding box ของผิวน้ำ (Water-Area) ตามข้อกำหนด
+        # 1. วาดกล่องเสา Staff Gauge หลักที่ Aligned แล้ว
+        if is_manual:
+            box_color = (0, 165, 255)  # Amber
+            badge_txt = "Staff Gauge: Manual BBox (Dataset Saved)"
+            badge_bg = (0, 120, 220)
+        elif is_submerged:
+            box_color = (0, 255, 120)  # Emerald
+            badge_txt = f"Staff Gauge: Extrapolated (Submerged) {conf*100:.1f}%"
+            badge_bg = (0, 140, 70)
+        elif is_shifted:
+            box_color = (0, 255, 120)
+            badge_txt = f"Staff Gauge: Shift Aligned (dx:{dx:+.0f}px) {conf*100:.1f}%"
+            badge_bg = (0, 150, 60)
+        elif method == "HYBRID_CONFIG_TOP_ANCHOR":
+            box_color = (0, 255, 120)
+            badge_txt = f"Staff Gauge: Hybrid Aligned ({conf*100:.1f}%)"
+            badge_bg = (0, 160, 60)
+        else:
+            # CONFIG_GEOMETRY_BASELINE
+            box_color = (0, 200, 255)
+            badge_txt = "Staff Gauge: Config Baseline (AI Search Failed)"
+            badge_bg = (0, 120, 200)
+
+        # วาดกรอบเสาหลัก
+        cv2.rectangle(out, (ax1, ay1), (ax2, ay2), box_color, 3)
+
+        # Corner brackets สำหรับความคมชัดแบบโมเดิร์น
+        c_len = min(20, max(6, (ax2 - ax1) // 3))
+        cv2.line(out, (ax1, ay1), (ax1 + c_len, ay1), (255, 255, 255), 4)
+        cv2.line(out, (ax1, ay1), (ax1, ay1 + c_len), (255, 255, 255), 4)
+        cv2.line(out, (ax2, ay2), (ax2 - c_len, ay2), (255, 255, 255), 4)
+        cv2.line(out, (ax2, ay2), (ax2, ay2 - c_len), (255, 255, 255), 4)
+
+        # หากมีน้ำท่วมบังเสา: แสดงพื้นที่ต่อยอดสเกลลงใต้น้ำ
+        if is_submerged and raw_box:
+            ry2 = raw_box[3]
+            if ay2 > ry2:
+                overlay_sub = out.copy()
+                cv2.rectangle(overlay_sub, (ax1, ry2), (ax2, ay2), (0, 180, 255), -1)
+                cv2.addWeighted(overlay_sub, 0.25, out, 0.75, 0, out)
+                cv2.putText(out, "[Scale Extrapolated Below Waterline]", (ax1 + 4, min(out.shape[0] - 10, ay2 - 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 220, 255), 1, cv2.LINE_AA)
+
+        # Badge เหนือหัวเสา
+        (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
+        by_top = max(0, ay1 - th - 12)
+        cv2.rectangle(out, (ax1 - 2, by_top), (ax1 + tw + 16, ay1), badge_bg, -1)
+        cv2.putText(out, badge_txt, (ax1 + 6, ay1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
+
+        # 2. คัดกรองกล่อง AI ตรวจจับอื่นที่อยู่นอก Corridor (เช่น ราวสะพานมุมบน) และติดป้าย Filtered
+        for d in raw_detections:
+            if d.get("name") == "Staff Gauge":
+                g_box = d.get("bbox")
+                if g_box and g_box != raw_box and not d.get("is_manual"):
+                    gx1, gy1, gx2, gy2 = g_box
+                    cv2.rectangle(out, (gx1, gy1), (gx2, gy2), (100, 100, 200), 1, cv2.LINE_AA)
+                    cv2.putText(out, "[Filtered: Outside Corridor]", (gx1 + 2, max(14, gy1 - 5)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 220), 1, cv2.LINE_AA)
+
+        return out
+
+    # Fallback กรณีไม่มี hybrid_info (คงพฤติกรรมเดิม)
+    gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
     for g in gauges:
         bx1, by1, bx2, by2 = g["bbox"]
         conf = g.get("confidence", 0.0)
         is_manual = g.get("is_manual", False)
 
-        # วาดกรอบสี่เหลี่ยม Bounding Box (สีส้มทองถ้า Manual, สีเขียวถ้า AI)
         box_color = (0, 165, 255) if is_manual else (0, 255, 100)
         cv2.rectangle(out, (bx1, by1), (bx2, by2), box_color, 3)
 
-        # เพิ่ม Corner brackets สำหรับความคมชัด
         c_len = min(20, max(6, (bx2 - bx1) // 3))
         cv2.line(out, (bx1, by1), (bx1 + c_len, by1), (255, 255, 255), 4)
         cv2.line(out, (bx1, by1), (bx1, by1 + c_len), (255, 255, 255), 4)
         cv2.line(out, (bx2, by2), (bx2 - c_len, by2), (255, 255, 255), 4)
         cv2.line(out, (bx2, by2), (bx2, by2 - c_len), (255, 255, 255), 4)
 
-        # Badge กำกับเสา
         badge_txt = "Staff Gauge: Manual (Dataset Saved)" if is_manual else f"Staff Gauge: {conf*100:.1f}%"
         badge_bg = (0, 120, 220) if is_manual else (0, 160, 60)
         (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)

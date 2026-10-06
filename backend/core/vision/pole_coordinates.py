@@ -73,9 +73,13 @@ class PoleCoordinateManager:
 
         return pts
 
-    def compute_homography_matrices(self, frame_shape):
+    def compute_homography_matrices(self, frame_shape, custom_source_points=None):
         """คำนวณเมทริกซ์การแปลงมุมมอง Homography (M) และ Inverse Transform (M^-1)"""
-        pts_src = self.get_source_points(frame_shape)
+        if custom_source_points is not None:
+            pts_src = np.float32(custom_source_points)
+        else:
+            pts_src = self.get_source_points(frame_shape)
+
         pts_dst = np.float32([
             [0, 0],
             [self.rect_w, 0],
@@ -88,14 +92,15 @@ class PoleCoordinateManager:
         self.last_pts_src = pts_src
         return self.M, self.M_inv, pts_src
 
-    def extract_and_rectify(self, frame):
+    def extract_and_rectify(self, frame, source_points=None):
         """
         ดัดมุมมองเสาวัดน้ำและปรับปรุงคุณภาพความคมชัด (Rectify + CLAHE + Unsharp Masking)
+        รองรับการส่ง source_points ที่ผ่านการทำ Hybrid Alignment (Top-Cap Anchor + Height Extrapolation)
         ส่งคืน: (rectified_roi, enhanced_roi, pts_src)
         """
-        self.compute_homography_matrices(frame.shape)
+        self.compute_homography_matrices(frame.shape, custom_source_points=source_points)
 
-        if self.has_polygon:
+        if self.has_polygon or source_points is not None:
             rectified = cv2.warpPerspective(frame, self.M, (self.rect_w, self.rect_h))
             upscaled = cv2.resize(rectified, (self.enh_w, self.enh_h), interpolation=cv2.INTER_LANCZOS4)
             lab = cv2.cvtColor(upscaled, cv2.COLOR_BGR2LAB)
@@ -132,14 +137,14 @@ class PoleCoordinateManager:
         x_rect = float(x_enhanced) / float(self.enh_w) * float(self.rect_w)
         y_rect = float(y_enhanced) / float(self.enh_h) * float(self.rect_h)
 
-        if self.has_polygon:
+        if self.M_inv is not None:
             pt_rect = np.array([[[x_rect, y_rect]]], dtype=np.float32)
             pt_frame = cv2.perspectiveTransform(pt_rect, self.M_inv)
             fx = float(pt_frame[0, 0, 0])
             fy = float(pt_frame[0, 0, 1])
             return fx, fy
         else:
-            # กรณี BBox
+            # Fallback กรณี BBox หาก M_inv ยังไม่ถูกคำนวณ
             pts = self.last_pts_src
             x1, y1 = pts[0][0], pts[0][1]
             x2, y2 = pts[2][0], pts[2][1]

@@ -338,3 +338,194 @@ class StaffGaugeAutoLocalizer:
             "water_area_bbox": None,
             "waterline_hint_y": None
         }
+
+    def align_hybrid_pole(
+        self,
+        frame: np.ndarray,
+        station_config: Dict[str, Any],
+        raw_detections: Optional[List[Dict[str, Any]]] = None,
+        manual_bbox: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        """
+        ระบบ Hybrid Alignment ผสานเรขาคณิตจาก Config เข้ากับการตรวจจับ Real-time ของ AI:
+        1. Top-Cap Anchor: ยึดหัวเสา (Top-Y) และแนวกึ่งกลาง (Center-X)
+        2. Dynamic Shift Compensation: คำนวณการเลื่อนของมุมกล้อง (dx, dy)
+        3. Height Extrapolation (Anti-Occlusion): หากน้ำท่วมบังเสาท่อนล่าง จะดึงสเกลเต็มความยาวจาก Config ลงไปใต้น้ำ
+        4. Perspective Polygon Tracking: สำหรับสถานีที่มีความเอียง (Homography)
+        """
+        fh, fw = frame.shape[:2]
+        ref_res = station_config.get("reference_frame_resolution", [fw, fh])
+        ref_w, ref_h = float(ref_res[0]), float(ref_res[1])
+        scale_x = fw / ref_w
+        scale_y = fh / ref_h
+
+        has_poly = "staff_gauge_polygon" in station_config
+        has_bbox = "staff_gauge_bbox" in station_config
+
+        # คำนวณพิกัด Baseline Geometry จาก Config
+        if has_poly:
+            poly = station_config["staff_gauge_polygon"]
+            ref_tl = [poly["top_left"][0] * scale_x, poly["top_left"][1] * scale_y]
+            ref_tr = [poly["top_right"][0] * scale_x, poly["top_right"][1] * scale_y]
+            ref_br = [poly["bottom_right"][0] * scale_x, poly["bottom_right"][1] * scale_y]
+            ref_bl = [poly["bottom_left"][0] * scale_x, poly["bottom_left"][1] * scale_y]
+            base_pts = np.float32([ref_tl, ref_tr, ref_br, ref_bl])
+            ref_x1 = min(ref_tl[0], ref_bl[0])
+            ref_x2 = max(ref_tr[0], ref_br[0])
+            ref_y1 = min(ref_tl[1], ref_tr[1])
+            ref_y2 = max(ref_bl[1], ref_br[1])
+        elif has_bbox:
+            bb = station_config["staff_gauge_bbox"]
+            ref_x1 = bb["x1"] * scale_x
+            ref_y1 = bb["y1"] * scale_y
+            ref_x2 = bb["x2"] * scale_x
+            ref_y2 = bb["y2"] * scale_y
+            base_pts = np.float32([
+                [ref_x1, ref_y1],
+                [ref_x2, ref_y1],
+                [ref_x2, ref_y2],
+                [ref_x1, ref_y2]
+            ])
+        else:
+            ref_x1, ref_y1, ref_x2, ref_y2 = fw * 0.45, fh * 0.2, fw * 0.55, fh * 0.8
+            base_pts = np.float32([[ref_x1, ref_y1], [ref_x2, ref_y1], [ref_x2, ref_y2], [ref_x1, ref_y2]])
+
+        ref_cx = (ref_x1 + ref_x2) / 2.0
+        base_h = ref_y2 - ref_y1
+        base_w = ref_x2 - ref_x1
+
+        # กรณีมี Manual BBox ที่ผู้ใช้วาดโดยตรง
+        if manual_bbox and len(manual_bbox) == 4:
+            mx1, my1, mx2, my2 = manual_bbox
+            mcx = (mx1 + mx2) / 2.0
+            mw = max(4, mx2 - mx1)
+            mh = max(10, my2 - my1)
+            dx = mcx - ref_cx
+            dy = my1 - ref_y1
+
+            if has_poly:
+                aligned_pts = base_pts.copy()
+                aligned_pts[:, 0] += dx
+                aligned_pts[:, 1] += dy
+            else:
+                aligned_pts = np.float32([
+                    [mx1, my1],
+                    [mx2, my1],
+                    [mx2, my2],
+                    [mx1, my2]
+                ])
+
+            return {
+                "aligned_bbox": [int(mx1), int(my1), int(mx2), int(my2)],
+                "source_points": aligned_pts,
+                "camera_shift": {"dx": round(float(dx), 1), "dy": round(float(dy), 1)},
+                "is_camera_shifted": abs(dx) > 3.0 or abs(dy) > 3.0,
+                "is_submerged_occluded": False,
+                "is_manual": True,
+                "detected_height_px": int(mh),
+                "structural_height_px": int(mh),
+                "confidence": 1.0,
+                "method": "MANUAL_BBOX_ALIGNMENT",
+                "raw_yolo_bbox": manual_bbox
+            }
+
+        # ดึงผลตรวจจับของ YOLO
+        if raw_detections is None:
+            raw_detections = self.detect_raw(frame, conf_thresh=0.12)
+
+        gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+
+        best_g = None
+        best_score = -999.0
+        max_corridor = max(250.0, base_w * 4.5)
+
+        for g in gauges:
+            gx1, gy1, gx2, gy2 = g["bbox"]
+            gcx = (gx1 + gx2) / 2.0
+            gw = max(1, gx2 - gx1)
+            gh = max(1, gy2 - gy1)
+            aspect = gh / float(gw)
+            dist_x = abs(gcx - ref_cx)
+
+            # กรองกล่องที่หลอนหรืออยู่ไกลเกินขอบเขตเสาจริง
+            if dist_x < max_corridor and aspect >= 1.1:
+                # ให้คะแนนความน่าจะเป็นเสา: ยิ่งใกล้แกนเสาเดิมและ confidence สูง ยิ่งได้คะแนนมาก
+                proximity_score = 1.0 - (dist_x / max_corridor)
+                score = g.get("confidence", 0.5) * 1.5 + proximity_score * 1.0
+                if score > best_score:
+                    best_score = score
+                    best_g = g
+
+        if best_g is not None:
+            bx1, gy1, bx2, gy2 = best_g["bbox"]
+            gcx = (bx1 + bx2) / 2.0
+            det_h = gy2 - gy1
+
+            # 1. การเลื่อนของกล้องในแนวราบ (dx) และแนวดิ่งของหัวเสา (dy)
+            dx = gcx - ref_cx
+            dy_top = gy1 - ref_y1
+
+            dx_clamped = float(np.clip(dx, -250.0, 250.0))
+            dy_clamped = float(np.clip(dy_top, -150.0, 150.0))
+
+            # 2. ยึดหัวเสา (Top-Cap Anchor)
+            aligned_y1 = ref_y1 + dy_clamped
+
+            # 3. ตรวจจับการถูกน้ำท่วมบังเสา (Water Submergence Occlusion Check)
+            # ถ้าน้ำท่วมบังเสาท่อนล่าง det_h จะหดสั้นกว่าความสูงจริง base_h
+            is_submerged = (det_h < base_h * 0.85)
+
+            if is_submerged:
+                # ต่อยอดความยาวเสาเต็มต้น (Extrapolate) ลงไปใต้น้ำตามเรขาคณิตของ Config
+                aligned_y2 = aligned_y1 + base_h
+            else:
+                aligned_y2 = aligned_y1 + max(det_h, base_h)
+
+            aligned_x1 = int(round(gcx - base_w / 2.0))
+            aligned_x2 = int(round(gcx + base_w / 2.0))
+            aligned_y1 = int(round(aligned_y1))
+            aligned_y2 = int(round(aligned_y2))
+
+            # ปรับพิกัด 4 จุดสำหรับดัดมุมมอง (Homography Source Points)
+            if has_poly:
+                aligned_pts = base_pts.copy()
+                aligned_pts[:, 0] += dx_clamped
+                aligned_pts[:, 1] += dy_clamped
+            else:
+                aligned_pts = np.float32([
+                    [aligned_x1, aligned_y1],
+                    [aligned_x2, aligned_y1],
+                    [aligned_x2, aligned_y2],
+                    [aligned_x1, aligned_y2]
+                ])
+
+            return {
+                "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                "source_points": aligned_pts,
+                "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
+                "is_camera_shifted": abs(dx_clamped) > 3.0 or abs(dy_clamped) > 3.0,
+                "is_submerged_occluded": is_submerged,
+                "is_manual": False,
+                "detected_height_px": int(det_h),
+                "structural_height_px": int(base_h),
+                "confidence": float(best_g["confidence"]),
+                "method": "HYBRID_CONFIG_TOP_ANCHOR",
+                "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)]
+            }
+
+        # Fallback: กรณี YOLO ไม่พบเสาใน Corridor หรือโมเดลหลอน ให้ใช้แม่พิมพ์ Config ที่ปรับสเกล
+        aligned_pts = base_pts.copy()
+        aligned_bbox = [int(round(ref_x1)), int(round(ref_y1)), int(round(ref_x2)), int(round(ref_y2))]
+        return {
+            "aligned_bbox": aligned_bbox,
+            "source_points": aligned_pts,
+            "camera_shift": {"dx": 0.0, "dy": 0.0},
+            "is_camera_shifted": False,
+            "is_submerged_occluded": False,
+            "is_manual": False,
+            "detected_height_px": int(base_h),
+            "structural_height_px": int(base_h),
+            "confidence": 0.85,
+            "method": "CONFIG_GEOMETRY_BASELINE",
+            "raw_yolo_bbox": None
+        }

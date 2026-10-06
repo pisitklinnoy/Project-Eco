@@ -53,7 +53,6 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   const actualDataset = timeline.map(t => byTime.get(t) ?? null);
   const forecastValues = [forecast?.context_json?.current_level_m ?? null, forecast?.predicted_1h ?? null, forecast?.predicted_2h ?? null, forecast?.predicted_3h ?? null];
   const forecastDataset = timeline.map((_, i) => forecast && i >= 24 ? forecastValues[i - 24] : null);
-  const historyValues = actualDataset.filter((value): value is number => value !== null);
 
   const data = {
     labels: allLabels,
@@ -116,7 +115,8 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       y: {
         grid: { color: 'rgba(226, 232, 240, 0.6)' },
         ticks: { color: '#64748b', font: { size: 10, weight: 'bold' as const } },
-        suggestedMin: historyValues.length ? Math.min(...historyValues) - 0.5 : undefined,
+        beginAtZero: true,
+        min: 0,
       },
     },
   };

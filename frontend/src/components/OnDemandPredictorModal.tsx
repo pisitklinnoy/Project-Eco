@@ -98,7 +98,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
 
   // Scale Inputs (Meters)
   const [highMeter, setHighMeter] = useState<number>(1.00);
-  const [lowMeter, setLowMeter] = useState<number>(0.50);
+  const [lowMeter, setLowMeter] = useState<number>(0.00);
   const [stationNote, setStationNote] = useState<string>(
     station ? `${station.name} (ตรวจทานโดยมนุษย์)` : 'หาดใหญ่ใน (ตรวจทานโดยมนุษย์)'
   );
@@ -735,7 +735,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                     : !pointHigh
                     ? '👉 คลิกขีดตัวเลขบนเสา (P1 เช่น 1.00 ม.)'
                     : !pointLow
-                    ? '👉 คลิกขีดตัวเลขล่างเสา (P2 เช่น 0.50 ม.)'
+                    ? '👉 คลิกขีดตัวเลขล่างเสา (P2 เช่น 0.00 ม.)'
                     : '✅ ปักหมุด P1 และ P2 เรียบร้อยแล้ว พร้อมส่งผลเข้า Label Studio'}
                 </span>
               </div>
@@ -1273,6 +1273,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                     <input
                       type="number"
                       step="0.05"
+                      min="0"
                       value={lowMeter}
                       onChange={(e) => setLowMeter(parseFloat(e.target.value) || 0)}
                       className="w-20 px-2 py-1 text-xs font-bold bg-white rounded-lg border border-slate-300 text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-amber-500"

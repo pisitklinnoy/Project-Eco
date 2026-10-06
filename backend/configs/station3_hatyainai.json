@@ -33,7 +33,8 @@
     [3.00, 1350],
     [2.00, 1600],
     [1.00, 1860],
-    [0.60, 2140]
+    [0.60, 2140],
+    [0.00, 2240]
   ],
   "unit": "meters",
   "datum": "R.T.K.",
@@ -42,7 +43,7 @@
     "warning_m": 5.5,
     "critical_flood_m": 6.0
   },
-  "baseline_water_level_m": 0.60,
-  "baseline_water_y_px": 2140,
+  "baseline_water_level_m": 0.0,
+  "baseline_water_y_px": 2240,
   "calibration_bias_m": 0.0
 }

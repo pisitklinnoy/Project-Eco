@@ -34,7 +34,8 @@ class PiecewiseScaleCalibrator:
         # กรณีอยู่ใต้จุดอ้างอิงล่างสุด (< ต่ำสุด)
         if y >= self.anchors[-1][1]:
             ppm = (self.anchors[-1][1] - self.anchors[-2][1]) / (self.anchors[-2][0] - self.anchors[-1][0])
-            return float(self.anchors[-1][0] - (y - self.anchors[-1][1]) / max(ppm, 1e-6))
+            calc = float(self.anchors[-1][0] - (y - self.anchors[-1][1]) / max(ppm, 1e-6))
+            return max(0.0, calc)
 
         # กรณีอยู่ระหว่างช่วงเมตรต่างๆ (Piecewise Linear Interpolation)
         for i in range(len(self.anchors) - 1):
@@ -42,9 +43,9 @@ class PiecewiseScaleCalibrator:
             lvl_bot, y_bot = self.anchors[i + 1]
             if y_top <= y <= y_bot:
                 frac = (y - y_top) / float(y_bot - y_top)
-                return float(lvl_top - frac * (lvl_top - lvl_bot))
+                return max(0.0, float(lvl_top - frac * (lvl_top - lvl_bot)))
 
-        return float(self.anchors[-1][0])
+        return max(0.0, float(self.anchors[-1][0]))
 
     def level_to_pixel(self, level: float, target_h: int = None) -> int:
         """แปลงระดับน้ำ (เมตร) เป็นพิกัดพิกเซล Y บน Enhanced ROI"""
@@ -91,11 +92,9 @@ class PiecewiseScaleCalibrator:
         canvas[:] = (26, 26, 26)
         canvas[:, :w] = image
 
-        min_lvl = min(a[0] for a in self.anchors)
+        # ขอบเขตระดับน้ำสำหรับวาดสเกล เริ่มต้นจากระดับต่ำสุด 0.0 ม. เสมอ
+        curr_lvl = 0.0
         max_lvl = max(a[0] for a in self.anchors)
-
-        # ขอบเขตระดับน้ำสำหรับวาดสเกล
-        curr_lvl = round(min_lvl - 0.2, 1)
         end_lvl = round(max_lvl + 0.25, 1)
 
         curr = curr_lvl

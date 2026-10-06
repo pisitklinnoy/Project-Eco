@@ -973,7 +973,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                         <line x1="340" y1={y} x2="358" y2={y} stroke="#dc2626" strokeWidth="2" />
                         <line x1="358" y1={y} x2="385" y2={y} stroke="#0f172a" strokeWidth="1" />
                         <text x="362" y={y + 4} fill="#0f172a" fontSize="9" fontWeight="bold">
-                          {(station.bank_level - idx * ((station.bank_level - station.normal_level) / 8)).toFixed(1)}
+                          {(station.bank_level - idx * (station.bank_level / 8)).toFixed(1)}
                         </text>
                       </g>
                     ))}

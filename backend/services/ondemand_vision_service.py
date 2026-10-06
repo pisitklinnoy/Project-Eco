@@ -63,8 +63,7 @@ class OnDemandVisionService:
             if pt_water.actual_meter is not None and pt_water.actual_meter > 0:
                 calculated_level_m = round(float(pt_water.actual_meter), 3)
             else:
-                calculated_level_m = m_high - ((y_water_orig - y_high) * scale_m_per_px)
-                calculated_level_m = round(float(calculated_level_m), 3)
+                calculated_level_m = max(0.0, round(float(m_high - ((y_water_orig - y_high) * scale_m_per_px)), 3))
         else:
             # กรณีค้นหาผิวน้ำอัตโนมัติด้วย 1D Change Point Analysis
             gray = cv2.cvtColor(cropped_gauge, cv2.COLOR_BGR2GRAY)
@@ -95,8 +94,7 @@ class OnDemandVisionService:
                     best_y_crop = y
 
             y_water_orig = by + best_y_crop
-            calculated_level_m = m_high - ((y_water_orig - y_high) * scale_m_per_px)
-            calculated_level_m = round(float(calculated_level_m), 3)
+            calculated_level_m = max(0.0, round(float(m_high - ((y_water_orig - y_high) * scale_m_per_px)), 3))
 
         # 4. สร้างภาพพรีวิวผลลัพธ์ (Preview with Waterline)
         preview_img = cropped_gauge.copy()

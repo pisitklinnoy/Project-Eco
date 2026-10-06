@@ -20,8 +20,8 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
 }) => {
   const [point1, setPoint1] = useState<CalibrationPoint | null>(null);
   const [point2, setPoint2] = useState<CalibrationPoint | null>(null);
-  const [val1, setVal1] = useState<number>(2.0);
-  const [val2, setVal2] = useState<number>(1.0);
+  const [val1, setVal1] = useState<number>(1.0);
+  const [val2, setVal2] = useState<number>(0.0);
   const [testClickY, setTestClickY] = useState<number | null>(null);
   const [testClickPos, setTestClickPos] = useState<{ x: number; y: number } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
@@ -622,6 +622,7 @@ export const ClickToCalibrateModal: React.FC<ClickToCalibrateModalProps> = ({
                 <input
                   type="number"
                   step="0.1"
+                  min="0"
                   value={val2}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value) || 0;

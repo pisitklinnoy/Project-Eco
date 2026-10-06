@@ -8,11 +8,16 @@ class WaterService:
     def get_latest_measurement(db, station_code):
         ecosystem, _ = station_codes(station_code)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        return db.query(WaterMeasurement).filter(
+        # ดึงค่าตรวจวัดล่าสุดของสถานี (รวมผลวัดจากกล้อง AI และ RID ที่ตรวจสอบแล้ว)
+        meas = db.query(WaterMeasurement).filter(
             WaterMeasurement.station_code == ecosystem,
-            WaterMeasurement.source_type == VERIFIED_WATER_SOURCE,
             WaterMeasurement.timestamp <= now,
         ).order_by(WaterMeasurement.timestamp.desc(), WaterMeasurement.created_at.desc(), WaterMeasurement.id.desc()).first()
+        if meas:
+            return meas
+        return db.query(WaterMeasurement).filter(
+            WaterMeasurement.station_code == ecosystem,
+        ).order_by(WaterMeasurement.timestamp.desc(), WaterMeasurement.id.desc()).first()
 
     @staticmethod
     def get_historical_measurements(db, station_code, hours=24):

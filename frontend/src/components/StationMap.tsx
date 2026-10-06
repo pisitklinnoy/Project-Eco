@@ -3,6 +3,16 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Station, WaterMeasurement } from '../types';
 import { MapPin, Navigation } from 'lucide-react';
+import { getStationFlagInfo } from './CameraViewer';
+
+export const getShortStationCode = (station: Station): string => {
+  const code = (station.station_code || '').toUpperCase();
+  const name = station.name || '';
+  if (code.includes('MUANGKONG') || code.includes('X.173') || name.includes('ม่วงก็อง')) return 'X.173A';
+  if (code.includes('BANGSALA') || code.includes('X.90') || name.includes('บางศาลา')) return 'X.90';
+  if (code.includes('HATYAI') || code.includes('X.44') || name.includes('หาดใหญ่')) return 'X.44';
+  return station.station_code;
+};
 
 interface StationMapProps {
   stations: Station[];
@@ -87,67 +97,97 @@ export const StationMap: React.FC<StationMapProps> = ({
       }).addTo(map);
     }
 
-    // Add each station as a clean circular dot marker
+    // Add each station as a high-precision GIS coin marker
     stations.forEach((stn) => {
       const isSelected = selectedStation?.station_code === stn.station_code;
       
-      const meas = measurementsByStation[stn.station_code] || 
-        (isSelected && latestWater ? latestWater : null);
-      const waterLvl = meas ? meas.water_level : stn.normal_level;
+      // Resolution priority:
+      // 1. If currently selected station and latestWater exists, use latestWater
+      // 2. Otherwise lookup from measurementsByStation by exact station_code
+      // 3. Fallback lookup by code variations (e.g. without 'STN-', fuzzy key match)
+      const meas = (isSelected && latestWater) 
+        ? latestWater 
+        : (measurementsByStation[stn.station_code] 
+           || (stn.station_code.startsWith('STN-') ? measurementsByStation[stn.station_code.replace('STN-', '')] : null)
+           || Object.entries(measurementsByStation).find(([k]) => k.toUpperCase().includes(stn.station_code.toUpperCase().replace('STN-', '')))?.[1]
+           || null);
 
-      // Color coding based on real station-specific thresholds
-      let statusText = 'ปกติ';
-      let themeColor = '#10b981'; // Emerald Green
-      let bgBadge = '#d1fae5';
+      const waterLvl = meas && meas.water_level != null ? Number(meas.water_level) : stn.normal_level;
+      const shortCode = getShortStationCode(stn);
+      const shortName = stn.name.split(' ')[0];
+      const distanceToBank = (stn.bank_level - waterLvl).toFixed(2);
+      const formattedWaterLvl = waterLvl.toFixed(2);
+
+      // Warning flag and risk color coding according to official basin criteria
+      const flagInfo = getStationFlagInfo(stn, waterLvl);
+
+      let themeColor = '#10b981'; // Green (default)
+      let bgBadge = '#ecfdf5';
       let textBadge = '#065f46';
-      let borderBadge = '#34d399';
+      let borderBadge = '#a7f3d0';
       let pingClass = 'bg-emerald-400 opacity-40';
 
-      if (waterLvl >= stn.critical_level) {
-        statusText = 'วิกฤต';
+      if (flagInfo.flagColor === 'red') {
         themeColor = '#ef4444'; // Red
-        bgBadge = '#fee2e2';
+        bgBadge = '#fef2f2';
         textBadge = '#991b1b';
-        borderBadge = '#f87171';
+        borderBadge = '#fecaca';
         pingClass = 'bg-rose-500 animate-ping opacity-75';
-      } else if (waterLvl >= stn.warning_level) {
-        statusText = 'เตือนภัย';
+      } else if (flagInfo.flagColor === 'yellow') {
         themeColor = '#f59e0b'; // Amber
-        bgBadge = '#fef3c7';
+        bgBadge = '#fffbeb';
         textBadge = '#92400e';
-        borderBadge = '#fbbf24';
+        borderBadge = '#fde68a';
         pingClass = 'bg-amber-400 animate-ping opacity-75';
       }
 
-      const shortName = stn.name.split(' ')[0];
-      const distanceToBank = (stn.bank_level - waterLvl).toFixed(2);
-
-      // Clean circular dot marker
+      // High-precision GIS coin marker with 2-decimal display and station code tag
       const iconHtml = `
-        <div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-          <!-- Radar Pulse Ring -->
-          <span style="position: absolute; width: 36px; height: 36px; border-radius: 9999px; background-color: ${themeColor}; pointer-events: none;" class="${pingClass}"></span>
-
-          <!-- Circular Dot -->
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; user-select: none;">
+          <!-- Floating Station Code Tag -->
           <div style="
-            position: relative;
-            width: 30px;
-            height: 30px;
-            border-radius: 9999px;
-            background-color: ${themeColor};
-            border: 2.5px solid #ffffff;
-            box-shadow: ${isSelected ? '0 0 0 3px #0284c7, 0 8px 16px rgba(0,0,0,0.3)' : '0 4px 10px rgba(0,0,0,0.2)'};
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(4px);
             color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 800;
-            font-family: monospace;
-            transition: all 0.2s ease;
-            ${isSelected ? 'transform: scale(1.18);' : ''}
-          ">
-            ${waterLvl.toFixed(1)}
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 9999px;
+            white-space: nowrap;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            letter-spacing: 0.02em;
+            margin-bottom: 2px;
+          ">${shortCode}</div>
+
+          <!-- Coin Wrapper -->
+          <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+            <!-- Radar Pulse Ring -->
+            <span style="position: absolute; width: 44px; height: 44px; border-radius: 9999px; background-color: ${themeColor}; pointer-events: none;" class="${pingClass}"></span>
+
+            <!-- Circular Coin Marker -->
+            <div style="
+              position: relative;
+              width: 42px;
+              height: 42px;
+              border-radius: 9999px;
+              background-color: ${themeColor};
+              border: 2.5px solid #ffffff;
+              box-shadow: ${isSelected ? '0 0 0 3px #0284c7, 0 8px 18px rgba(0,0,0,0.35)' : '0 4px 12px rgba(0,0,0,0.22)'};
+              color: #ffffff;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              line-height: 1.05;
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+              ${isSelected ? 'transform: scale(1.15);' : ''}
+            ">
+              <span style="font-size: 11.5px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: -0.02em;">
+                ${formattedWaterLvl}
+              </span>
+              <span style="font-size: 8.5px; font-weight: 700; opacity: 0.95;">ม.</span>
+            </div>
           </div>
         </div>
       `;
@@ -155,29 +195,32 @@ export const StationMap: React.FC<StationMapProps> = ({
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'custom-map-dot-marker',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        iconSize: [60, 68],
+        iconAnchor: [30, 40],
       });
 
       const marker = L.marker([stn.latitude, stn.longitude], { icon: customIcon }).addTo(map);
 
       // Compact, non-overlapping hover tooltip
       marker.bindTooltip(
-        `<strong>${shortName}</strong>: ${waterLvl.toFixed(2)} ม. รทก. (${statusText})`,
-        { direction: 'top', offset: [0, -18], className: 'font-sans text-xs' }
+        `<strong>${shortName} (${shortCode})</strong>: ${formattedWaterLvl} ม. รทก. [${flagInfo.flagName} - ${flagInfo.statusTitle}]`,
+        { direction: 'top', offset: [0, -36], className: 'font-sans text-xs' }
       );
 
-      // Popup Content with detailed elevation criteria and "ม. รทก."
+      // Popup Content with detailed elevation criteria, flag guide, and "ม. รทก."
       const popupContent = document.createElement('div');
-      popupContent.className = 'p-1 text-slate-900 font-sans min-w-[250px]';
+      popupContent.className = 'p-1 text-slate-900 font-sans min-w-[270px]';
       popupContent.innerHTML = `
         <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
           <div>
-            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-white">${stn.station_code}</span>
+            <div class="flex items-center space-x-1.5">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900 text-white">${stn.station_code}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-mono">${shortCode}</span>
+            </div>
             <div class="font-extrabold text-sm text-slate-900 mt-1">${stn.name}</div>
           </div>
-          <span class="text-xs px-2.5 py-0.5 rounded-full font-bold" style="background:${bgBadge}; color:${textBadge}; border:1px solid ${borderBadge}">
-            ${statusText}
+          <span class="text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap" style="background:${bgBadge}; color:${textBadge}; border:1px solid ${borderBadge}">
+            ${flagInfo.flagName} (${flagInfo.statusTitle})
           </span>
         </div>
 
@@ -188,7 +231,7 @@ export const StationMap: React.FC<StationMapProps> = ({
           <div class="flex justify-between items-center text-xs">
             <span class="font-semibold text-slate-700">ระดับน้ำตรวจวัดล่าสุด:</span>
             <span class="font-extrabold text-base font-mono" style="color: ${themeColor}">
-              ${waterLvl.toFixed(2)} ม. รทก.
+              ${formattedWaterLvl} ม. รทก.
             </span>
           </div>
           <div class="text-[10px] text-slate-500 flex justify-between mt-1 pt-1 border-t border-slate-200/60 font-medium">
@@ -197,23 +240,20 @@ export const StationMap: React.FC<StationMapProps> = ({
           </div>
         </div>
 
-        <!-- Criteria Table -->
-        <div class="space-y-1 text-[11px] text-slate-600 mb-3 bg-slate-50/60 p-2 rounded-xl border border-slate-200/60">
-          <div class="flex justify-between">
-            <span class="text-slate-500">ระดับตลิ่ง:</span>
-            <span class="font-bold text-slate-800">${stn.bank_level.toFixed(2)} ม. รทก.</span>
+        <!-- Official Warning Flag Criteria Guide -->
+        <div class="mb-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+            <span>เกณฑ์สีธงเตือนภัย</span>
+            <span class="font-semibold text-slate-700 font-mono">${shortCode}</span>
           </div>
-          <div class="flex justify-between">
-            <span class="text-rose-600 font-medium">ระดับวิกฤต:</span>
-            <span class="font-bold text-rose-600">${stn.critical_level.toFixed(2)} ม. รทก.</span>
+          <div class="text-[11px] font-medium text-slate-700 space-y-1">
+            <div class="p-1.5 rounded-lg bg-white/80 border border-slate-200/50 text-[10.5px] leading-relaxed text-slate-600">
+              ${flagInfo.thresholdGuide}
+            </div>
           </div>
-          <div class="flex justify-between">
-            <span class="text-amber-600 font-medium">ระดับเตือนภัย:</span>
-            <span class="font-bold text-amber-600">${stn.warning_level.toFixed(2)} ม. รทก.</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-emerald-700 font-medium">ระดับปกติ:</span>
-            <span class="font-bold text-emerald-700">${stn.normal_level.toFixed(2)} ม. รทก.</span>
+          <div class="mt-2 pt-1.5 border-t border-slate-200/50 flex justify-between text-[10px] text-slate-500">
+            <span>ระดับตลิ่งวิกฤต:</span>
+            <span class="font-bold text-slate-700 font-mono">${stn.bank_level.toFixed(2)} ม. รทก.</span>
           </div>
         </div>
 
@@ -227,7 +267,7 @@ export const StationMap: React.FC<StationMapProps> = ({
         marker.closePopup();
       });
 
-      marker.bindPopup(popupContent, { offset: [0, -14] });
+      marker.bindPopup(popupContent, { offset: [0, -28] });
       markersRef.current[stn.station_code] = marker;
     });
 
@@ -264,19 +304,19 @@ export const StationMap: React.FC<StationMapProps> = ({
           </div>
         </div>
 
-        {/* Legend Pills strictly matching dot colors */}
+        {/* Legend Pills strictly matching dot colors & flag criteria */}
         <div className="flex items-center space-x-1.5 text-xs bg-slate-50/90 p-1 rounded-2xl border border-slate-200/60 shadow-sm">
           <span className="flex items-center space-x-1.5 bg-emerald-50/80 px-2.5 py-1 rounded-xl border border-emerald-200 text-emerald-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>ปกติ</span>
+            <span>ธงเขียว (ปกติ)</span>
           </span>
           <span className="flex items-center space-x-1.5 bg-amber-50/80 px-2.5 py-1 rounded-xl border border-amber-200 text-amber-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span>เตือนภัย</span>
+            <span>ธงเหลือง (เฝ้าระวัง)</span>
           </span>
           <span className="flex items-center space-x-1.5 bg-rose-50/80 px-2.5 py-1 rounded-xl border border-rose-200 text-rose-800 font-semibold text-[11px]">
             <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-            <span>วิกฤต</span>
+            <span>ธงแดง (วิกฤต)</span>
           </span>
         </div>
       </div>

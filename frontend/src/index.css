@@ -93,3 +93,9 @@
   color: #0f172a !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
+
+/* Leaflet DivIcon reset for custom dot/coin markers */
+.custom-map-dot-marker {
+  background: transparent !important;
+  border: none !important;
+}

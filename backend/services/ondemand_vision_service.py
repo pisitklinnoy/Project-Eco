@@ -20,7 +20,8 @@ class OnDemandVisionService:
         pt_high: CalibrationPoint,
         pt_low: CalibrationPoint,
         db: Session,
-        station_note: Optional[str] = "On-Demand Field Inspection"
+        station_note: Optional[str] = "On-Demand Field Inspection",
+        pt_water: Optional[CalibrationPoint] = None
     ) -> OnDemandPredictResponse:
         # 1. Decode รูปภาพจาก Bytes
         nparr = np.frombuffer(image_bytes, np.uint8)
@@ -38,45 +39,7 @@ class OnDemandVisionService:
 
         cropped_gauge = img_bgr[by:by+bh, bx:bx+bw]
 
-        # 3. 1D Change Point Analysis หาพิกเซลรอยต่อผิวน้ำ (Water Surface Contact)
-        # ต่อยอดจากอัลกอริทึมหลักของ FloodLens
-        gray = cv2.cvtColor(cropped_gauge, cv2.COLOR_BGR2GRAY)
-        
-        # วิเคราะห์ความแปรปรวนแนวนอนเฉพาะบริเวณแกนกลางเสา (ตัดขอบ 20% ซ้าย-ขวา)
-        cx1 = int(bw * 0.20)
-        cx2 = int(bw * 0.80)
-        stds = np.array([np.std(gray[y, cx1:cx2]) if cx2 > cx1 else np.std(gray[y, :]) for y in range(bh)], dtype=np.float32)
-
-        # Rolling Max เพื่อกรองสัญญาณรบกวนของเส้นขีดและตัวเลขบนเสา
-        win = max(5, int(bh * 0.05))
-        rolling_max = np.array([
-            np.max(stds[max(0, y - win // 2):min(bh, y + win // 2)])
-            for y in range(bh)
-        ])
-        cum = np.cumsum(rolling_max)
-        total_sum = float(cum[-1]) if len(cum) > 0 else 1.0
-
-        # Scan หาจุดเปลี่ยนความคมชัด (Change Point Scan)
-        scan_top = max(1, int(bh * 0.08))
-        scan_bottom = min(bh - 1, int(bh * 0.92))
-
-        best_y_crop = int(bh * 0.5)
-        best_score = -1e9
-
-        for y in range(scan_top, scan_bottom):
-            m_above = cum[y - 1] / float(y)
-            m_below = (total_sum - cum[y - 1]) / float(bh - y)
-            score = m_above - m_below
-            if score > best_score:
-                best_score = score
-                best_y_crop = y
-
-        # พิกัดระดับน้ำบนภาพต้นฉบับเต็ม
-        y_water_orig = by + best_y_crop
-
-        # 4. แปลงพิกเซลเป็นเมตรจริงด้วย 2-Point Linear Interpolation
-        # (แกนภาพ: ค่า Y บนสุด = 0, ยิ่งลงมาด้านล่าง ค่า Y ยิ่งเพิ่มขึ้น)
-        # จุด high ควรมีค่า Y น้อยกว่าจุด low
+        # คำนวณสเกล 2-Point Linear Interpolation (Pixel-to-Meter)
         y_high = min(pt_high.y, pt_low.y)
         m_high = max(pt_high.actual_meter, pt_low.actual_meter)
         y_low = max(pt_high.y, pt_low.y)
@@ -86,30 +49,76 @@ class OnDemandVisionService:
         dm_meter = float(m_high - m_low)
         scale_m_per_px = dm_meter / dy_pixel
 
-        # คำนวณระดับน้ำ: ยิ่งระดับน้ำสูง พิกเซล Y จะยิ่งต่ำ (เลื่อนขึ้นไปทางหัวเสา)
-        calculated_level_m = m_high - ((y_water_orig - y_high) * scale_m_per_px)
-        calculated_level_m = round(float(calculated_level_m), 3)
+        confidence_score = 0.91
 
-        # 5. สร้างภาพพรีวิวผลลัพธ์ (Preview with Waterline)
+        # 3. กำหนดตำแหน่งผิวน้ำ (Manual Pinpoint vs Auto 1D Change Point Analysis)
+        if pt_water is not None:
+            # กรณีผู้ใช้ระบุตำแหน่งผิวน้ำด้วยตนเอง (Manual Water Surface)
+            y_water_orig = int(round(pt_water.y))
+            best_y_crop = int(max(0, min(bh - 1, round(pt_water.y - by))))
+            confidence_score = 1.0  # มั่นใจ 100% เพราะผู้ใช้ตรวจสอบและกำหนดจุดผิวน้ำเอง
+
+            # หากมีการระบุ actual_meter มาด้วยและ > 0 ให้ใช้ค่านั้น หรือคำนวณจากพิกัด Y
+            if pt_water.actual_meter is not None and pt_water.actual_meter > 0:
+                calculated_level_m = round(float(pt_water.actual_meter), 3)
+            else:
+                calculated_level_m = m_high - ((y_water_orig - y_high) * scale_m_per_px)
+                calculated_level_m = round(float(calculated_level_m), 3)
+        else:
+            # กรณีค้นหาผิวน้ำอัตโนมัติด้วย 1D Change Point Analysis
+            gray = cv2.cvtColor(cropped_gauge, cv2.COLOR_BGR2GRAY)
+            cx1 = int(bw * 0.20)
+            cx2 = int(bw * 0.80)
+            stds = np.array([np.std(gray[y, cx1:cx2]) if cx2 > cx1 else np.std(gray[y, :]) for y in range(bh)], dtype=np.float32)
+
+            win = max(5, int(bh * 0.05))
+            rolling_max = np.array([
+                np.max(stds[max(0, y - win // 2):min(bh, y + win // 2)])
+                for y in range(bh)
+            ])
+            cum = np.cumsum(rolling_max)
+            total_sum = float(cum[-1]) if len(cum) > 0 else 1.0
+
+            scan_top = max(1, int(bh * 0.08))
+            scan_bottom = min(bh - 1, int(bh * 0.92))
+
+            best_y_crop = int(bh * 0.5)
+            best_score = -1e9
+
+            for y in range(scan_top, scan_bottom):
+                m_above = cum[y - 1] / float(y)
+                m_below = (total_sum - cum[y - 1]) / float(bh - y)
+                score = m_above - m_below
+                if score > best_score:
+                    best_score = score
+                    best_y_crop = y
+
+            y_water_orig = by + best_y_crop
+            calculated_level_m = m_high - ((y_water_orig - y_high) * scale_m_per_px)
+            calculated_level_m = round(float(calculated_level_m), 3)
+
+        # 4. สร้างภาพพรีวิวผลลัพธ์ (Preview with Waterline)
         preview_img = cropped_gauge.copy()
-        # ขีดเส้นแดงระบุตำแหน่งผิวน้ำที่ตรวจพบ
-        cv2.line(preview_img, (0, best_y_crop), (bw, best_y_crop), (0, 0, 255), 3)
+        # ขีดเส้นระดับผิวน้ำ (สีส้มสดสำหรับผิวน้ำที่ระบุ/ตรวจพบ)
+        line_color = (0, 140, 255) if pt_water is not None else (0, 0, 255)
+        cv2.line(preview_img, (0, best_y_crop), (bw, best_y_crop), line_color, 3)
         # แถบแสดงตัวเลขผลลัพธ์
         cv2.rectangle(preview_img, (0, max(0, best_y_crop - 28)), (bw, best_y_crop), (0, 0, 0), -1)
+        tag = "MANUAL" if pt_water is not None else "AI"
         cv2.putText(
             preview_img, 
-            f"WL: {calculated_level_m:.2f} m", 
+            f"WL ({tag}): {calculated_level_m:.2f} m", 
             (5, max(18, best_y_crop - 8)),
             cv2.FONT_HERSHEY_SIMPLEX, 
-            0.55, 
-            (0, 255, 128), 
+            0.50, 
+            (0, 220, 255) if pt_water is not None else (0, 255, 128), 
             2
         )
 
         _, buf = cv2.imencode(".jpg", preview_img)
         preview_b64 = f"data:image/jpeg;base64,{base64.b64encode(buf).decode('utf-8')}"
 
-        # 6. บันทึกภาพลง MinIO และส่งเข้า Label Studio Database (Active Learning Loop)
+        # 5. บันทึกภาพลง MinIO และส่งเข้า Label Studio Database (Active Learning Loop)
         task_id, minio_path = cls._save_to_minio_and_label_studio(
             image_bytes=image_bytes,
             orig_w=orig_w,
@@ -125,7 +134,7 @@ class OnDemandVisionService:
             calculated_water_level_m=calculated_level_m,
             pixel_water_y_cropped=best_y_crop,
             pixel_water_y_original=y_water_orig,
-            confidence_score=0.91,
+            confidence_score=confidence_score,
             preview_image_base64=preview_b64,
             label_studio_task_id=task_id,
             minio_image_path=minio_path,

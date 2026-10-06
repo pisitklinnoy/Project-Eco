@@ -12,6 +12,7 @@ import {
   Sparkles,
   Info,
   FileImage,
+  Waves,
 } from 'lucide-react';
 import { floodlensApi } from '../api/floodlensApi';
 import type { OnDemandPredictResponse } from '../types';
@@ -32,17 +33,19 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
-  // Interaction Mode: 'bbox' (Draw Staff Gauge) | 'point_high' (Upper mark) | 'point_low' (Lower mark)
-  const [activeTool, setActiveTool] = useState<'bbox' | 'point_high' | 'point_low'>('bbox');
+  // Interaction Mode: 'bbox' (Draw Staff Gauge) | 'point_high' (Upper mark) | 'point_low' (Lower mark) | 'point_water' (Water surface)
+  const [activeTool, setActiveTool] = useState<'bbox' | 'point_high' | 'point_low' | 'point_water'>('bbox');
 
   // Annotation Coordinates (Original Image Pixels)
   const [bbox, setBbox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [pointHigh, setPointHigh] = useState<{ x: number; y: number } | null>(null);
   const [pointLow, setPointLow] = useState<{ x: number; y: number } | null>(null);
+  const [pointWater, setPointWater] = useState<{ x: number; y: number } | null>(null);
 
   // Scale Inputs (Meters)
   const [highMeter, setHighMeter] = useState<number>(0.90);
   const [lowMeter, setLowMeter] = useState<number>(0.60);
+  const [waterMeter, setWaterMeter] = useState<number | null>(null);
   const [stationNote, setStationNote] = useState<string>('หาดใหญ่ใน (ตรวจวัดแบบกำหนดเอง)');
 
   // Drag-to-draw state for Bounding Box
@@ -58,6 +61,35 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageElementRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // คำนวณระดับน้ำจากพิกัด Y บนภาพ (Linear Interpolation)
+  const calculateWaterLevelFromY = useCallback((yPixel: number): number | null => {
+    if (!pointHigh || !pointLow || pointHigh.y === pointLow.y || highMeter === lowMeter) return null;
+    const dy = pointLow.y - pointHigh.y;
+    const dm = highMeter - lowMeter;
+    const level = highMeter - ((yPixel - pointHigh.y) / dy) * dm;
+    return Number(level.toFixed(3));
+  }, [pointHigh, pointLow, highMeter, lowMeter]);
+
+  // คำนวณพิกัด Y บนภาพจากค่าระดับน้ำ (เมตร)
+  const calculateYFromWaterLevel = useCallback((meter: number): number | null => {
+    if (!pointHigh || !pointLow || highMeter === lowMeter) return null;
+    const dy = pointLow.y - pointHigh.y;
+    const dm = highMeter - lowMeter;
+    const y = pointHigh.y + ((highMeter - meter) / dm) * dy;
+    return Math.round(y);
+  }, [pointHigh, pointLow, highMeter, lowMeter]);
+
+  const handleWaterMeterChange = (val: number) => {
+    setWaterMeter(val);
+    const newY = calculateYFromWaterLevel(val);
+    if (newY !== null) {
+      setPointWater((prev) => ({
+        x: prev ? prev.x : bbox ? Math.round(bbox.x + bbox.width / 2) : 100,
+        y: newY,
+      }));
+    }
+  };
 
   // Redraw Canvas Overlay
   const redrawCanvas = useCallback(() => {
@@ -184,8 +216,56 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
       ctx.fillText(text, pointLow.x + radius + 8, pointLow.y - 2);
     }
 
+    // 3.5 Draw Point Water (Manual Water Surface)
+    if (pointWater) {
+      const waterY = pointWater.y;
+      const box = bbox || { x: 0, width: canvas.width };
+      const leftX = Math.max(0, box.x - 30);
+      const rightX = Math.min(canvas.width, box.x + box.width + 30);
+
+      // Vivid orange dashed waterline
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = Math.max(3, Math.round(canvas.width / 350));
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(leftX, waterY);
+      ctx.lineTo(rightX, waterY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Circular marker & crosshair
+      const radius = Math.max(6, Math.round(canvas.width / 120));
+      ctx.beginPath();
+      ctx.arc(pointWater.x, pointWater.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#f97316';
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pointWater.x - radius * 1.8, pointWater.y);
+      ctx.lineTo(pointWater.x + radius * 1.8, pointWater.y);
+      ctx.moveTo(pointWater.x, pointWater.y - radius * 1.8);
+      ctx.lineTo(pointWater.x, pointWater.y + radius * 1.8);
+      ctx.stroke();
+
+      // Text Badge
+      const text = `ผิวน้ำที่ระบุ: ${waterMeter !== null ? waterMeter.toFixed(2) : '...'} ม.`;
+      const fontSize = Math.max(12, Math.round(canvas.width / 80));
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      const tw = ctx.measureText(text).width;
+      const badgeY = Math.max(fontSize + 6, waterY - 8);
+      ctx.fillStyle = 'rgba(234, 88, 12, 0.95)';
+      ctx.fillRect(leftX, badgeY - fontSize - 2, tw + 12, fontSize + 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, leftX + 6, badgeY);
+    }
+
     // 4. Draw Detected Water Level Line if prediction returned
-    if (predictionResult && predictionResult.pixel_water_y_original) {
+    if (predictionResult && predictionResult.pixel_water_y_original && !pointWater) {
       const waterY = predictionResult.pixel_water_y_original;
       const box = bbox || { x: 0, width: canvas.width };
       const leftX = Math.max(0, box.x - 20);
@@ -201,7 +281,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
       ctx.setLineDash([]);
 
       // Waterline Badge
-      const waterText = `ระดับน้ำที่ตรวจพบ: ${predictionResult.calculated_water_level_m.toFixed(3)} ม.`;
+      const waterText = `ระดับน้ำที่ตรวจพบ (AI): ${predictionResult.calculated_water_level_m.toFixed(3)} ม.`;
       const fontSize = Math.max(13, Math.round(canvas.width / 75));
       ctx.font = `bold ${fontSize}px sans-serif`;
       const tw = ctx.measureText(waterText).width;
@@ -210,7 +290,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
       ctx.fillStyle = '#ffffff';
       ctx.fillText(waterText, box.x + 6, waterY + fontSize + 2);
     }
-  }, [bbox, tempBBox, pointHigh, pointLow, highMeter, lowMeter, predictionResult]);
+  }, [bbox, tempBBox, pointHigh, pointLow, pointWater, highMeter, lowMeter, waterMeter, predictionResult]);
 
   useEffect(() => {
     redrawCanvas();
@@ -233,6 +313,8 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
     setBbox(null);
     setPointHigh(null);
     setPointLow(null);
+    setPointWater(null);
+    setWaterMeter(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -297,6 +379,13 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
       setActiveTool('point_low');
     } else if (activeTool === 'point_low') {
       setPointLow(pt);
+      setActiveTool('point_water');
+    } else if (activeTool === 'point_water') {
+      setPointWater(pt);
+      const calculated = calculateWaterLevelFromY(pt.y);
+      if (calculated !== null) {
+        setWaterMeter(calculated);
+      }
     }
   };
 
@@ -333,6 +422,8 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
     setBbox(null);
     setPointHigh(null);
     setPointLow(null);
+    setPointWater(null);
+    setWaterMeter(null);
     setPredictionResult(null);
     setErrorMsg(null);
     setActiveTool('bbox');
@@ -377,6 +468,16 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
         'point_low',
         JSON.stringify({ x: pointLow.x, y: pointLow.y, actual_meter: lowMeter })
       );
+      if (pointWater) {
+        formData.append(
+          'point_water',
+          JSON.stringify({
+            x: pointWater.x,
+            y: pointWater.y,
+            actual_meter: waterMeter ?? calculateWaterLevelFromY(pointWater.y) ?? 0,
+          })
+        );
+      }
       formData.append('station_note', stationNote);
 
       const res = await floodlensApi.predictCustomImage(formData);
@@ -468,6 +569,20 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                   <span>3. สเกลล่าง (P2)</span>
                   {pointLow && <CheckCircle2 className="w-3.5 h-3.5 text-amber-300 ml-1" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTool('point_water')}
+                  disabled={!imageSrc}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition-all ${
+                    activeTool === 'point_water'
+                      ? 'bg-orange-600 text-white shadow-sm'
+                      : 'bg-white/80 text-slate-700 hover:bg-white'
+                  } disabled:opacity-40`}
+                >
+                  <Waves className="w-3.5 h-3.5" />
+                  <span>4. ระบุผิวน้ำ (Water)</span>
+                  {pointWater && <CheckCircle2 className="w-3.5 h-3.5 text-orange-200 ml-1" />}
+                </button>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -506,7 +621,9 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                         ? 'โหมด: คลิกลากเพื่อวาดกรอบสี่เหลี่ยมครอบตัวเสา'
                         : activeTool === 'point_high'
                         ? `โหมด: คลิกตำแหน่งสเกลบน (${highMeter.toFixed(2)} ม.)`
-                        : `โหมด: คลิกตำแหน่งสเกลล่าง (${lowMeter.toFixed(2)} ม.)`}
+                        : activeTool === 'point_low'
+                        ? `โหมด: คลิกตำแหน่งสเกลล่าง (${lowMeter.toFixed(2)} ม.)`
+                        : 'โหมด: คลิกตำแหน่งผิวน้ำ (หรือกรอกค่าระดับน้ำในฝั่งขวา)'}
                     </span>
                   </div>
                 </div>
@@ -692,6 +809,74 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                   </div>
                 </div>
 
+                {/* 5. Water Surface Point (Optional / Manual Ground Truth) */}
+                <div className="flex items-start space-x-3 text-xs">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 font-black ${
+                      pointWater ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    5
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-extrabold text-slate-900">ตำแหน่งผิวน้ำ (Water Surface)</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">(ไม่บังคับ)</span>
+                      </div>
+                      {pointWater && (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[10px] text-orange-600 font-bold">
+                            y: {pointWater.y} px
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPointWater(null);
+                              setWaterMeter(null);
+                            }}
+                            className="text-[10px] text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                            title="ล้างจุดผิวน้ำ เพื่อใช้ AI อัตโนมัติ"
+                          >
+                            ล้างจุด
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {pointWater
+                        ? 'ระบุตำแหน่งผิวน้ำแล้ว สามารถปรับระดับเมตรได้ด้านล่าง'
+                        : 'คลิกบนภาพ หรือพิมพ์ระดับน้ำ (หากไม่ระบุ AI จะตรวจจับอัตโนมัติ)'}
+                    </p>
+                    <div className="mt-1.5 flex items-center space-x-2">
+                      <span className="text-[11px] text-slate-500">ระดับน้ำที่ผิวน้ำ:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={waterMeter !== null ? waterMeter : ''}
+                        placeholder={pointHigh && pointLow ? 'เช่น 0.75' : 'กำหนด P1, P2 ก่อน'}
+                        disabled={!pointHigh || !pointLow}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                          if (val !== null && !isNaN(val)) {
+                            handleWaterMeterChange(val);
+                          } else {
+                            setWaterMeter(null);
+                            setPointWater(null);
+                          }
+                        }}
+                        className="w-24 px-2 py-0.5 text-xs font-bold bg-white rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50"
+                      />
+                      <span className="text-[11px] text-slate-500">ม.</span>
+                      {pointWater && (
+                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                          Manual
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Station Note */}
                 <div className="pt-2 border-t border-slate-200/60">
                   <label className="text-[11px] font-bold text-slate-600 block mb-1">
@@ -725,7 +910,11 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                 onClick={handleCalculate}
                 icon={<Calculator className="w-4 h-4" />}
               >
-                {loading ? 'กำลังประมวลผล 1D Change Point...' : 'คำนวณระดับน้ำทันที'}
+                {loading
+                  ? 'กำลังประมวลผลระดับน้ำ...'
+                  : pointWater
+                  ? 'คำนวณระดับน้ำ (ใช้ผิวน้ำที่ระบุ)'
+                  : 'คำนวณระดับน้ำทันที (AI ตรวจจับ)'}
               </PillButton>
             </div>
 
@@ -735,10 +924,10 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black uppercase text-blue-900 flex items-center space-x-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>ผลการวิเคราะห์ระดับน้ำ AI</span>
+                    <span>ผลการวิเคราะห์ระดับน้ำ {pointWater ? '(กำหนดเอง)' : '(AI)'}</span>
                   </span>
                   <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    ความแม่นยำ {(predictionResult.confidence_score * 100).toFixed(1)}%
+                    {pointWater ? 'ความแม่นยำ 100% (Manual Ground Truth)' : `ความแม่นยำ ${(predictionResult.confidence_score * 100).toFixed(1)}%`}
                   </span>
                 </div>
 

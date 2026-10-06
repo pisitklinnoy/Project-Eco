@@ -20,7 +20,237 @@ import {
   Waves,
   Columns,
   AlertTriangle,
+  Flag,
 } from 'lucide-react';
+
+// เกณฑ์ระดับน้ำและสีธงเตือนภัยตามเงื่อนไขของแต่ละสถานี
+export interface StationFlagInfo {
+  flagColor: 'green' | 'yellow' | 'red';
+  flagName: string; // 'ธงเขียว' | 'ธงเหลือง' | 'ธงแดง'
+  statusTitle: string; // 'ภาวะปกติ' | 'เฝ้าระวัง' | 'วิกฤต'
+  description: string;
+  containerBg: string;
+  containerBorder: string;
+  flagColorClass: string;
+  flagTextClass: string;
+  dotColor: string;
+  pingDotColor: string;
+  thresholdGuide: string;
+}
+
+export function getStationFlagInfo(station: Station | null, currentLevel: number): StationFlagInfo {
+  if (!station) {
+    return {
+      flagColor: 'green',
+      flagName: 'ธงเขียว',
+      statusTitle: 'ภาวะปกติ',
+      description: 'ระดับน้ำปกติ',
+      containerBg: 'bg-slate-950/80',
+      containerBorder: 'border-emerald-500/40',
+      flagColorClass: 'text-emerald-400 fill-emerald-400',
+      flagTextClass: 'text-emerald-300',
+      dotColor: 'bg-emerald-400',
+      pingDotColor: 'bg-emerald-400',
+      thresholdGuide: '0 - 8.00 ม. (ธงเขียว)',
+    };
+  }
+
+  const code = (station.station_code || '').toUpperCase();
+  const name = station.name || '';
+
+  // 1. สะพานม่วงก็อง (0-15.90m: ธงเขียว | 15.91-16.55m: ธงเหลือง | 16.556m+: ธงแดง)
+  if (code.includes('MUANGKONG') || code.includes('X.173') || name.includes('ม่วงก็อง')) {
+    const guide = '0 - 15.90 ม. (ธงเขียว) | 15.91 - 16.55 ม. (ธงเหลือง) | > 16.55 ม. (ธงแดง)';
+    if (currentLevel <= 15.90) {
+      return {
+        flagColor: 'green',
+        flagName: 'ธงเขียว',
+        statusTitle: 'ภาวะปกติ',
+        description: 'ระดับน้ำปกติ ปลอดภัย',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-emerald-500/50 shadow-emerald-950/30',
+        flagColorClass: 'text-emerald-400 fill-emerald-400',
+        flagTextClass: 'text-emerald-300',
+        dotColor: 'bg-emerald-400',
+        pingDotColor: 'bg-emerald-400',
+        thresholdGuide: guide,
+      };
+    } else if (currentLevel <= 16.55) {
+      return {
+        flagColor: 'yellow',
+        flagName: 'ธงเหลือง',
+        statusTitle: 'เฝ้าระวัง',
+        description: 'ระดับน้ำเตือนภัย เฝ้าระวังใกล้ชิด',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-amber-500/50 shadow-amber-950/30',
+        flagColorClass: 'text-amber-400 fill-amber-400',
+        flagTextClass: 'text-amber-300',
+        dotColor: 'bg-amber-400',
+        pingDotColor: 'bg-amber-400',
+        thresholdGuide: guide,
+      };
+    } else {
+      return {
+        flagColor: 'red',
+        flagName: 'ธงแดง',
+        statusTitle: 'วิกฤต',
+        description: 'ระดับน้ำวิกฤต ล้นตลิ่ง/อันตราย',
+        containerBg: 'bg-slate-950/85',
+        containerBorder: 'border-rose-500/60 shadow-rose-950/40',
+        flagColorClass: 'text-rose-500 fill-rose-500',
+        flagTextClass: 'text-rose-300',
+        dotColor: 'bg-rose-500',
+        pingDotColor: 'bg-rose-500 animate-ping',
+        thresholdGuide: guide,
+      };
+    }
+  }
+
+  // 2. บางศาลา (0-8.00m: ธงเขียว | 8.01-9.30m: ธงเหลือง | 9.31m+: ธงแดง)
+  if (code.includes('BANGSALA') || code.includes('X.90') || name.includes('บางศาลา')) {
+    const guide = '0 - 8.00 ม. (ธงเขียว) | 8.01 - 9.30 ม. (ธงเหลือง) | > 9.30 ม. (ธงแดง)';
+    if (currentLevel <= 8.00) {
+      return {
+        flagColor: 'green',
+        flagName: 'ธงเขียว',
+        statusTitle: 'ภาวะปกติ',
+        description: 'ระดับน้ำปกติ ปลอดภัย',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-emerald-500/50 shadow-emerald-950/30',
+        flagColorClass: 'text-emerald-400 fill-emerald-400',
+        flagTextClass: 'text-emerald-300',
+        dotColor: 'bg-emerald-400',
+        pingDotColor: 'bg-emerald-400',
+        thresholdGuide: guide,
+      };
+    } else if (currentLevel <= 9.30) {
+      return {
+        flagColor: 'yellow',
+        flagName: 'ธงเหลือง',
+        statusTitle: 'เฝ้าระวัง',
+        description: 'ระดับน้ำเตือนภัย เฝ้าระวังใกล้ชิด',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-amber-500/50 shadow-amber-950/30',
+        flagColorClass: 'text-amber-400 fill-amber-400',
+        flagTextClass: 'text-amber-300',
+        dotColor: 'bg-amber-400',
+        pingDotColor: 'bg-amber-400',
+        thresholdGuide: guide,
+      };
+    } else {
+      return {
+        flagColor: 'red',
+        flagName: 'ธงแดง',
+        statusTitle: 'วิกฤต',
+        description: 'ระดับน้ำวิกฤต ล้นตลิ่ง/อันตราย',
+        containerBg: 'bg-slate-950/85',
+        containerBorder: 'border-rose-500/60 shadow-rose-950/40',
+        flagColorClass: 'text-rose-500 fill-rose-500',
+        flagTextClass: 'text-rose-300',
+        dotColor: 'bg-rose-500',
+        pingDotColor: 'bg-rose-500 animate-ping',
+        thresholdGuide: guide,
+      };
+    }
+  }
+
+  // 3. ที่ว่าการ อ.หาดใหญ่ / หาดใหญ่นอก (0-7.30m: ธงเขียว | 7.31-8.30m: ธงเหลือง | 8.31m+: ธงแดง)
+  if (code.includes('HATYAI') || code.includes('X.44') || name.includes('หาดใหญ่')) {
+    const guide = '0 - 7.30 ม. (ธงเขียว) | 7.31 - 8.30 ม. (ธงเหลือง) | > 8.30 ม. (ธงแดง)';
+    if (currentLevel <= 7.30) {
+      return {
+        flagColor: 'green',
+        flagName: 'ธงเขียว',
+        statusTitle: 'ภาวะปกติ',
+        description: 'ระดับน้ำปกติ ปลอดภัย',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-emerald-500/50 shadow-emerald-950/30',
+        flagColorClass: 'text-emerald-400 fill-emerald-400',
+        flagTextClass: 'text-emerald-300',
+        dotColor: 'bg-emerald-400',
+        pingDotColor: 'bg-emerald-400',
+        thresholdGuide: guide,
+      };
+    } else if (currentLevel <= 8.30) {
+      return {
+        flagColor: 'yellow',
+        flagName: 'ธงเหลือง',
+        statusTitle: 'เฝ้าระวัง',
+        description: 'ระดับน้ำเตือนภัย เฝ้าระวังใกล้ชิด',
+        containerBg: 'bg-slate-950/80',
+        containerBorder: 'border-amber-500/50 shadow-amber-950/30',
+        flagColorClass: 'text-amber-400 fill-amber-400',
+        flagTextClass: 'text-amber-300',
+        dotColor: 'bg-amber-400',
+        pingDotColor: 'bg-amber-400',
+        thresholdGuide: guide,
+      };
+    } else {
+      return {
+        flagColor: 'red',
+        flagName: 'ธงแดง',
+        statusTitle: 'วิกฤต',
+        description: 'ระดับน้ำวิกฤต ล้นตลิ่ง/อันตราย',
+        containerBg: 'bg-slate-950/85',
+        containerBorder: 'border-rose-500/60 shadow-rose-950/40',
+        flagColorClass: 'text-rose-500 fill-rose-500',
+        flagTextClass: 'text-rose-300',
+        dotColor: 'bg-rose-500',
+        pingDotColor: 'bg-rose-500 animate-ping',
+        thresholdGuide: guide,
+      };
+    }
+  }
+
+  // Fallback สำหรับสถานีทั่วไป
+  const warn = station.warning_level ?? 8.0;
+  const crit = station.critical_level ?? 9.3;
+  const guide = `≤ ${warn.toFixed(2)} ม. (ธงเขียว) | ${warn.toFixed(2)} - ${crit.toFixed(2)} ม. (ธงเหลือง) | > ${crit.toFixed(2)} ม. (ธงแดง)`;
+
+  if (currentLevel <= warn) {
+    return {
+      flagColor: 'green',
+      flagName: 'ธงเขียว',
+      statusTitle: 'ภาวะปกติ',
+      description: 'ระดับน้ำปกติ ปลอดภัย',
+      containerBg: 'bg-slate-950/80',
+      containerBorder: 'border-emerald-500/50 shadow-emerald-950/30',
+      flagColorClass: 'text-emerald-400 fill-emerald-400',
+      flagTextClass: 'text-emerald-300',
+      dotColor: 'bg-emerald-400',
+      pingDotColor: 'bg-emerald-400',
+      thresholdGuide: guide,
+    };
+  } else if (currentLevel <= crit) {
+    return {
+      flagColor: 'yellow',
+      flagName: 'ธงเหลือง',
+      statusTitle: 'เฝ้าระวัง',
+      description: 'ระดับน้ำเตือนภัย เฝ้าระวังใกล้ชิด',
+      containerBg: 'bg-slate-950/80',
+      containerBorder: 'border-amber-500/50 shadow-amber-950/30',
+      flagColorClass: 'text-amber-400 fill-amber-400',
+      flagTextClass: 'text-amber-300',
+      dotColor: 'bg-amber-400',
+      pingDotColor: 'bg-amber-400',
+      thresholdGuide: guide,
+    };
+  } else {
+    return {
+      flagColor: 'red',
+      flagName: 'ธงแดง',
+      statusTitle: 'วิกฤต',
+      description: 'ระดับน้ำวิกฤต ล้นตลิ่ง/อันตราย',
+      containerBg: 'bg-slate-950/85',
+      containerBorder: 'border-rose-500/60 shadow-rose-950/40',
+      flagColorClass: 'text-rose-500 fill-rose-500',
+      flagTextClass: 'text-rose-300',
+      dotColor: 'bg-rose-500',
+      pingDotColor: 'bg-rose-500 animate-ping',
+      thresholdGuide: guide,
+    };
+  }
+}
 
 interface CameraViewerProps {
   station: Station | null;
@@ -33,7 +263,7 @@ interface CameraViewerProps {
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
-  measurement: _measurement,
+  measurement,
   onOpenReview,
   onOpenCalibrate,
   onOpenOnDemand,
@@ -73,6 +303,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     station?.station_code.toUpperCase().includes('HATYAI') ||
     station?.station_code.toUpperCase().includes('X.44')
   );
+
+  // คำนวณระดับน้ำปัจจุบันและสถานะธงเตือนภัยตามเกณฑ์ของสถานี
+  const currentWaterLevel = measurement ? measurement.water_level : (station?.normal_level ?? 0);
+  const flagInfo = getStationFlagInfo(station, currentWaterLevel);
 
   // Zoom & Pan state
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -501,7 +735,11 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   ? 'bg-amber-100 text-amber-900 border-amber-300'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
-              title={showOverlays ? 'ซ่อนป้ายข้อความเพื่อไม่ให้บังภาพกล้องและเวลา' : 'แสดงป้ายข้อความกำกับ'}
+              title={
+                showOverlays
+                  ? 'ซ่อนป้ายชื่อสถานีเพื่อไม่ให้บังภาพกล้อง (คงเหลือเฉพาะระดับน้ำและสีธงขวาบน)'
+                  : 'แสดงป้ายข้อความกำกับทั้งหมด'
+              }
             >
               {showOverlays ? <EyeOff className="w-3 h-3 text-slate-500" /> : <Eye className="w-3 h-3 text-amber-700" />}
               <span>{showOverlays ? 'ซ่อนป้ายบัง' : 'แสดงป้าย'}</span>
@@ -649,6 +887,38 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </span>
             </div>
           )}
+
+          {/* Top-Right Compact Measured Water Level & Warning Flag Badge (แสดงขนาดกะทัดรัด ไม่บังกล้อง) */}
+          <div
+            className="absolute top-3 right-3 z-10 flex items-center space-x-1.5 pointer-events-auto"
+            title={`${station.name}\nระดับน้ำที่วัดได้: ${currentWaterLevel.toFixed(2)} ม. (${flagInfo.flagName} - ${flagInfo.statusTitle})\nเกณฑ์ระดับน้ำสถานี: ${flagInfo.thresholdGuide}`}
+          >
+            <div className={`flex items-center space-x-2 px-2.5 py-1.5 rounded-xl ${flagInfo.containerBg} ${flagInfo.containerBorder} border backdrop-blur-md shadow-lg transition-all select-none`}>
+              {/* Flag Icon & Name */}
+              <div className="flex items-center space-x-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${flagInfo.pingDotColor}`} />
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${flagInfo.dotColor}`} />
+                </span>
+                <Flag className={`w-3.5 h-3.5 ${flagInfo.flagColorClass}`} />
+                <span className={`text-[11px] font-black tracking-tight ${flagInfo.flagTextClass}`}>
+                  {flagInfo.flagName}
+                </span>
+              </div>
+
+              <span className="text-white/30 text-xs font-light">|</span>
+
+              {/* Measured Water Level */}
+              <div className="flex items-baseline space-x-1">
+                <span className="text-xs font-black font-mono text-white tracking-tight">
+                  {currentWaterLevel.toFixed(2)}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-300">
+                  ม.
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Zoom & Pan Guide Hint */}
           {showOverlays && zoomLevel > 1.0 && (
@@ -988,6 +1258,36 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 )}
               </div>
             )}
+
+            {/* Fullscreen Top-Right Compact Measured Water Level & Flag Badge */}
+            <div
+              className="absolute top-4 right-4 z-20 flex items-center space-x-1.5 pointer-events-auto"
+              title={`${station.name}\nระดับน้ำที่วัดได้: ${currentWaterLevel.toFixed(2)} ม. (${flagInfo.flagName} - ${flagInfo.statusTitle})\nเกณฑ์ระดับน้ำสถานี: ${flagInfo.thresholdGuide}`}
+            >
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl ${flagInfo.containerBg} ${flagInfo.containerBorder} border backdrop-blur-md shadow-2xl transition-all select-none`}>
+                <div className="flex items-center space-x-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${flagInfo.pingDotColor}`} />
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${flagInfo.dotColor}`} />
+                  </span>
+                  <Flag className={`w-3.5 h-3.5 ${flagInfo.flagColorClass}`} />
+                  <span className={`text-xs font-black tracking-tight ${flagInfo.flagTextClass}`}>
+                    {flagInfo.flagName}
+                  </span>
+                </div>
+
+                <span className="text-white/30 text-xs font-light">|</span>
+
+                <div className="flex items-baseline space-x-1">
+                  <span className="text-sm font-black font-mono text-white tracking-tight">
+                    {currentWaterLevel.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-300">
+                    ม. (รทก.)
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

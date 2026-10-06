@@ -13,7 +13,9 @@ def create_db_engine():
         return pg_engine
     except Exception as e:
         print(f"[Database] PostgreSQL connection not ready ({e}). Falling back to local SQLite database.")
-        return create_engine("sqlite:///./floodlens_local.db", connect_args={"check_same_thread": False})
+        import os
+        sqlite_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "floodlens_local.db")
+        return create_engine(f"sqlite:///{sqlite_file}", connect_args={"check_same_thread": False})
 
 engine = create_db_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

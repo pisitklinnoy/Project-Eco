@@ -465,20 +465,21 @@ class VisionService:
 
         # คำนวณระดับน้ำจาก WaterSurfaceDetector หรือ Scenario Benchmark
         detected_water_level = None
-        if alignment.get("source_points"):
+        source_pts = alignment.get("source_points")
+        if source_pts is not None and len(source_pts) > 0:
             try:
                 pole_mgr = PoleCoordinateManager(cfg)
                 rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(
                     frame,
-                    source_points=alignment["source_points"]
+                    source_points=source_pts
                 )
                 calibrator = PiecewiseScaleCalibrator(cfg.get("piecewise_anchors", []))
                 detector = WaterSurfaceDetector(calibrator, cfg)
                 water_info = detector.detect_waterline(enhanced)
                 if water_info and "water_level" in water_info:
                     detected_water_level = round(float(water_info["water_level"]), 2)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[check_detection_status] water detection error: {e}")
 
         if detected_water_level is None:
             if mode == "flood":
@@ -490,6 +491,30 @@ class VisionService:
             else:
                 norm = cfg.get("warning_thresholds", {}).get("normal_m", 3.0)
                 detected_water_level = round(float(norm), 2)
+
+        # บันทึกระดับน้ำที่วัดได้จริงจากภาพลงในตาราง WaterMeasurement ทันที เพื่อให้ Telemetry ล่าสุดตรงกับค่าที่วัดได้
+        if detected_water_level is not None and mode == "live":
+            try:
+                from core.database import SessionLocal
+                from models.measurement import WaterMeasurement
+                with SessionLocal() as db_session:
+                    latest = db_session.query(WaterMeasurement).filter(
+                        WaterMeasurement.station_code == station_code
+                    ).order_by(WaterMeasurement.timestamp.desc()).first()
+                    # ถ้ายังไม่มีข้อมูล หรือระดับน้ำที่วัดได้จริงต่างจากข้อมูลล่าสุดเกิน 1 ซม. ให้บันทึกการวัดใหม่
+                    if not latest or abs(latest.water_level - detected_water_level) > 0.01:
+                        new_meas = WaterMeasurement(
+                            station_code=station_code,
+                            timestamp=datetime.utcnow(),
+                            water_level=detected_water_level,
+                            source_type="CAMERA_VISION",
+                            vision_confidence=round(float(alignment.get("confidence", 0.9)), 3),
+                            is_reviewed_by_human=False
+                        )
+                        db_session.add(new_meas)
+                        db_session.commit()
+            except Exception as e:
+                print(f"[check_detection_status] could not record measurement: {e}")
 
         if alignment.get("is_manual"):
             return {

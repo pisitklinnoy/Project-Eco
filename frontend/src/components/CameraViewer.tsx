@@ -307,28 +307,24 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // คำนวณระดับน้ำปัจจุบันและสถานะธงเตือนภัยตามเกณฑ์ของสถานี
   // ลำดับความสำคัญ:
-  // 1. หากอยู่ในโหมด ai_dashboard จำลองสถานการณ์ (flood, daytime, nighttime) ให้ใช้ระดับน้ำของสถานการณ์นั้น
-  // 2. หากมีข้อมูล measurement ล่าสุด (จากการวัดรอบใหม่ หรือ On-Demand AI) ให้ใช้ measurement.water_level
-  // 3. หากมี detectionStatus.water_level จากการรันตรวจจับ ให้ใช้ค่านั้น
+  // 1. หาก detectionStatus มีค่าระดับน้ำจากการตรวจจับ AI ของกล้องนี้ ให้ใช้ค่านั้นก่อน เพราะตรงกับสิ่งที่ AI วัดได้บนภาพกล้องสดขณะนั้นจริงๆ
+  // 2. หากอยู่ในโหมด ai_dashboard จำลองสถานการณ์ (flood, daytime, nighttime) ให้ใช้ระดับน้ำของสถานการณ์นั้น
+  // 3. หากมีข้อมูล measurement ล่าสุด (จากการวัดรอบใหม่ หรือ On-Demand AI) ให้ใช้ measurement.water_level
   // 4. สำรองด้วย station.normal_level
   let currentWaterLevel: number;
-  if (viewMode === 'ai_dashboard' && (aiScenario === 'flood' || aiScenario === 'nighttime' || aiScenario === 'daytime')) {
-    if (detectionStatus?.water_level != null) {
-      currentWaterLevel = detectionStatus.water_level;
-    } else if (aiScenario === 'flood') {
-      const code = (station?.station_code || '').toUpperCase();
-      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 16.90 : code.includes('BANGSALA') || code.includes('90') ? 9.80 : 8.50;
-    } else if (aiScenario === 'nighttime') {
-      const code = (station?.station_code || '').toUpperCase();
-      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.40 : code.includes('BANGSALA') || code.includes('90') ? 2.95 : 0.80;
-    } else {
-      const code = (station?.station_code || '').toUpperCase();
-      currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.20 : code.includes('BANGSALA') || code.includes('90') ? 2.75 : 0.60;
-    }
+  if (detectionStatus?.water_level != null) {
+    currentWaterLevel = detectionStatus.water_level;
+  } else if (viewMode === 'ai_dashboard' && aiScenario === 'flood') {
+    const code = (station?.station_code || '').toUpperCase();
+    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 16.90 : code.includes('BANGSALA') || code.includes('90') ? 9.80 : 8.50;
+  } else if (viewMode === 'ai_dashboard' && aiScenario === 'nighttime') {
+    const code = (station?.station_code || '').toUpperCase();
+    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.40 : code.includes('BANGSALA') || code.includes('90') ? 2.95 : 0.80;
+  } else if (viewMode === 'ai_dashboard' && aiScenario === 'daytime') {
+    const code = (station?.station_code || '').toUpperCase();
+    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.20 : code.includes('BANGSALA') || code.includes('90') ? 2.75 : 0.60;
   } else if (measurement?.water_level != null) {
     currentWaterLevel = measurement.water_level;
-  } else if (detectionStatus?.water_level != null) {
-    currentWaterLevel = detectionStatus.water_level;
   } else {
     currentWaterLevel = station?.normal_level ?? 0;
   }
@@ -378,7 +374,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     let isMounted = true;
     const fetchDetectionStatus = async () => {
       try {
-        const res = await fetch(`/api/v1/stations/${encodeURIComponent(station.station_code)}/detection-status?mode=${aiScenario}`);
+        const modeParam = viewMode === 'ai_dashboard' ? aiScenario : 'live';
+        const res = await fetch(`/api/v1/stations/${encodeURIComponent(station.station_code)}/detection-status?mode=${modeParam}`);
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
@@ -394,7 +391,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [station?.station_code, aiScenario, refreshKey]);
+  }, [station?.station_code, aiScenario, viewMode, refreshKey]);
 
   if (!station) return null;
 
@@ -1243,14 +1240,23 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <div className="absolute top-4 left-4 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl text-white max-w-sm sm:max-w-md pointer-events-none select-none">
                 <div className="flex items-center space-x-2.5 mb-2">
                   <span className={`w-3 h-3 rounded-full shrink-0 ${
-                    detectionStatus?.detected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping'
+                    detectionStatus === null
+                      ? 'bg-amber-400 animate-pulse'
+                      : detectionStatus.detected
+                      ? 'bg-emerald-400 animate-pulse'
+                      : 'bg-rose-500 animate-ping'
                   }`} />
                   <span className="font-extrabold text-xs text-sky-200">
                     AI Vision: <code className="text-amber-300 font-mono">model_best_v2.pt</code> (YOLOv8-Seg) &bull; {station.name}
                   </span>
                 </div>
 
-                {detectionStatus?.detected ? (
+                {detectionStatus === null ? (
+                  <div className="flex items-center space-x-2 text-slate-300 font-medium text-xs py-1">
+                    <span className="w-3 h-3 rounded-full border-2 border-sky-400 border-t-transparent animate-spin" />
+                    <span>กำลังวิเคราะห์ภาพเสาวัดระดับน้ำ...</span>
+                  </div>
+                ) : detectionStatus.detected ? (
                   <div className="space-y-1.5">
                     <div className={`flex items-center space-x-2 font-bold text-xs ${
                       detectionStatus.is_manual ? 'text-amber-400' : 'text-emerald-400'
@@ -1268,6 +1274,12 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                         <span className={`ml-2 font-bold ${detectionStatus.is_manual ? 'text-amber-300' : 'text-sky-300'}`}>
                           (W={detectionStatus.bbox[2] - detectionStatus.bbox[0]}px, H={detectionStatus.bbox[3] - detectionStatus.bbox[1]}px)
                         </span>
+                      </div>
+                    )}
+                    {detectionStatus.water_level != null && (
+                      <div className="text-[11px] text-emerald-300 font-bold bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center justify-between">
+                        <span>ระดับน้ำที่ AI ตรวจจับได้:</span>
+                        <span className="text-xs font-mono font-black text-white">{detectionStatus.water_level.toFixed(2)} ม.</span>
                       </div>
                     )}
                   </div>

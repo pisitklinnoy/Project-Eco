@@ -12,6 +12,7 @@ import {
   Globe,
   ShieldAlert,
   Camera,
+  Crop,
 } from 'lucide-react';
 import { IconButton } from './ui/IconButton';
 import type { UserRole } from './Navbar';
@@ -23,6 +24,7 @@ interface FloatingSidebarProps {
   onSwitchRole: (role: UserRole) => void;
   onOpenReview: () => void;
   onOpenCalibrate: () => void;
+  onOpenManualBBox?: () => void;
   onOpenOnDemand?: () => void;
   onRefresh: () => void;
   loading?: boolean;
@@ -35,6 +37,7 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
   onSwitchRole,
   onOpenReview,
   onOpenCalibrate,
+  onOpenManualBBox,
   onOpenOnDemand,
   onRefresh,
   loading = false,
@@ -116,6 +119,17 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
       {/* Admin Engineering Quick Actions (Only visible in admin mode) */}
       {role === 'admin' && (
         <div className="flex flex-col items-center space-y-2 pt-1 border-t border-slate-200/60 w-full">
+          {onOpenManualBBox && (
+            <IconButton
+              onClick={onOpenManualBBox}
+              tooltip="วาดกรอบเสาภาพสด / ครอปเสา (Manual Crop)"
+              size="md"
+              className="text-amber-700 hover:!bg-amber-50 hover:!text-amber-800"
+            >
+              <Crop className="w-4 h-4 text-amber-600" />
+            </IconButton>
+          )}
+
           <IconButton
             onClick={onOpenReview}
             tooltip="ตรวจทานผลวัดน้ำ (Human-in-the-Loop)"

@@ -264,6 +264,7 @@ export const App: React.FC = () => {
         onSwitchRole={handleSwitchRole}
         onOpenReview={() => setIsReviewOpen(true)}
         onOpenCalibrate={() => setIsCalibrateOpen(true)}
+        onOpenManualBBox={() => setIsManualBBoxOpen(true)}
         onOpenOnDemand={() => setIsOnDemandOpen(true)}
         onRefresh={loadStationData}
         loading={loading}
@@ -380,6 +381,10 @@ export const App: React.FC = () => {
                       <CameraViewer
                         station={selectedStation}
                         measurement={measurement}
+                        onOpenManualBBox={() => setIsManualBBoxOpen(true)}
+                        onOpenCalibrate={() => setIsCalibrateOpen(true)}
+                        onOpenOnDemand={() => setIsOnDemandOpen(true)}
+                        onOpenReview={() => setIsReviewOpen(true)}
                       />
                     </div>
                   </div>

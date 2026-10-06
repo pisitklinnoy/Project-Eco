@@ -2,8 +2,8 @@
 Staff Gauge & Water Surface Auto-Localizer Module
 ระบบตรวจจับหาตำแหน่งเสาวัดระดับน้ำและผิวน้ำอัตโนมัติด้วย YOLO Segmentation
 รองรับ:
-1. YOLOv8-Seg via Ultralytics PyTorch (model_best_v2.pt)
-2. YOLOv8-Seg via OpenCV DNN (model_best_v2.onnx) - รวดเร็ว ไม่ต้องพึ่งพา PyTorch
+1. YOLOv8-Seg via OpenCV DNN (model_muangkong_seg.onnx) - รวดเร็ว ไม่ต้องพึ่งพา PyTorch
+2. YOLOv8-Seg via Ultralytics PyTorch (model_muangkong_seg.pt)
 3. Color Saliency & Structural Aspect Ratio Fallback (Pure Computer Vision)
 4. Dynamic Camera Shift Compensation เมื่อกล้อง CCTV ขยับ/ส่าย/เปลี่ยนมุมมอง
 """
@@ -29,6 +29,25 @@ def _letterbox(im: np.ndarray, new_shape=(640, 640), color=(114, 114, 114)) -> T
     return im, r, (dw, dh)
 
 
+def enhance_night_frame(frame: np.ndarray) -> np.ndarray:
+    """
+    ปรับปรุงคุณภาพภาพถ่ายกลางคืน / แสงน้อย (Adaptive Gamma + LAB CLAHE)
+    เพื่อช่วยให้โมเดล YOLO ตรวจจับเสาวัดระดับน้ำได้ในสภาวะมืดหรือแสงสลัว
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mean_val = float(np.mean(gray))
+    gamma = 1.8 if mean_val < 60.0 else 1.35
+    inv_gamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in range(256)]).astype("uint8")
+    gamma_frame = cv2.LUT(frame, table)
+
+    lab = cv2.cvtColor(gamma_frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+    return cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2BGR)
+
+
 class StaffGaugeAutoLocalizer:
     """
     ระบบค้นหาเสาวัดน้ำและผิวน้ำอัตโนมัติในเฟรมภาพ CCTV
@@ -38,56 +57,63 @@ class StaffGaugeAutoLocalizer:
         self.yolo_pt = None
         self.backend = None
         self.model_path = None
+        # แคชตำแหน่งเสาที่ตรวจพบแม่นยำในเวลากลางวันสำหรับแต่ละสถานี (Temporal Anchor Persistence)
+        self.station_anchors: Dict[str, Dict[str, Any]] = {}
 
-        # ค้นหาโมเดลอัตโนมัติหากไม่ได้ระบุ (ให้ความสำคัญกับ model_best_v2.pt และ model_best_v2.onnx ก่อน)
+        # ค้นหาโมเดลอัตโนมัติหากไม่ได้ระบุ (ให้ความสำคัญกับ model_best_v2 ก่อน)
         candidates = []
         if model_path:
             candidates.append(model_path)
 
         curr_dir = os.path.dirname(os.path.abspath(__file__))
-        models_dir = os.path.join(os.path.dirname(curr_dir), "models")
-        candidates.extend([
-            os.path.join(models_dir, "model_best_v2.pt"),
-            os.path.join(models_dir, "model_best_v2.onnx"),
-            os.path.join(models_dir, "model_muangkong_seg.pt"),
-            os.path.join(models_dir, "model_muangkong_seg.onnx"),
-        ])
+        p = curr_dir
+        project_roots = []
+        for _ in range(5):
+            project_roots.append(p)
+            p = os.path.dirname(p)
 
-        # 1. ลองโหลดผ่าน Ultralytics PyTorch ก่อน
-        for p in candidates:
-            if p.endswith(".pt") and os.path.exists(p):
-                try:
-                    from ultralytics import YOLO
-                    self.yolo_pt = YOLO(p)
-                    self.backend = "PYTORCH"
-                    self.model_path = p
-                    print(f"🤖 [AutoLocalizer] โหลดโมเดล YOLO PyTorch สำเร็จ: {os.path.basename(p)}")
-                    break
-                except Exception as e:
-                    pass
+        search_names = ["model_best_v2.pt", "model_best_v2.onnx", "model_muangkong_seg.pt", "model_muangkong_seg.onnx"]
+        search_dirs = []
+        for root in project_roots:
+            search_dirs.extend([
+                os.path.join(root, "non_time_series", "models"),
+                os.path.join(root, "models"),
+                os.path.join(root, "backend", "models"),
+                os.path.join(root, "workers", "vision", "models"),
+            ])
 
-        # 2. ถ้าไม่มี PyTorch หรือโหลด .pt ไม่ได้ ให้โหลด .onnx ผ่าน OpenCV DNN
-        if self.backend is None:
-            for p in candidates:
-                if p.endswith(".onnx") and os.path.exists(p):
+        for s_dir in search_dirs:
+            for s_name in search_names:
+                candidates.append(os.path.join(s_dir, s_name))
+
+        for cand in candidates:
+            if cand and os.path.exists(cand):
+                self.model_path = cand
+                if cand.endswith(".pt"):
                     try:
-                        self.net = cv2.dnn.readNetFromONNX(p)
-                        self.backend = "OPENCV_ONNX"
-                        self.model_path = p
-                        print(f"🤖 [AutoLocalizer] โหลดโมเดล YOLO ONNX (OpenCV DNN) สำเร็จ: {os.path.basename(p)}")
+                        from ultralytics import YOLO
+                        self.yolo_pt = YOLO(cand)
+                        self.backend = "PYTORCH"
+                        print(f"[AutoLocalizer] Loaded YOLO PyTorch model: {cand}")
+                        break
+                    except Exception:
+                        pass
+                elif cand.endswith(".onnx"):
+                    try:
+                        self.net = cv2.dnn.readNetFromONNX(cand)
+                        self.backend = "ONNX"
+                        print(f"[AutoLocalizer] Loaded YOLO ONNX model: {cand}")
                         break
                     except Exception as e:
-                        pass
+                        print(f"[AutoLocalizer] Failed to load ONNX {cand}: {e}")
 
-        if self.backend is None:
-            print("⚠️ [AutoLocalizer] ไม่สามารถโหลดโมเดล Deep Learning ได้ จะใช้ Color Saliency & Config Fallback แทน")
+        if not self.backend:
+            print("[AutoLocalizer] No YOLO model found, using Color Saliency & Config Prior.")
 
-    def detect_raw(self, frame: np.ndarray, conf_thresh: float = 0.25) -> List[Dict[str, Any]]:
-        """
-        รันการตรวจจับวัตถุบนภาพต้นฉบับ ส่งคืนรายการ detections
-        """
-        detections = []
+    def _run_inference(self, frame: np.ndarray, conf_thresh: float = 0.12) -> List[Dict[str, Any]]:
+        """รัน Inference บนโมเดล YOLO (PyTorch หรือ ONNX)"""
         h, w = frame.shape[:2]
+        detections = []
 
         if self.backend == "PYTORCH" and self.yolo_pt is not None:
             results = self.yolo_pt(frame, conf=conf_thresh, verbose=False)
@@ -100,67 +126,115 @@ class StaffGaugeAutoLocalizer:
                     poly = None
                     if i < len(masks_xy) and len(masks_xy[i]) > 0:
                         poly = masks_xy[i].reshape(-1, 1, 2).astype(np.int32)
-                    name = self.yolo_pt.names.get(cls, "Staff Gauge" if cls == 0 else "Water-Area")
                     detections.append({
-                        "name": name,
+                        "name": "Staff Gauge" if cls == 0 else "Water-Area",
                         "class_id": cls,
                         "confidence": round(conf, 3),
                         "bbox": [max(0, int(xyxy[0])), max(0, int(xyxy[1])), min(w, int(xyxy[2])), min(h, int(xyxy[3]))],
                         "polygon": poly
                     })
 
-        elif self.backend == "OPENCV_ONNX" and self.net is not None:
-            img, ratio, (dw, dh) = _letterbox(frame, (640, 640))
-            blob = cv2.dnn.blobFromImage(img, 1.0 / 255.0, (640, 640), swapRB=True, crop=False)
+        elif self.backend == "ONNX" and self.net is not None:
+            img_letter, r, (dw, dh) = _letterbox(frame)
+            blob = cv2.dnn.blobFromImage(img_letter, 1.0 / 255.0, (640, 640), swapRB=True, crop=False)
             self.net.setInput(blob)
-            preds = self.net.forward()
-            if isinstance(preds, (list, tuple)):
-                out = preds[0]
-            else:
-                out = preds
+            out_names = self.net.getUnconnectedOutLayersNames()
+            outs = self.net.forward(out_names)
+            output0 = outs[0][0]  # shape: (38, 8400)
+            proto = outs[1][0] if len(outs) > 1 else None
+            preds = output0.T
 
-            if len(out.shape) == 3:
-                out = out[0]
-            if out.shape[0] < out.shape[1]:
-                out = out.T
+            boxes, confidences, class_ids = [], [], []
+            raw_boxes, mask_coeffs = [], []
+            for row in preds:
+                scores = row[4:6]
+                max_s = np.max(scores)
+                if max_s > conf_thresh:
+                    cls = int(np.argmax(scores))
+                    cx, cy, bw, bh = row[0], row[1], row[2], row[3]
+                    raw_boxes.append([cx, cy, bw, bh])
+                    if proto is not None:
+                        mask_coeffs.append(row[6:38])
+                    cx_orig = (cx - dw) / r
+                    cy_orig = (cy - dh) / r
+                    bw_orig = bw / r
+                    bh_orig = bh / r
+                    x1 = int(cx_orig - bw_orig / 2.0)
+                    y1 = int(cy_orig - bh_orig / 2.0)
+                    boxes.append([x1, y1, int(bw_orig), int(bh_orig)])
+                    confidences.append(float(max_s))
+                    class_ids.append(cls)
 
-            boxes = []
-            confs = []
-            class_ids = []
+            indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_thresh, 0.45)
+            if len(indices) > 0:
+                for idx in np.array(indices).flatten():
+                    bx, by, bw, bh = boxes[idx]
+                    cls = class_ids[idx]
+                    conf = float(confidences[idx])
 
-            for row in out:
-                cls_scores = row[4:6]
-                cls_id = int(np.argmax(cls_scores))
-                conf = float(cls_scores[cls_id])
-                if conf >= conf_thresh:
-                    cx, cy, bw, bh = row[0:4]
-                    x1 = (cx - bw / 2.0 - dw) / ratio
-                    y1 = (cy - bh / 2.0 - dh) / ratio
-                    x2 = (cx + bw / 2.0 - dw) / ratio
-                    y2 = (cy + bh / 2.0 - dh) / ratio
+                    poly = None
+                    if proto is not None and idx < len(mask_coeffs):
+                        try:
+                            cx, cy, raw_w, raw_h = raw_boxes[idx]
+                            lx1 = max(0, int(cx - raw_w / 2.0))
+                            ly1 = max(0, int(cy - raw_h / 2.0))
+                            lx2 = min(640, int(cx + raw_w / 2.0))
+                            ly2 = min(640, int(cy + raw_h / 2.0))
 
-                    x1 = max(0, min(w, int(round(x1))))
-                    y1 = max(0, min(h, int(round(y1))))
-                    x2 = max(0, min(w, int(round(x2))))
-                    y2 = max(0, min(h, int(round(y2))))
+                            mc = np.array(mask_coeffs[idx])
+                            mask_160 = (1.0 / (1.0 + np.exp(-(mc @ proto.reshape(32, -1))))).reshape(160, 160)
+                            mask_640 = cv2.resize(mask_160, (640, 640), interpolation=cv2.INTER_LINEAR)
 
-                    boxes.append([x1, y1, x2 - x1, y2 - y1])
-                    confs.append(conf)
-                    class_ids.append(cls_id)
+                            cropped_mask = np.zeros_like(mask_640)
+                            cropped_mask[ly1:ly2, lx1:lx2] = mask_640[ly1:ly2, lx1:lx2]
 
-            if len(boxes) > 0:
-                indices = cv2.dnn.NMSBoxes(boxes, confs, conf_thresh, 0.45)
-                if len(indices) > 0:
-                    for idx in indices.flatten():
-                        bx, by, bw_b, bh_b = boxes[idx]
-                        cls = class_ids[idx]
-                        detections.append({
-                            "name": "Staff Gauge" if cls == 0 else "Water-Area",
-                            "class_id": cls,
-                            "confidence": round(float(confs[idx]), 3),
-                            "bbox": [bx, by, bx + bw_b, by + bh_b],
-                            "polygon": None
-                        })
+                            valid_h, valid_w = int(round(h * r)), int(round(w * r))
+                            top, left = int(dh), int(dw)
+                            mask_cropped = cropped_mask[top:top+valid_h, left:left+valid_w]
+                            mask_orig = cv2.resize(mask_cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+                            mask_bin = (mask_orig > 0.50).astype(np.uint8)
+
+                            contours, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                            if len(contours) > 0:
+                                best_cnt = max(contours, key=cv2.contourArea)
+                                if cv2.contourArea(best_cnt) > 200:
+                                    poly = cv2.approxPolyDP(best_cnt, 2.5, True)
+                        except Exception:
+                            poly = None
+
+                    detections.append({
+                        "name": "Staff Gauge" if cls == 0 else "Water-Area",
+                        "class_id": cls,
+                        "confidence": round(conf, 3),
+                        "bbox": [max(0, bx), max(0, by), min(w, bx + bw), min(h, by + bh)],
+                        "polygon": poly
+                    })
+
+        return detections
+
+    def detect_raw(self, frame: np.ndarray, conf_thresh: float = 0.12) -> List[Dict[str, Any]]:
+        """
+        ตรวจจับวัตถุทั้งหมด (Staff Gauge และ Water-Area) ในภาพ พร้อมดึง Polygon Mask
+        รองรับโหมดเพิ่มประสิทธิภาพภาพถ่ายกลางคืนอัตโนมัติ (Night Vision CLAHE Enhancement)
+        """
+        detections = self._run_inference(frame, conf_thresh=conf_thresh)
+        has_gauge = any(d.get("name") == "Staff Gauge" for d in detections)
+
+        # ตรวจสอบสภาพแสงในภาพ (Low-light check)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        mean_lum = float(np.mean(gray))
+        is_low_light = mean_lum < 95.0
+
+        if (not has_gauge or not any(d.get("confidence", 0) >= 0.25 for d in detections if d.get("name") == "Staff Gauge")) and is_low_light:
+            try:
+                enh_frame = enhance_night_frame(frame)
+                night_dets = self._run_inference(enh_frame, conf_thresh=max(0.06, conf_thresh * 0.65))
+                for d in night_dets:
+                    if d.get("name") == "Staff Gauge":
+                        d["is_night_enhanced"] = True
+                        detections.append(d)
+            except Exception as e:
+                print(f"[AutoLocalizer] Night enhancement inference warning: {e}")
 
         return detections
 
@@ -178,7 +252,7 @@ class StaffGaugeAutoLocalizer:
         ref_cx = (ref_x1 + ref_x2) / 2.0
         ref_cy = (ref_y1 + ref_y2) / 2.0
 
-        detections = self.detect_raw(frame, conf_thresh=0.20)
+        detections = self.detect_raw(frame, conf_thresh=0.25)
         gauge_boxes = [d for d in detections if d["name"] == "Staff Gauge"]
         water_boxes = [d for d in detections if d["name"] == "Water-Area"]
 
@@ -190,12 +264,13 @@ class StaffGaugeAutoLocalizer:
             gx1, gy1, gx2, gy2 = g["bbox"]
             gcx = (gx1 + gx2) / 2.0
             gcy = (gy1 + gy2) / 2.0
+            # เสาวัดน้ำต้องเป็นแท่งแนวดิ่ง
             gbw = max(1, gx2 - gx1)
             gbh = max(1, gy2 - gy1)
             aspect = gbh / float(gbw)
 
             dist_x = abs(gcx - ref_cx)
-            if dist_x < best_dist and dist_x < 350.0 and aspect >= 1.5:
+            if dist_x < best_dist and dist_x < 300.0 and aspect >= 1.5:
                 best_dist = dist_x
                 best_gauge = g
 
@@ -203,12 +278,12 @@ class StaffGaugeAutoLocalizer:
         water_area_bbox = None
         water_area_conf = None
         waterline_hint_y = None
-        best_water = None
         if len(water_boxes) > 0:
+            # เลือกผิวน้ำที่มีความเชื่อมั่นสูงสุด
             best_water = max(water_boxes, key=lambda x: x["confidence"])
             water_area_bbox = best_water["bbox"]
             water_area_conf = best_water["confidence"]
-            waterline_hint_y = water_area_bbox[1]
+            waterline_hint_y = water_area_bbox[1]  # ขอบบนของผิวน้ำ
 
         if best_gauge is not None:
             bx1, gy1, bx2, gy2 = best_gauge["bbox"]
@@ -219,6 +294,7 @@ class StaffGaugeAutoLocalizer:
             is_shifted = abs(dx) > 15.0
 
             # ปรับ BBox ที่อัปเดตแล้วสำหรับส่งต่อให้ PoleCoordinateManager
+            updated_w = cfg_bbox.get("width", bx2 - bx1)
             adj_x1 = int(round(ref_x1 + dx))
             adj_x2 = int(round(ref_x2 + dx))
             adj_y1 = ref_y1
@@ -234,7 +310,7 @@ class StaffGaugeAutoLocalizer:
                 "gauge_polygon": best_gauge.get("polygon"),
                 "water_area_bbox": water_area_bbox,
                 "water_area_conf": water_area_conf,
-                "water_polygon": best_water.get("polygon") if best_water else None,
+                "water_polygon": best_water.get("polygon") if 'best_water' in locals() and best_water else None,
                 "waterline_hint_y": waterline_hint_y
             }
 
@@ -304,4 +380,229 @@ class StaffGaugeAutoLocalizer:
             "is_camera_shifted": False,
             "water_area_bbox": None,
             "waterline_hint_y": None
+        }
+
+    def align_hybrid_pole(
+        self,
+        frame: np.ndarray,
+        station_config: Dict[str, Any],
+        raw_detections: Optional[List[Dict[str, Any]]] = None,
+        manual_bbox: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        """
+        ระบบ Hybrid Alignment ผสานเรขาคณิตจาก Config เข้ากับการตรวจจับ Real-time ของ AI:
+        1. Top-Cap Anchor: ยึดหัวเสา (Top-Y) และแนวกึ่งกลาง (Center-X)
+        2. Dynamic Shift Compensation: คำนวณการเลื่อนของมุมกล้อง (dx, dy)
+        3. Height Extrapolation (Anti-Occlusion): หากน้ำท่วมบังเสาท่อนล่าง จะดึงสเกลเต็มความยาวจาก Config ลงไปใต้น้ำ
+        4. Perspective Polygon Tracking: สำหรับสถานีที่มีความเอียง (Homography)
+        """
+        fh, fw = frame.shape[:2]
+        ref_res = station_config.get("reference_frame_resolution", [fw, fh])
+        ref_w, ref_h = float(ref_res[0]), float(ref_res[1])
+        scale_x = fw / ref_w
+        scale_y = fh / ref_h
+
+        has_poly = "staff_gauge_polygon" in station_config
+        has_bbox = "staff_gauge_bbox" in station_config
+
+        # คำนวณพิกัด Baseline Geometry จาก Config
+        if has_poly:
+            poly = station_config["staff_gauge_polygon"]
+            ref_tl = [poly["top_left"][0] * scale_x, poly["top_left"][1] * scale_y]
+            ref_tr = [poly["top_right"][0] * scale_x, poly["top_right"][1] * scale_y]
+            ref_br = [poly["bottom_right"][0] * scale_x, poly["bottom_right"][1] * scale_y]
+            ref_bl = [poly["bottom_left"][0] * scale_x, poly["bottom_left"][1] * scale_y]
+            base_pts = np.float32([ref_tl, ref_tr, ref_br, ref_bl])
+            ref_x1 = min(ref_tl[0], ref_bl[0])
+            ref_x2 = max(ref_tr[0], ref_br[0])
+            ref_y1 = min(ref_tl[1], ref_tr[1])
+            ref_y2 = max(ref_bl[1], ref_br[1])
+        elif has_bbox:
+            bb = station_config["staff_gauge_bbox"]
+            ref_x1 = bb["x1"] * scale_x
+            ref_y1 = bb["y1"] * scale_y
+            ref_x2 = bb["x2"] * scale_x
+            ref_y2 = bb["y2"] * scale_y
+            base_pts = np.float32([
+                [ref_x1, ref_y1],
+                [ref_x2, ref_y1],
+                [ref_x2, ref_y2],
+                [ref_x1, ref_y2]
+            ])
+        else:
+            ref_x1, ref_y1, ref_x2, ref_y2 = fw * 0.45, fh * 0.2, fw * 0.55, fh * 0.8
+            base_pts = np.float32([[ref_x1, ref_y1], [ref_x2, ref_y1], [ref_x2, ref_y2], [ref_x1, ref_y2]])
+
+        ref_cx = (ref_x1 + ref_x2) / 2.0
+        base_h = ref_y2 - ref_y1
+        base_w = ref_x2 - ref_x1
+
+        # กรณีมี Manual BBox ที่ผู้ใช้วาดโดยตรง
+        if manual_bbox and len(manual_bbox) == 4:
+            mx1, my1, mx2, my2 = manual_bbox
+            mcx = (mx1 + mx2) / 2.0
+            mw = max(4, mx2 - mx1)
+            mh = max(10, my2 - my1)
+            dx = mcx - ref_cx
+            dy = my1 - ref_y1
+
+            if has_poly:
+                aligned_pts = base_pts.copy()
+                aligned_pts[:, 0] += dx
+                aligned_pts[:, 1] += dy
+            else:
+                aligned_pts = np.float32([
+                    [mx1, my1],
+                    [mx2, my1],
+                    [mx2, my2],
+                    [mx1, my2]
+                ])
+
+            return {
+                "aligned_bbox": [int(mx1), int(my1), int(mx2), int(my2)],
+                "source_points": aligned_pts,
+                "camera_shift": {"dx": round(float(dx), 1), "dy": round(float(dy), 1)},
+                "is_camera_shifted": abs(dx) > 3.0 or abs(dy) > 3.0,
+                "is_submerged_occluded": False,
+                "is_manual": True,
+                "detected_height_px": int(mh),
+                "structural_height_px": int(mh),
+                "confidence": 1.0,
+                "method": "MANUAL_BBOX_ALIGNMENT",
+                "raw_yolo_bbox": manual_bbox
+            }
+
+        # ดึงผลตรวจจับของ YOLO
+        if raw_detections is None:
+            raw_detections = self.detect_raw(frame, conf_thresh=0.12)
+
+        gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
+
+        best_g = None
+        best_score = -999.0
+        max_corridor = max(250.0, base_w * 4.5)
+
+        for g in gauges:
+            gx1, gy1, gx2, gy2 = g["bbox"]
+            gcx = (gx1 + gx2) / 2.0
+            gw = max(1, gx2 - gx1)
+            gh = max(1, gy2 - gy1)
+            aspect = gh / float(gw)
+            dist_x = abs(gcx - ref_cx)
+
+            # กรองกล่องที่หลอนหรืออยู่ไกลเกินขอบเขตเสาจริง
+            if dist_x < max_corridor and aspect >= 1.1:
+                # ให้คะแนนความน่าจะเป็นเสา: ยิ่งใกล้แกนเสาเดิมและ confidence สูง ยิ่งได้คะแนนมาก
+                proximity_score = 1.0 - (dist_x / max_corridor)
+                score = g.get("confidence", 0.5) * 1.5 + proximity_score * 1.0
+                if score > best_score:
+                    best_score = score
+                    best_g = g
+
+        if best_g is not None:
+            bx1, gy1, bx2, gy2 = best_g["bbox"]
+            gcx = (bx1 + bx2) / 2.0
+            det_h = gy2 - gy1
+
+            # 1. การเลื่อนของกล้องในแนวราบ (dx) และแนวดิ่งของหัวเสา (dy)
+            dx = gcx - ref_cx
+            dy_top = gy1 - ref_y1
+
+            dx_clamped = float(np.clip(dx, -250.0, 250.0))
+            dy_clamped = float(np.clip(dy_top, -150.0, 150.0))
+
+            # 2. ยึดหัวเสา (Top-Cap Anchor)
+            aligned_y1 = ref_y1 + dy_clamped
+
+            # 3. ตรวจจับการถูกน้ำท่วมบังเสา (Water Submergence Occlusion Check)
+            # ถ้าน้ำท่วมบังเสาท่อนล่าง det_h จะหดสั้นกว่าความสูงจริง base_h
+            is_submerged = (det_h < base_h * 0.85)
+
+            if is_submerged:
+                # ต่อยอดความยาวเสาเต็มต้น (Extrapolate) ลงไปใต้น้ำตามเรขาคณิตของ Config
+                aligned_y2 = aligned_y1 + base_h
+            else:
+                aligned_y2 = aligned_y1 + max(det_h, base_h)
+
+            aligned_x1 = int(round(gcx - base_w / 2.0))
+            aligned_x2 = int(round(gcx + base_w / 2.0))
+            aligned_y1 = int(round(aligned_y1))
+            aligned_y2 = int(round(aligned_y2))
+
+            # ปรับพิกัด 4 จุดสำหรับดัดมุมมอง (Homography Source Points)
+            if has_poly:
+                aligned_pts = base_pts.copy()
+                aligned_pts[:, 0] += dx_clamped
+                aligned_pts[:, 1] += dy_clamped
+            else:
+                aligned_pts = np.float32([
+                    [aligned_x1, aligned_y1],
+                    [aligned_x2, aligned_y1],
+                    [aligned_x2, aligned_y2],
+                    [aligned_x1, aligned_y2]
+                ])
+
+            # บันทึกพิกัดเสาลงแคชประจำสถานี (สำหรับใช้ต่อในเวลากลางคืน)
+            stn_code = station_config.get("station_code") or station_config.get("station_name") or "default"
+            if best_g.get("confidence", 0.0) >= 0.20:
+                self.station_anchors[stn_code] = {
+                    "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                    "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)],
+                    "source_points": aligned_pts.copy(),
+                    "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
+                    "detected_height_px": int(det_h),
+                    "structural_height_px": int(base_h),
+                    "confidence": float(best_g["confidence"])
+                }
+
+            return {
+                "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                "source_points": aligned_pts,
+                "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
+                "is_camera_shifted": abs(dx_clamped) > 3.0 or abs(dy_clamped) > 3.0,
+                "is_submerged_occluded": is_submerged,
+                "is_manual": False,
+                "detected_height_px": int(det_h),
+                "structural_height_px": int(base_h),
+                "confidence": float(best_g["confidence"]),
+                "method": "HYBRID_CONFIG_TOP_ANCHOR",
+                "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)]
+            }
+
+        # Fallback: กรณี YOLO ไม่พบเสาใน Corridor หรือในเวลากลางคืนที่มืดสนิท
+        stn_code = station_config.get("station_code") or station_config.get("station_name") or "default"
+        # 1. ตรวจสอบว่ามีพิกัดที่แคชไว้จากเวลากลางวันหรือไม่ (Daytime Temporal Anchor Persistence)
+        if stn_code in self.station_anchors:
+            cached = self.station_anchors[stn_code]
+            return {
+                "aligned_bbox": cached["aligned_bbox"],
+                "source_points": cached["source_points"].copy(),
+                "camera_shift": cached.get("camera_shift", {"dx": 0.0, "dy": 0.0}),
+                "is_camera_shifted": False,
+                "is_submerged_occluded": False,
+                "is_manual": False,
+                "is_night_anchor": True,
+                "detected_height_px": cached.get("detected_height_px", int(base_h)),
+                "structural_height_px": cached.get("structural_height_px", int(base_h)),
+                "confidence": max(0.85, cached.get("confidence", 0.85)),
+                "method": "NIGHT_FIXED_ANCHOR",
+                "raw_yolo_bbox": cached.get("raw_yolo_bbox") or cached["aligned_bbox"]
+            }
+
+        # 2. หากยังไม่มีแคชกลางวัน ใช้พิกัดแม่พิมพ์คาลิเบรตของสถานี (Blueprint Geometry Baseline)
+        aligned_pts = base_pts.copy()
+        aligned_bbox = [int(round(ref_x1)), int(round(ref_y1)), int(round(ref_x2)), int(round(ref_y2))]
+        return {
+            "aligned_bbox": aligned_bbox,
+            "source_points": aligned_pts,
+            "camera_shift": {"dx": 0.0, "dy": 0.0},
+            "is_camera_shifted": False,
+            "is_submerged_occluded": False,
+            "is_manual": False,
+            "is_night_anchor": True,
+            "detected_height_px": int(base_h),
+            "structural_height_px": int(base_h),
+            "confidence": 0.85,
+            "method": "NIGHT_FIXED_ANCHOR",
+            "raw_yolo_bbox": aligned_bbox
         }

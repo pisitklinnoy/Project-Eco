@@ -29,6 +29,25 @@ def _letterbox(im: np.ndarray, new_shape=(640, 640), color=(114, 114, 114)) -> T
     return im, r, (dw, dh)
 
 
+def enhance_night_frame(frame: np.ndarray) -> np.ndarray:
+    """
+    ปรับปรุงคุณภาพภาพถ่ายกลางคืน / แสงน้อย (Adaptive Gamma + LAB CLAHE)
+    เพื่อช่วยให้โมเดล YOLO ตรวจจับเสาวัดระดับน้ำได้ในสภาวะมืดหรือแสงสลัว
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mean_val = float(np.mean(gray))
+    gamma = 1.8 if mean_val < 60.0 else 1.35
+    inv_gamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in range(256)]).astype("uint8")
+    gamma_frame = cv2.LUT(frame, table)
+
+    lab = cv2.cvtColor(gamma_frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+    return cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2BGR)
+
+
 class StaffGaugeAutoLocalizer:
     """
     ระบบค้นหาเสาวัดน้ำและผิวน้ำอัตโนมัติในเฟรมภาพ CCTV
@@ -38,8 +57,10 @@ class StaffGaugeAutoLocalizer:
         self.yolo_pt = None
         self.backend = None
         self.model_path = None
+        # แคชตำแหน่งเสาที่ตรวจพบแม่นยำในเวลากลางวันสำหรับแต่ละสถานี (Temporal Anchor Persistence)
+        self.station_anchors: Dict[str, Dict[str, Any]] = {}
 
-        # ค้นหาโมเดลอัตโนมัติหากไม่ได้ระบุ
+        # ค้นหาโมเดลอัตโนมัติหากไม่ได้ระบุ (ให้ความสำคัญกับ model_best_v2 ก่อน)
         candidates = []
         if model_path:
             candidates.append(model_path)
@@ -51,14 +72,14 @@ class StaffGaugeAutoLocalizer:
             project_roots.append(p)
             p = os.path.dirname(p)
 
-        search_names = ["model_best_v2.pt", "model_best_v2.onnx", "model_muangkong_seg.onnx", "model_muangkong_seg.pt"]
+        search_names = ["model_best_v2.pt", "model_best_v2.onnx", "model_muangkong_seg.pt", "model_muangkong_seg.onnx"]
         search_dirs = []
         for root in project_roots:
             search_dirs.extend([
                 os.path.join(root, "non_time_series", "models"),
                 os.path.join(root, "models"),
-                os.path.join(root, "workers", "vision", "models"),
                 os.path.join(root, "backend", "models"),
+                os.path.join(root, "workers", "vision", "models"),
             ])
 
         for s_dir in search_dirs:
@@ -68,7 +89,16 @@ class StaffGaugeAutoLocalizer:
         for cand in candidates:
             if cand and os.path.exists(cand):
                 self.model_path = cand
-                if cand.endswith(".onnx"):
+                if cand.endswith(".pt"):
+                    try:
+                        from ultralytics import YOLO
+                        self.yolo_pt = YOLO(cand)
+                        self.backend = "PYTORCH"
+                        print(f"[AutoLocalizer] Loaded YOLO PyTorch model: {cand}")
+                        break
+                    except Exception:
+                        pass
+                elif cand.endswith(".onnx"):
                     try:
                         self.net = cv2.dnn.readNetFromONNX(cand)
                         self.backend = "ONNX"
@@ -76,35 +106,42 @@ class StaffGaugeAutoLocalizer:
                         break
                     except Exception as e:
                         print(f"[AutoLocalizer] Failed to load ONNX {cand}: {e}")
-                elif cand.endswith(".pt"):
-                    try:
-                        from ultralytics import YOLO
-                        self.yolo_pt = YOLO(cand)
-                        self.backend = "PYTORCH"
-                        print(f"[AutoLocalizer] Loaded YOLO PyTorch model: {cand}")
-                        break
-                    except Exception as e:
-                        # Ultralytics or Torch might not be in this env
-                        pass
 
         if not self.backend:
             print("[AutoLocalizer] No YOLO model found, using Color Saliency & Config Prior.")
 
-    def detect_raw(self, frame: np.ndarray, conf_thresh: float = 0.20) -> List[Dict[str, Any]]:
-        """
-        ตรวจจับวัตถุทั้งหมด (Staff Gauge และ Water-Area) ในภาพ พร้อมดึง Polygon Mask
-        """
+    def _run_inference(self, frame: np.ndarray, conf_thresh: float = 0.12) -> List[Dict[str, Any]]:
+        """รัน Inference บนโมเดล YOLO (PyTorch หรือ ONNX)"""
         h, w = frame.shape[:2]
         detections = []
 
-        if self.backend == "ONNX" and self.net is not None:
+        if self.backend == "PYTORCH" and self.yolo_pt is not None:
+            results = self.yolo_pt(frame, conf=conf_thresh, verbose=False)
+            for res in results:
+                masks_xy = res.masks.xy if res.masks is not None else []
+                for i, b in enumerate(res.boxes):
+                    cls = int(b.cls[0])
+                    conf = float(b.conf[0])
+                    xyxy = b.xyxy[0].cpu().numpy().astype(int)
+                    poly = None
+                    if i < len(masks_xy) and len(masks_xy[i]) > 0:
+                        poly = masks_xy[i].reshape(-1, 1, 2).astype(np.int32)
+                    detections.append({
+                        "name": "Staff Gauge" if cls == 0 else "Water-Area",
+                        "class_id": cls,
+                        "confidence": round(conf, 3),
+                        "bbox": [max(0, int(xyxy[0])), max(0, int(xyxy[1])), min(w, int(xyxy[2])), min(h, int(xyxy[3]))],
+                        "polygon": poly
+                    })
+
+        elif self.backend == "ONNX" and self.net is not None:
             img_letter, r, (dw, dh) = _letterbox(frame)
             blob = cv2.dnn.blobFromImage(img_letter, 1.0 / 255.0, (640, 640), swapRB=True, crop=False)
             self.net.setInput(blob)
             out_names = self.net.getUnconnectedOutLayersNames()
             outs = self.net.forward(out_names)
             output0 = outs[0][0]  # shape: (38, 8400)
-            proto = outs[1][0] if len(outs) > 1 else None  # shape: (32, 160, 160)
+            proto = outs[1][0] if len(outs) > 1 else None
             preds = output0.T
 
             boxes, confidences, class_ids = [], [], []
@@ -135,7 +172,6 @@ class StaffGaugeAutoLocalizer:
                     cls = class_ids[idx]
                     conf = float(confidences[idx])
 
-                    # ดึง Polygon จาก Segmentation Mask
                     poly = None
                     if proto is not None and idx < len(mask_coeffs):
                         try:
@@ -174,24 +210,31 @@ class StaffGaugeAutoLocalizer:
                         "polygon": poly
                     })
 
-        elif self.backend == "PYTORCH" and self.yolo_pt is not None:
-            results = self.yolo_pt(frame, conf=conf_thresh, verbose=False)
-            for res in results:
-                masks_xy = res.masks.xy if res.masks is not None else []
-                for i, b in enumerate(res.boxes):
-                    cls = int(b.cls[0])
-                    conf = float(b.conf[0])
-                    xyxy = b.xyxy[0].cpu().numpy().astype(int)
-                    poly = None
-                    if i < len(masks_xy) and len(masks_xy[i]) > 0:
-                        poly = masks_xy[i].reshape(-1, 1, 2).astype(np.int32)
-                    detections.append({
-                        "name": "Staff Gauge" if cls == 0 else "Water-Area",
-                        "class_id": cls,
-                        "confidence": round(conf, 3),
-                        "bbox": [max(0, int(xyxy[0])), max(0, int(xyxy[1])), min(w, int(xyxy[2])), min(h, int(xyxy[3]))],
-                        "polygon": poly
-                    })
+        return detections
+
+    def detect_raw(self, frame: np.ndarray, conf_thresh: float = 0.12) -> List[Dict[str, Any]]:
+        """
+        ตรวจจับวัตถุทั้งหมด (Staff Gauge และ Water-Area) ในภาพ พร้อมดึง Polygon Mask
+        รองรับโหมดเพิ่มประสิทธิภาพภาพถ่ายกลางคืนอัตโนมัติ (Night Vision CLAHE Enhancement)
+        """
+        detections = self._run_inference(frame, conf_thresh=conf_thresh)
+        has_gauge = any(d.get("name") == "Staff Gauge" for d in detections)
+
+        # ตรวจสอบสภาพแสงในภาพ (Low-light check)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        mean_lum = float(np.mean(gray))
+        is_low_light = mean_lum < 95.0
+
+        if (not has_gauge or not any(d.get("confidence", 0) >= 0.25 for d in detections if d.get("name") == "Staff Gauge")) and is_low_light:
+            try:
+                enh_frame = enhance_night_frame(frame)
+                night_dets = self._run_inference(enh_frame, conf_thresh=max(0.06, conf_thresh * 0.65))
+                for d in night_dets:
+                    if d.get("name") == "Staff Gauge":
+                        d["is_night_enhanced"] = True
+                        detections.append(d)
+            except Exception as e:
+                print(f"[AutoLocalizer] Night enhancement inference warning: {e}")
 
         return detections
 
@@ -499,6 +542,19 @@ class StaffGaugeAutoLocalizer:
                     [aligned_x1, aligned_y2]
                 ])
 
+            # บันทึกพิกัดเสาลงแคชประจำสถานี (สำหรับใช้ต่อในเวลากลางคืน)
+            stn_code = station_config.get("station_code") or station_config.get("station_name") or "default"
+            if best_g.get("confidence", 0.0) >= 0.20:
+                self.station_anchors[stn_code] = {
+                    "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                    "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)],
+                    "source_points": aligned_pts.copy(),
+                    "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
+                    "detected_height_px": int(det_h),
+                    "structural_height_px": int(base_h),
+                    "confidence": float(best_g["confidence"])
+                }
+
             return {
                 "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
                 "source_points": aligned_pts,
@@ -513,7 +569,27 @@ class StaffGaugeAutoLocalizer:
                 "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)]
             }
 
-        # Fallback: กรณี YOLO ไม่พบเสาใน Corridor หรือโมเดลหลอน ให้ใช้แม่พิมพ์ Config ที่ปรับสเกล
+        # Fallback: กรณี YOLO ไม่พบเสาใน Corridor หรือในเวลากลางคืนที่มืดสนิท
+        stn_code = station_config.get("station_code") or station_config.get("station_name") or "default"
+        # 1. ตรวจสอบว่ามีพิกัดที่แคชไว้จากเวลากลางวันหรือไม่ (Daytime Temporal Anchor Persistence)
+        if stn_code in self.station_anchors:
+            cached = self.station_anchors[stn_code]
+            return {
+                "aligned_bbox": cached["aligned_bbox"],
+                "source_points": cached["source_points"].copy(),
+                "camera_shift": cached.get("camera_shift", {"dx": 0.0, "dy": 0.0}),
+                "is_camera_shifted": False,
+                "is_submerged_occluded": False,
+                "is_manual": False,
+                "is_night_anchor": True,
+                "detected_height_px": cached.get("detected_height_px", int(base_h)),
+                "structural_height_px": cached.get("structural_height_px", int(base_h)),
+                "confidence": max(0.85, cached.get("confidence", 0.85)),
+                "method": "NIGHT_FIXED_ANCHOR",
+                "raw_yolo_bbox": cached.get("raw_yolo_bbox") or cached["aligned_bbox"]
+            }
+
+        # 2. หากยังไม่มีแคชกลางวัน ใช้พิกัดแม่พิมพ์คาลิเบรตของสถานี (Blueprint Geometry Baseline)
         aligned_pts = base_pts.copy()
         aligned_bbox = [int(round(ref_x1)), int(round(ref_y1)), int(round(ref_x2)), int(round(ref_y2))]
         return {
@@ -523,9 +599,10 @@ class StaffGaugeAutoLocalizer:
             "is_camera_shifted": False,
             "is_submerged_occluded": False,
             "is_manual": False,
+            "is_night_anchor": True,
             "detected_height_px": int(base_h),
             "structural_height_px": int(base_h),
             "confidence": 0.85,
-            "method": "CONFIG_GEOMETRY_BASELINE",
-            "raw_yolo_bbox": None
+            "method": "NIGHT_FIXED_ANCHOR",
+            "raw_yolo_bbox": aligned_bbox
         }

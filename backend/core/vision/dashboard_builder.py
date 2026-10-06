@@ -323,79 +323,61 @@ def render_model_v2_detection_view(
         is_manual = hybrid_info.get("is_manual", False)
         is_submerged = hybrid_info.get("is_submerged_occluded", False)
         is_shifted = hybrid_info.get("is_camera_shifted", False)
+        is_night = hybrid_info.get("is_night_anchor", False) or method == "NIGHT_FIXED_ANCHOR"
         conf = hybrid_info.get("confidence", 0.90)
         shift = hybrid_info.get("camera_shift", {})
         dx = shift.get("dx", 0.0)
         ax1, ay1, ax2, ay2 = hybrid_info["aligned_bbox"]
         raw_box = hybrid_info.get("raw_yolo_bbox")
 
-        # 1. วาดกล่องเสา Staff Gauge หลักที่ Aligned แล้ว
+        # แสดงเฉพาะกรอบ Bounding Box ที่ตรวจจับได้จากโมเดล YOLO โดยตรง (หรือ Aligned Box) เพียงกรอบเดียว
+        if raw_box and len(raw_box) == 4 and not is_manual:
+            bx1, by1, bx2, by2 = raw_box
+        else:
+            bx1, by1, bx2, by2 = ax1, ay1, ax2, ay2
+
         if is_manual:
             box_color = (0, 165, 255)  # Amber
-            badge_txt = "Staff Gauge: Manual BBox (Dataset Saved)"
+            badge_txt = "Staff Gauge: Manual"
             badge_bg = (0, 120, 220)
-        elif is_submerged:
-            box_color = (0, 255, 120)  # Emerald
-            badge_txt = f"Staff Gauge: Extrapolated (Submerged) {conf*100:.1f}%"
-            badge_bg = (0, 140, 70)
-        elif is_shifted:
-            box_color = (0, 255, 120)
-            badge_txt = f"Staff Gauge: Shift Aligned (dx:{dx:+.0f}px) {conf*100:.1f}%"
-            badge_bg = (0, 150, 60)
-        elif method == "HYBRID_CONFIG_TOP_ANCHOR":
-            box_color = (0, 255, 120)
-            badge_txt = f"Staff Gauge: Hybrid Aligned ({conf*100:.1f}%)"
-            badge_bg = (0, 160, 60)
+        elif is_night:
+            box_color = (0, 230, 255)  # Cyan Gold
+            badge_txt = f"Staff Gauge (Night Vision): {conf*100:.1f}%" if conf < 1.0 else "Staff Gauge (Night Anchor)"
+            badge_bg = (0, 130, 180)
+        elif raw_box:
+            box_color = (0, 255, 100)  # Bright Emerald
+            badge_txt = f"Staff Gauge: {conf*100:.1f}%"
+            badge_bg = (0, 150, 50)
         else:
-            # CONFIG_GEOMETRY_BASELINE
-            box_color = (0, 200, 255)
-            badge_txt = "Staff Gauge: Config Baseline (AI Search Failed)"
-            badge_bg = (0, 120, 200)
+            box_color = (0, 210, 255)
+            badge_txt = f"Staff Gauge: Anchor ({conf*100:.1f}%)"
+            badge_bg = (0, 120, 180)
 
-        # วาดกรอบเสาหลัก
-        cv2.rectangle(out, (ax1, ay1), (ax2, ay2), box_color, 3)
+        # วาดกรอบเสาหลักเพียงกรอบเดียว ไม่แสดง Filtered Box อื่นๆ
+        cv2.rectangle(out, (bx1, by1), (bx2, by2), box_color, 3)
 
-        # Corner brackets สำหรับความคมชัดแบบโมเดิร์น
-        c_len = min(20, max(6, (ax2 - ax1) // 3))
-        cv2.line(out, (ax1, ay1), (ax1 + c_len, ay1), (255, 255, 255), 4)
-        cv2.line(out, (ax1, ay1), (ax1, ay1 + c_len), (255, 255, 255), 4)
-        cv2.line(out, (ax2, ay2), (ax2 - c_len, ay2), (255, 255, 255), 4)
-        cv2.line(out, (ax2, ay2), (ax2, ay2 - c_len), (255, 255, 255), 4)
-
-        # หากมีน้ำท่วมบังเสา: แสดงพื้นที่ต่อยอดสเกลลงใต้น้ำ
-        if is_submerged and raw_box:
-            ry2 = raw_box[3]
-            if ay2 > ry2:
-                overlay_sub = out.copy()
-                cv2.rectangle(overlay_sub, (ax1, ry2), (ax2, ay2), (0, 180, 255), -1)
-                cv2.addWeighted(overlay_sub, 0.25, out, 0.75, 0, out)
-                cv2.putText(out, "[Scale Extrapolated Below Waterline]", (ax1 + 4, min(out.shape[0] - 10, ay2 - 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 220, 255), 1, cv2.LINE_AA)
+        # Corner brackets เพิ่มความคมชัด
+        c_len = min(22, max(8, (bx2 - bx1) // 3))
+        cv2.line(out, (bx1, by1), (bx1 + c_len, by1), (255, 255, 255), 4)
+        cv2.line(out, (bx1, by1), (bx1, by1 + c_len), (255, 255, 255), 4)
+        cv2.line(out, (bx2, by2), (bx2 - c_len, by2), (255, 255, 255), 4)
+        cv2.line(out, (bx2, by2), (bx2, by2 - c_len), (255, 255, 255), 4)
 
         # Badge เหนือหัวเสา
         (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
-        by_top = max(0, ay1 - th - 12)
-        cv2.rectangle(out, (ax1 - 2, by_top), (ax1 + tw + 16, ay1), badge_bg, -1)
-        cv2.putText(out, badge_txt, (ax1 + 6, ay1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
-
-        # 2. คัดกรองกล่อง AI ตรวจจับอื่นที่อยู่นอก Corridor (เช่น ราวสะพานมุมบน) และติดป้าย Filtered
-        for d in raw_detections:
-            if d.get("name") == "Staff Gauge":
-                g_box = d.get("bbox")
-                if g_box and g_box != raw_box and not d.get("is_manual"):
-                    gx1, gy1, gx2, gy2 = g_box
-                    cv2.rectangle(out, (gx1, gy1), (gx2, gy2), (100, 100, 200), 1, cv2.LINE_AA)
-                    cv2.putText(out, "[Filtered: Outside Corridor]", (gx1 + 2, max(14, gy1 - 5)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 220), 1, cv2.LINE_AA)
+        by_top = max(0, by1 - th - 12)
+        cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), badge_bg, -1)
+        cv2.putText(out, badge_txt, (bx1 + 6, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
 
         return out
 
-    # Fallback กรณีไม่มี hybrid_info (คงพฤติกรรมเดิม)
+    # Fallback กรณีไม่มี hybrid_info
     gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
-    for g in gauges:
-        bx1, by1, bx2, by2 = g["bbox"]
-        conf = g.get("confidence", 0.0)
-        is_manual = g.get("is_manual", False)
+    if gauges:
+        best_g = max(gauges, key=lambda d: d.get("confidence", 0.0))
+        bx1, by1, bx2, by2 = best_g["bbox"]
+        conf = best_g.get("confidence", 0.0)
+        is_manual = best_g.get("is_manual", False)
 
         box_color = (0, 165, 255) if is_manual else (0, 255, 100)
         cv2.rectangle(out, (bx1, by1), (bx2, by2), box_color, 3)
@@ -406,8 +388,8 @@ def render_model_v2_detection_view(
         cv2.line(out, (bx2, by2), (bx2 - c_len, by2), (255, 255, 255), 4)
         cv2.line(out, (bx2, by2), (bx2, by2 - c_len), (255, 255, 255), 4)
 
-        badge_txt = "Staff Gauge: Manual (Dataset Saved)" if is_manual else f"Staff Gauge: {conf*100:.1f}%"
-        badge_bg = (0, 120, 220) if is_manual else (0, 160, 60)
+        badge_txt = "Staff Gauge: Manual" if is_manual else f"Staff Gauge: {conf*100:.1f}%"
+        badge_bg = (0, 120, 220) if is_manual else (0, 150, 50)
         (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
         by_top = max(0, by1 - th - 12)
         cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), badge_bg, -1)

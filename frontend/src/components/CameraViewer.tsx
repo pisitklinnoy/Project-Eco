@@ -15,8 +15,6 @@ import {
   Move,
   Sliders,
   CheckCircle,
-  Sun,
-  Moon,
   Columns,
   AlertTriangle,
   Flag,
@@ -275,8 +273,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // View Mode: 'live' = Realtime CCTV Feed with AI Bounding Box | 'ai_dashboard' = Realtime AI Staff Gauge Cropped Inspection
   const [viewMode, setViewMode] = useState<'live' | 'ai_dashboard'>('live');
 
-  // AI Scenario: 'daytime' | 'nighttime' | 'live'
-  const [aiScenario, setAiScenario] = useState<'daytime' | 'nighttime' | 'live'>('live');
+  // AI Scenario: 'live' (โหมดตรวจจับสดกล้อง CCTV)
+  const aiScenario = 'live';
 
   // AI View Mode: 'cctv' = Full 16:9 CCTV view with Bounding Box | 'gauge' = High-Res Staff Gauge Scale Ruler | 'composite' = Stitched dual view
   const [aiViewType, setAiViewType] = useState<'cctv' | 'gauge' | 'composite'>('cctv');
@@ -311,18 +309,11 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // คำนวณระดับน้ำปัจจุบันและสถานะธงเตือนภัยตามเกณฑ์ของสถานี
   // ลำดับความสำคัญ:
   // 1. หาก detectionStatus มีค่าระดับน้ำจากการตรวจจับ AI ของกล้องนี้ ให้ใช้ค่านั้นก่อน เพราะตรงกับสิ่งที่ AI วัดได้บนภาพกล้องสดขณะนั้นจริงๆ
-  // 2. หากอยู่ในโหมด ai_dashboard แสดงผล Benchmark ให้ใช้ระดับน้ำตามสภาพแสง (daytime / nighttime)
-  // 3. หากมีข้อมูล measurement ล่าสุด ให้ใช้ measurement.water_level
-  // 4. สำรองด้วย station.normal_level
+  // 2. หากมีข้อมูล measurement ล่าสุด ให้ใช้ measurement.water_level
+  // 3. สำรองด้วย station.normal_level
   let currentWaterLevel: number;
   if (detectionStatus?.water_level != null) {
     currentWaterLevel = detectionStatus.water_level;
-  } else if (viewMode === 'ai_dashboard' && aiScenario === 'nighttime') {
-    const code = (station?.station_code || '').toUpperCase();
-    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.40 : code.includes('BANGSALA') || code.includes('90') ? 2.95 : 0.80;
-  } else if (viewMode === 'ai_dashboard' && aiScenario === 'daytime') {
-    const code = (station?.station_code || '').toUpperCase();
-    currentWaterLevel = code.includes('MUANGKONG') || code.includes('173') ? 10.20 : code.includes('BANGSALA') || code.includes('90') ? 2.75 : 0.60;
   } else if (measurement?.water_level != null) {
     currentWaterLevel = measurement.water_level;
   } else {
@@ -491,6 +482,16 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     setIsDragging(false);
   };
 
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const maxZoom = isFullscreen ? 4.0 : 3.5;
+    setZoomLevel((prev) => {
+      const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), maxZoom);
+      if (next === 1.0) setPan({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
   // Native non-passive Wheel Event Listeners to prevent browser window scrolling while zooming
   useEffect(() => {
     const handleNativeWheel = (e: WheelEvent) => {
@@ -523,7 +524,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
         modalEl.removeEventListener('wheel', handleNativeWheel);
       }
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, viewMode, aiViewType, station?.station_code]);
 
   const zoomPercent = Math.round(zoomLevel * 100);
 
@@ -540,7 +541,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-mono mb-3">
         <span>โมเดล AI: model_best_v2.pt</span>
         <span>&bull;</span>
-        <span>โหมด: {aiScenario === 'live' ? 'กล้องสด (Live)' : aiScenario.toUpperCase()}</span>
+        <span>โหมด: กล้องสด (Live)</span>
       </div>
 
       <p className="text-xs text-slate-300 mb-4 leading-relaxed max-w-md">
@@ -757,44 +758,11 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </button>
             </div>
 
-            {/* Right: AI Scenario Benchmark Switcher (Daytime / Nighttime / Live) */}
-            <div className="flex items-center space-x-1 bg-white/10 p-0.5 rounded-xl border border-white/15 text-[11px]">
-              <button
-                onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
-                className={`px-2 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'daytime'
-                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="ผลลัพธ์ Benchmark สภาพแสงกลางวัน (ความแม่นยำ 92-95%)"
-              >
-                <Sun className="w-3 h-3 text-amber-200 shrink-0" />
-                <span>☀️ กลางวัน</span>
-              </button>
-              <button
-                onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
-                className={`px-2 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'nighttime'
-                    ? 'bg-indigo-600 text-white font-black shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="ผลลัพธ์ Benchmark สภาพแสงกลางคืน / อินฟราเรด"
-              >
-                <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
-                <span>🌙 กลางคืน</span>
-              </button>
-              <button
-                onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                className={`px-2 py-1 rounded-lg font-bold transition flex items-center space-x-1 cursor-pointer ${
-                  aiScenario === 'live'
-                    ? 'bg-emerald-600 text-white font-black shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title={isHatyai ? "ประมวลผลโมเดล AI สดจากกล้อง Axis Camera (ta200304.dyndns.info:5001)" : "ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"}
-              >
-                <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
-                <span>🔴 ตรวจวัดสด</span>
-              </button>
+            {/* Right: Live AI Detection Indicator (ตรวจภาพสดเท่านั้น) */}
+            <div className="flex items-center space-x-1.5 bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-xl text-[11px] font-bold shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <Radio className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (Live AI)' : '🔴 ตรวจวัดสดกล้อง CCTV (Live AI)'}</span>
             </div>
           </div>
         )}
@@ -940,7 +908,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] touch-none overscroll-contain ${
+          onWheel={handleWheel}
+          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] overscroll-contain ${
             zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
           }`}
         >
@@ -1112,43 +1081,14 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </button>
             </div>
 
-            {/* Scenario toggle in fullscreen when in ai_dashboard mode */}
+            {/* Live Indicator in fullscreen when in ai_dashboard mode */}
             {viewMode === 'ai_dashboard' && (
               <div className="flex items-center space-x-1.5 bg-white/10 p-1 rounded-xl border border-white/20 text-xs flex-wrap">
-                <span className="text-[11px] font-bold text-sky-300 px-1.5 flex items-center space-x-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
-                  <span>ชุดผลการตรวจ AI:</span>
-                </span>
-                <button
-                  onClick={() => { setAiScenario('daytime'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'daytime' ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-300 hover:text-white'
-                  }`}
-                  title="ผลลัพธ์ Benchmark สภาพแสงกลางวัน (ความแม่นยำ 92-95%)"
-                >
-                  <Sun className="w-3 h-3 text-amber-200 shrink-0" />
-                  <span>☀️ กลางวัน (Daytime)</span>
-                </button>
-                <button
-                  onClick={() => { setAiScenario('nighttime'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'nighttime' ? 'bg-indigo-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
-                  }`}
-                  title="ผลลัพธ์ Benchmark สภาพแสงกลางคืน / อินฟราเรด"
-                >
-                  <Moon className="w-3 h-3 text-indigo-200 shrink-0" />
-                  <span>🌙 กลางคืน (Nighttime)</span>
-                </button>
-                <button
-                  onClick={() => { setAiScenario('live'); handleResetZoom(); }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                    aiScenario === 'live' ? 'bg-emerald-600 text-white font-black shadow-sm' : 'text-slate-300 hover:text-white'
-                  }`}
-                  title={isHatyai ? "ประมวลผลโมเดล AI สดจากกล้อง Axis Camera (ta200304.dyndns.info:5001)" : "ประมวลผลโมเดล AI สดจากกล้อง CCTV ปัจจุบันแบบ Realtime"}
-                >
-                  <Radio className="w-3 h-3 text-emerald-200 animate-pulse shrink-0" />
+                <div className="flex items-center space-x-1.5 bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <Radio className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
                   <span>{isHatyai ? '🔴 ตรวจวัดสด Axis (API)' : '🔴 ประมวลผลสด (Live AI)'}</span>
-                </button>
+                </div>
 
                 {/* Fullscreen AI View Type Toggle: CCTV Bounding Box vs Gauge Scale vs Split */}
                 <div className="flex items-center space-x-1 bg-black/50 p-1 rounded-xl border border-white/20 text-xs ml-1">
@@ -1304,7 +1244,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`flex-1 relative bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-white/15 touch-none overscroll-contain ${
+            onWheel={handleWheel}
+            className={`flex-1 relative bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-white/15 overscroll-contain ${
               zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
             }`}
           >

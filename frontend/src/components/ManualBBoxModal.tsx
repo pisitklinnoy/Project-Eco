@@ -15,6 +15,7 @@ import {
   Sparkles,
   RefreshCw,
   Radio,
+  ExternalLink,
 } from 'lucide-react';
 
 interface ManualBBoxModalProps {
@@ -45,6 +46,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [labelStudioUrl, setLabelStudioUrl] = useState<string | null>(null);
 
   // Live snapshot state
   const [capturedTimestamp, setCapturedTimestamp] = useState<number>(Date.now());
@@ -308,6 +310,9 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
       const res = await floodlensApi.saveManualBBox(station.station_code, payload);
       setSaveSuccess(res.message || 'บันทึกภาพสดและพิกัดเสาวัดระดับน้ำเข้า Dataset สำหรับ Re-train สำเร็จ');
+      if (res.label_studio_url) {
+        setLabelStudioUrl(res.label_studio_url);
+      }
 
       if (onSaved) {
         onSaved(res.bbox);
@@ -315,7 +320,7 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
       setTimeout(() => {
         onClose();
-      }, 1500);
+      }, res.label_studio_url ? 2800 : 1500);
     } catch (err: any) {
       setSaveError(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
@@ -639,9 +644,25 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
 
               {/* Status Feedback */}
               {saveSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{saveSuccess}</span>
+                <div className="space-y-2 animate-in fade-in">
+                  <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{saveSuccess}</span>
+                  </div>
+                  {labelStudioUrl && (
+                    <a
+                      href={labelStudioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 text-xs flex items-center justify-between transition cursor-pointer"
+                    >
+                      <span className="font-bold flex items-center space-x-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                        <span>เปิดตรวจทานใน Label Studio (Task #{labelStudioUrl.split('task=')[1] || ''})</span>
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    </a>
+                  )}
                 </div>
               )}
 

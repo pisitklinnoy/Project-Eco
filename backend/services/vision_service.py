@@ -655,7 +655,8 @@ class VisionService:
         image_resolution: Optional[List[int]] = None,
         mode: str = "live",
         label: str = "Staff Gauge",
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
+        db: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         บันทึกกรอบ Bounding Box เสาวัดระดับน้ำที่ผู้ใช้วาดด้วยมือ (Manual Annotation)
@@ -800,6 +801,121 @@ class VisionService:
             except Exception as ex:
                 print(f"[VisionService] Retrain state update error: {ex}")
 
+        # 4. บันทึกและเชื่อมโยงเข้า Label Studio (Project ID 2) ตาม ecosystem
+        label_studio_task_id = None
+        label_studio_url = None
+        minio_path = None
+        try:
+            _, encoded_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            frame_bytes = encoded_buf.tobytes()
+
+            from core.config import settings
+            from services.minio_service import minio_service
+            bucket = settings.bucket_raw_images
+            minio_path = minio_service.upload_image_bytes(
+                bucket_name=bucket,
+                object_name=f"manual_annotations/{file_prefix}.jpg",
+                data=frame_bytes,
+                content_type="image/jpeg"
+            )
+        except Exception as e:
+            print(f"[VisionService] MinIO upload note: {e}")
+
+        if db is not None:
+            try:
+                import uuid
+                from sqlalchemy import text
+                image_url = f"http://localhost:9000/raw-camera-images/manual_annotations/{file_prefix}.jpg" if minio_path else f"/data/upload/manual_annotations/{file_prefix}.jpg"
+
+                box_x_pct = round((bx1 / float(fw)) * 100.0, 2)
+                box_y_pct = round((by1 / float(fh)) * 100.0, 2)
+                box_w_pct = round((box_w / float(fw)) * 100.0, 2)
+                box_h_pct = round((box_h / float(fh)) * 100.0, 2)
+
+                prediction_result = [
+                    {
+                        "id": f"box_{uuid.uuid4().hex[:6]}",
+                        "type": "rectanglelabels",
+                        "value": {
+                            "x": box_x_pct,
+                            "y": box_y_pct,
+                            "width": box_w_pct,
+                            "height": box_h_pct,
+                            "rotation": 0,
+                            "rectanglelabels": ["Staff Gauge"]
+                        },
+                        "to_name": "image",
+                        "from_name": "objects",
+                        "original_width": fw,
+                        "original_height": fh
+                    }
+                ]
+
+                now_iso = datetime.utcnow().isoformat()
+                task_data = json.dumps({
+                    "image": image_url,
+                    "station_name": station_code,
+                    "source": "MANUAL_BBOX_CCTV_LIVE",
+                    "captured_at": now_iso,
+                    "notes": notes or f"Manual crop from {station_code}"
+                })
+
+                insert_task_sql = text("""
+                    INSERT INTO task (
+                        data, project_id, created_at, updated_at, 
+                        overlap, inner_id, total_predictions, total_annotations,
+                        cancelled_annotations, comment_count, unresolved_comment_count, is_labeled
+                    )
+                    VALUES (
+                        :data, 2, NOW(), NOW(), 
+                        1, COALESCE((SELECT MAX(inner_id) FROM task WHERE project_id = 2), 0) + 1, 
+                        1, 1, 0, 0, 0, TRUE
+                    )
+                    RETURNING id;
+                """)
+                res_task = db.execute(insert_task_sql, {"data": task_data})
+                t_row = res_task.fetchone()
+                if t_row:
+                    label_studio_task_id = t_row[0]
+                    insert_pred_sql = text("""
+                        INSERT INTO prediction (
+                            task_id, project_id, result, score, model_version, mislabeling, created_at, updated_at
+                        )
+                        VALUES (:tid, 2, :result, 1.0, 'Manual-BBox-Crop', 0.0, NOW(), NOW())
+                        RETURNING id;
+                    """)
+                    pred_res = db.execute(insert_pred_sql, {
+                        "tid": label_studio_task_id,
+                        "result": json.dumps(prediction_result)
+                    })
+                    pred_row = pred_res.fetchone()
+                    pred_id = pred_row[0] if pred_row else None
+
+                    insert_annot_sql = text("""
+                        INSERT INTO task_completion (
+                            task_id, project_id, result, was_cancelled, ground_truth,
+                            result_count, completed_by_id, parent_prediction_id, unique_id,
+                            created_at, updated_at
+                        )
+                        VALUES (
+                            :tid, 2, :result, FALSE, TRUE,
+                            :rc, 1, :pred_id, gen_random_uuid(),
+                            NOW(), NOW()
+                        );
+                    """)
+                    db.execute(insert_annot_sql, {
+                        "tid": label_studio_task_id,
+                        "result": json.dumps(prediction_result),
+                        "rc": len(prediction_result),
+                        "pred_id": pred_id
+                    })
+                    db.commit()
+                    label_studio_url = f"http://localhost:8085/projects/2/data?task={label_studio_task_id}"
+                    print(f"[VisionService] 🎯 Synced Manual Crop to Label Studio Task #{label_studio_task_id} successfully!")
+            except Exception as e:
+                db.rollback()
+                print(f"[VisionService] Label Studio direct sync note: {e}")
+
         # Invalidate dashboard cache
         self._cached_dashboards.clear()
 
@@ -809,7 +925,9 @@ class VisionService:
             "bbox": clamped_bbox,
             "yolo_normalized": [round(x_center, 6), round(y_center, 6), round(w_norm, 6), round(h_norm, 6)],
             "dataset_file": f"{file_prefix}.jpg",
-            "message": "บันทึกกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV เข้า Dataset เรียบร้อยแล้ว (พร้อมสำหรับ Re-train โมเดล)"
+            "label_studio_task_id": label_studio_task_id,
+            "label_studio_url": label_studio_url,
+            "message": "บันทึกกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV เข้า Retrain Dataset และเชื่อมต่อ Label Studio เรียบร้อยแล้ว"
         }
 
 

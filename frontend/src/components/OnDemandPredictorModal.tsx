@@ -47,7 +47,7 @@ interface NaturalPoint {
 }
 
 type ActiveTool = 'bbox' | 'pin' | 'pan';
-type PinTarget = 'p1' | 'p2' | 'water' | 'ready';
+type PinTarget = 'p1' | 'p2' | 'ready';
 type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w' | 'move';
 
 export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
@@ -61,10 +61,9 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
-  // Active Tool: 'bbox' (Draw Staff Gauge) | 'pin' (Place P1, P2, Waterline) | 'pan' (Pan around)
+  // Active Tool: 'bbox' (Draw Staff Gauge) | 'pin' (Place P1, P2) | 'pan' (Pan around)
   const [activeTool, setActiveTool] = useState<ActiveTool>('bbox');
   const [pinTarget, setPinTarget] = useState<PinTarget>('p1');
-  const [useAiWaterline, setUseAiWaterline] = useState<boolean>(true);
 
   // Zoom & Pan State
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -93,10 +92,9 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
     setActiveTool('bbox');
   };
 
-  // Calibration Keypoints in NATURAL IMAGE RESOLUTION
+  // Calibration Keypoints in NATURAL IMAGE RESOLUTION (Only P1 and P2)
   const [pointHigh, setPointHigh] = useState<NaturalPoint | null>(null);
   const [pointLow, setPointLow] = useState<NaturalPoint | null>(null);
-  const [pointWater, setPointWater] = useState<NaturalPoint | null>(null);
 
   // Scale Inputs (Meters)
   const [highMeter, setHighMeter] = useState<number>(1.00);
@@ -282,17 +280,13 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
       return;
     }
 
-    // 3. Mode: Pin Points (P1, P2, Waterline)
+    // 3. Mode: Pin Points (P1, P2 only)
     if (activeTool === 'pin') {
       if (pinTarget === 'p1') {
         setPointHigh(pt);
         setPinTarget('p2');
       } else if (pinTarget === 'p2') {
         setPointLow(pt);
-        setPinTarget('ready');
-      } else if (pinTarget === 'water' || pinTarget === 'ready') {
-        setPointWater(pt);
-        setUseAiWaterline(false);
         setPinTarget('ready');
       }
     }
@@ -446,33 +440,10 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
         ctx.lineTo(canvas.width, py);
         ctx.stroke();
       }
-
-      // เส้นระดับผิวน้ำที่ผู้ใช้ระบุ
-      if (pointWater && !useAiWaterline && pointWater.y >= y && pointWater.y <= y + height) {
-        const py = ((pointWater.y - y) / height) * canvas.height;
-        ctx.strokeStyle = '#f97316';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 3]);
-        ctx.beginPath();
-        ctx.moveTo(0, py);
-        ctx.lineTo(canvas.width, py);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
     } catch {
       // Ignore if image not ready
     }
-  }, [activeBBox, pointHigh, pointLow, pointWater, useAiWaterline, naturalSize]);
-
-  // Real-time Water Level calculation
-  const instantWaterLevel = useMemo(() => {
-    if (!pointHigh || !pointLow || !pointWater) return null;
-    const dy = pointLow.y - pointHigh.y;
-    if (Math.abs(dy) < 1e-4) return null;
-    const dm = highMeter - lowMeter;
-    const level = highMeter - ((pointWater.y - pointHigh.y) / dy) * dm;
-    return Number(level.toFixed(3));
-  }, [pointHigh, pointLow, pointWater, highMeter, lowMeter]);
+  }, [activeBBox, pointHigh, pointLow, naturalSize]);
 
   if (!isOpen) return null;
 
@@ -483,9 +454,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
     setErrorMsg(null);
     setPointHigh(null);
     setPointLow(null);
-    setPointWater(null);
     setBBox(null);
-    setUseAiWaterline(true);
     setPinTarget('p1');
     setActiveTool('bbox');
     setZoomLevel(1.0);
@@ -538,10 +507,8 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
   const handleResetPoints = () => {
     setPointHigh(null);
     setPointLow(null);
-    setPointWater(null);
     setPredictionResult(null);
     setErrorMsg(null);
-    setUseAiWaterline(true);
     setPinTarget('p1');
   };
 
@@ -584,17 +551,6 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
         JSON.stringify({ x: pointLow.x, y: pointLow.y, actual_meter: lowMeter })
       );
 
-      if (pointWater && !useAiWaterline) {
-        formData.append(
-          'point_water',
-          JSON.stringify({
-            x: pointWater.x,
-            y: pointWater.y,
-            actual_meter: instantWaterLevel ?? 0,
-          })
-        );
-      }
-
       if (station?.station_code) {
         formData.append('station_code', station.station_code);
       }
@@ -614,7 +570,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
 
   const displayWaterLevel = predictionResult
     ? predictionResult.calculated_water_level_m
-    : instantWaterLevel;
+    : null;
 
   // SVG Annotation Sizes scaled with Natural Image Resolution
   const naturalW = naturalSize?.width || 1000;
@@ -780,9 +736,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                     ? '👉 คลิกขีดตัวเลขบนเสา (P1 เช่น 1.00 ม.)'
                     : !pointLow
                     ? '👉 คลิกขีดตัวเลขล่างเสา (P2 เช่น 0.50 ม.)'
-                    : pointWater
-                    ? '✅ ปักหมุดครบแล้ว พร้อมส่งผลเข้า Label Studio'
-                    : '✨ ปักหมุด P1 และ P2 เรียบร้อยแล้ว พร้อมคำนวณระดับน้ำ'}
+                    : '✅ ปักหมุด P1 และ P2 เรียบร้อยแล้ว พร้อมส่งผลเข้า Label Studio'}
                 </span>
               </div>
 
@@ -820,13 +774,13 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                   </button>
                 )}
 
-                {(pointHigh || pointLow || pointWater) && (
+                {(pointHigh || pointLow) && (
                   <button
                     type="button"
                     onClick={handleResetPoints}
                     className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-slate-200/50 rounded-lg transition-colors cursor-pointer"
                   >
-                    ล้างหมุด
+                    ล้างหมุด P1/P2
                   </button>
                 )}
               </div>
@@ -1102,48 +1056,8 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                       </g>
                     )}
 
-                    {/* Point Waterline */}
-                    {pointWater && !useAiWaterline && (
-                      <g>
-                        <line
-                          x1={activeBBox ? activeBBox.x - strokeW * 6 : 0}
-                          y1={pointWater.y}
-                          x2={activeBBox ? activeBBox.x + activeBBox.width + strokeW * 6 : naturalSize.width}
-                          y2={pointWater.y}
-                          stroke="#f97316"
-                          strokeWidth={strokeW * 1.1}
-                          strokeDasharray="8,4"
-                        />
-                        <circle
-                          cx={pointWater.x}
-                          cy={pointWater.y}
-                          r={pinRadius}
-                          fill="#f97316"
-                          stroke="#ffffff"
-                          strokeWidth={strokeW * 0.8}
-                        />
-                        <rect
-                          x={pointWater.x + pinRadius * 1.2}
-                          y={pointWater.y - fontSize * 0.9}
-                          width={fontSize * 8}
-                          height={fontSize * 1.3}
-                          fill="rgba(234, 88, 12, 0.95)"
-                          rx={fontSize * 0.25}
-                        />
-                        <text
-                          x={pointWater.x + pinRadius * 1.5}
-                          y={pointWater.y + fontSize * 0.05}
-                          fill="#ffffff"
-                          fontSize={fontSize * 0.85}
-                          fontWeight="bold"
-                        >
-                          ผิวน้ำ: {instantWaterLevel !== null ? `${instantWaterLevel.toFixed(2)} ม.` : 'ระบุแล้ว'}
-                        </text>
-                      </g>
-                    )}
-
                     {/* AI Waterline from Backend Prediction */}
-                    {predictionResult && predictionResult.pixel_water_y_original && useAiWaterline && (
+                    {predictionResult && predictionResult.pixel_water_y_original && (
                       <g>
                         <line
                           x1={activeBBox ? activeBBox.x - strokeW * 6 : 0}
@@ -1226,13 +1140,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                 </div>
               )}
 
-              {/* Live Estimated Water Level */}
-              {instantWaterLevel !== null && !predictionResult && (
-                <div className="absolute bottom-3 left-3 bg-slate-900/85 backdrop-blur-md text-white text-[11px] font-semibold px-3 py-1.5 rounded-full border border-orange-500/40 shadow flex items-center space-x-1.5 pointer-events-none">
-                  <span className="w-2 h-2 rounded-full bg-orange-400 animate-ping" />
-                  <span>ระดับน้ำประมาณการ: <strong>{instantWaterLevel.toFixed(3)} ม.</strong></span>
-                </div>
-              )}
+              {/* Bottom Instruction Note on Hover */}
             </div>
 
             {/* Resolution Information */}
@@ -1374,63 +1282,13 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                 </div>
               </div>
 
-              {/* Pin 3: Waterline Card (Optional) */}
-              <div
-                onClick={() => {
-                  setActiveTool('pin');
-                  setPinTarget('water');
-                  setUseAiWaterline(false);
-                }}
-                className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                  activeTool === 'pin' && pinTarget === 'water' && !useAiWaterline
-                    ? 'bg-orange-50 border-orange-400 ring-2 ring-orange-400/20'
-                    : pointWater && !useAiWaterline
-                    ? 'bg-white border-orange-200'
-                    : 'bg-white/60 border-slate-200 hover:bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-white text-[11px] font-black flex items-center justify-center">
-                      3
-                    </span>
-                    <div>
-                      <span className="text-xs font-extrabold text-slate-900 block">
-                        ระบุผิวน้ำด้วยตนเอง
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-semibold">
-                        (ทางเลือกเสริม - หากไม่ระบุ Image Processing จะหาให้)
-                      </span>
-                    </div>
-                  </div>
-                  {pointWater && !useAiWaterline ? (
-                    <span className="text-[11px] font-bold text-orange-600 flex items-center space-x-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>ระบุแล้ว (y: {pointWater.y})</span>
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      อัตโนมัติโดย AI
-                    </span>
-                  )}
+              {/* Auto Waterline Detection Note */}
+              <div className="p-3 rounded-2xl bg-sky-50/80 border border-sky-200/80 text-[11px] text-sky-900 flex items-start space-x-2">
+                <Sparkles className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-extrabold text-sky-950">ตรวจจับผิวน้ำอัตโนมัติ: </span>
+                  ระบบจะใช้จุดอ้างอิง P1 และ P2 เพื่อคำนวณสเกลเสา และใช้อัลกอริทึม Computer Vision / Edge Detection ค้นหาเส้นระดับผิวน้ำให้อัตโนมัติ พร้อมส่งเข้า Label Studio
                 </div>
-
-                {pointWater && (
-                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500">ผิวน้ำที่ระบุ: {instantWaterLevel !== null ? `${instantWaterLevel.toFixed(2)} ม.` : ''}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPointWater(null);
-                        setUseAiWaterline(true);
-                      }}
-                      className="text-[11px] text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
-                    >
-                      ยกเลิกจุด (กลับไปใช้ AI)
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Station Note */}
@@ -1520,7 +1378,7 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                     </span>
                   </span>
                   <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    {useAiWaterline ? 'AI Change-Point' : 'Human Pinpoint (100%)'}
+                    AI Waterline Detection
                   </span>
                 </div>
 

@@ -77,7 +77,8 @@ def save_station_manual_bbox(
         image_resolution=payload.image_resolution,
         mode=payload.mode,
         label=payload.label,
-        notes=payload.notes
+        notes=payload.notes,
+        db=db
     )
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message", "Failed to save manual bbox"))

@@ -188,6 +188,8 @@ export interface ManualBBoxResponse {
   yolo_normalized: [number, number, number, number];
   dataset_file: string;
   message: string;
+  label_studio_task_id?: number | null;
+  label_studio_url?: string | null;
 }
 
 export interface TimeSeriesRetrainHistoryItem {

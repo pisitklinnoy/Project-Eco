@@ -594,17 +594,23 @@ class VisionService:
         file_prefix = f"{stn_key.lower()}_live_{ts_str}"
 
         img_path = os.path.join(dataset_dir, f"{file_prefix}.jpg")
+        crop_path = os.path.join(dataset_dir, f"{file_prefix}_crop.jpg")
         txt_path = os.path.join(dataset_dir, f"{file_prefix}.txt")
         json_path = os.path.join(dataset_dir, f"{file_prefix}.json")
 
-        # บันทึกรูปภาพ JPEG คุณภาพสูงจากภาพสดกล้อง CCTV
+        # 1. บันทึกรูปภาพทั้งภาพ (Full Frame) สำหรับนำไป Re-train โมเดล YOLO
         cv2.imwrite(img_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
-        # บันทึก YOLO format (.txt): class_id x_center y_center width height
+        # 2. บันทึกรูปภาพเฉพาะส่วนเสาที่ครอป (Cropped Pole) สำหรับตรวจสอบ/วิเคราะห์สเกลเสา
+        crop_pole = frame[by1:by2, bx1:bx2]
+        if crop_pole.size > 0:
+            cv2.imwrite(crop_path, crop_pole, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+        # 3. บันทึก YOLO format (.txt): class_id x_center y_center width height
         with open(txt_path, "w", encoding="utf-8") as f:
             f.write(f"0 {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n")
 
-        # บันทึก Metadata JSON
+        # 4. บันทึก Metadata JSON
         meta = {
             "station_code": station_code,
             "station_key": stn_key,
@@ -614,6 +620,7 @@ class VisionService:
             "label": label,
             "bbox_xyxy": clamped_bbox,
             "frame_resolution": [fw, fh],
+            "crop_resolution": [box_w, box_h],
             "yolo_normalized": {
                 "class_id": 0,
                 "class_name": label,
@@ -622,7 +629,8 @@ class VisionService:
                 "width": round(w_norm, 6),
                 "height": round(h_norm, 6)
             },
-            "image_file": f"{file_prefix}.jpg",
+            "full_image_file": f"{file_prefix}.jpg",
+            "cropped_image_file": f"{file_prefix}_crop.jpg",
             "txt_file": f"{file_prefix}.txt",
             "notes": notes or f"Manual Staff Gauge annotation from CCTV live frame for {station_code}",
             "status": "ready_for_retrain"

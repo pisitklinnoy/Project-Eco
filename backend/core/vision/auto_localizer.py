@@ -506,7 +506,8 @@ class StaffGaugeAutoLocalizer:
 
             # 1. การเลื่อนของกล้องในแนวราบ (dx) และแนวดิ่งของหัวเสา (dy)
             dx = gcx - ref_cx
-            dy_top = gy1 - ref_y1
+            expected_top = station_config.get("detection_top_y", ref_y1)
+            dy_top = gy1 - expected_top
 
             dx_clamped = float(np.clip(dx, -250.0, 250.0))
             dy_clamped = float(np.clip(dy_top, -150.0, 150.0))
@@ -524,6 +525,8 @@ class StaffGaugeAutoLocalizer:
             else:
                 aligned_y2 = aligned_y1 + max(det_h, base_h)
 
+            aligned_y2 = min(float(fh), max(aligned_y2, ref_y2))
+
             aligned_x1 = int(round(gcx - base_w / 2.0))
             aligned_x2 = int(round(gcx + base_w / 2.0))
             aligned_y1 = int(round(aligned_y1))
@@ -533,7 +536,9 @@ class StaffGaugeAutoLocalizer:
             if has_poly:
                 aligned_pts = base_pts.copy()
                 aligned_pts[:, 0] += dx_clamped
-                aligned_pts[:, 1] += dy_clamped
+                aligned_pts[:2, 1] += dy_clamped
+                # ขอบล่างของเสาให้ครอบคลุมลงไปถึงฐานเสา/ผิวน้ำเสมอ (ไม่ถูกยกขึ้นเหนือระดับน้ำ)
+                aligned_pts[2:, 1] = np.maximum(aligned_pts[2:, 1] + dy_clamped, base_pts[2:, 1])
             else:
                 aligned_pts = np.float32([
                     [aligned_x1, aligned_y1],

@@ -7,20 +7,21 @@
   "station_id": 469,
   "station_group_id": 1269,
   "reference_frame_resolution": [1920, 1080],
+  "detection_top_y": 7,
   "staff_gauge_polygon": {
     "top_left": [1334, 80],
     "top_right": [1367, 80],
-    "bottom_right": [1284, 1075],
-    "bottom_left": [1262, 1075]
+    "bottom_right": [1286, 1080],
+    "bottom_left": [1259, 1080]
   },
   "rectified_roi": {
     "width": 40,
-    "height": 1120
+    "height": 1126
   },
   "enhanced_roi": {
     "upscale_factor": 2.0,
     "width": 80,
-    "height": 2240
+    "height": 2252
   },
   "junction_description": "รอยต่อระหว่างเลข 1 กับเลข 9 (Junction Between 1 and 9)",
   "piecewise_anchors": [
@@ -33,7 +34,8 @@
     [3.00, 1350],
     [2.00, 1600],
     [1.00, 1860],
-    [0.60, 2140]
+    [0.60, 2140],
+    [0.00, 2252]
   ],
   "unit": "meters",
   "datum": "R.T.K.",
@@ -42,7 +44,8 @@
     "warning_m": 5.5,
     "critical_flood_m": 6.0
   },
-  "baseline_water_level_m": 0.60,
-  "baseline_water_y_px": 2140,
+  "baseline_water_level_m": 0.0,
+  "baseline_water_y_px": 2252,
+  "baseline_y": 2252,
   "calibration_bias_m": 0.0
 }

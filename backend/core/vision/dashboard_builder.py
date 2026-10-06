@@ -333,6 +333,8 @@ def render_model_v2_detection_view(
         # แสดงเฉพาะกรอบ Bounding Box ที่ตรวจจับได้จากโมเดล YOLO โดยตรง (หรือ Aligned Box) เพียงกรอบเดียว
         if raw_box and len(raw_box) == 4 and not is_manual:
             bx1, by1, bx2, by2 = raw_box
+            # ครอบคลุมลงมาถึงฐานเสาและผิวน้ำตาม aligned_bbox เสมอ
+            by2 = max(by2, ay2)
         else:
             bx1, by1, bx2, by2 = ax1, ay1, ax2, ay2
 

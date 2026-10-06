@@ -3,7 +3,8 @@ import io
 import time
 import json
 import urllib.request
-from typing import Dict, Any, Optional, Tuple
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple, List
 import numpy as np
 import cv2
 from PIL import Image, ImageFile
@@ -46,6 +47,7 @@ STATION_STREAM_MAP = {
 class VisionService:
     def __init__(self):
         self.station_components: Dict[str, Dict[str, Any]] = {}
+        self.manual_bboxes: Dict[str, List[int]] = {}  # {station_key: [x1, y1, x2, y2]}
         self._cached_dashboards: Dict[str, Tuple[float, bytes]] = {}  # {code: (timestamp, jpeg_bytes)}
         self._cached_metadata: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self.cache_ttl_seconds = 15.0
@@ -76,6 +78,9 @@ class VisionService:
                     anchors = cfg.get("piecewise_anchors", [])
                     calibrator = PiecewiseScaleCalibrator(anchors)
                     detector = WaterSurfaceDetector(calibrator, cfg)
+
+                    if cfg.get("manual_staff_gauge_bbox"):
+                        self.manual_bboxes[code] = cfg["manual_staff_gauge_bbox"]
 
                     self.station_components[code] = {
                         "config": cfg,
@@ -261,28 +266,55 @@ class VisionService:
 
             if view == "cctv":
                 # โหมดมุมมองกล้อง CCTV: ใช้เฉพาะ model_best_v2.pt ตรวจจับเสาตรงไปตรงมาตามคำขอ
+                # หากโมเดลตรวจไม่พบ แต่มี manual_bbox ให้แสดง manual bbox พร้อมป้ายกำกับ Manual
+                manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
+                display_detections = list(raw_detections)
+                if len(gauges) == 0 and manual_box:
+                    display_detections.append({
+                        "name": "Staff Gauge",
+                        "bbox": manual_box,
+                        "confidence": 1.0,
+                        "is_manual": True
+                    })
+
                 img_out = render_model_v2_detection_view(
                     frame=frame,
                     station_name=stn_name,
-                    raw_detections=raw_detections,
+                    raw_detections=display_detections,
                     model_name="model_best_v2.pt",
                     overlay_mode=overlay
                 )
             else:
                 # view == "gauge" or view == "composite"
-                if len(gauges) == 0:
-                    # ถ้าตรวจไม่พบเสาวัดระดับน้ำ: ไม่แสดงสเกลเสาหรือภาพรวมคู่ แต่แสดงภาพการแจ้งเตือนแนะนำให้ปรับเทียบเสา
+                manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
+                if len(gauges) == 0 and not manual_box:
+                    # ถ้าตรวจไม่พบเสาวัดระดับน้ำ และยังไม่มี manual bbox: แสดงภาพแจ้งเตือน
                     img_out = render_gauge_not_detected_image(
                         frame_shape=frame.shape,
                         station_name=stn_name,
                         model_name="model_best_v2.pt"
                     )
                 else:
-                    loc_res = self.localizer.localize(frame, cfg)
-                    if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
-                        bx1, by1, bx2, by2 = loc_res["bbox"]
-                        cfg["staff_gauge_bbox"]["x1"] = bx1
-                        cfg["staff_gauge_bbox"]["x2"] = bx2
+                    if len(gauges) > 0:
+                        loc_res = self.localizer.localize(frame, cfg)
+                        if loc_res.get("is_camera_shifted", False) and "staff_gauge_bbox" in cfg:
+                            bx1, by1, bx2, by2 = loc_res["bbox"]
+                            cfg["staff_gauge_bbox"]["x1"] = bx1
+                            cfg["staff_gauge_bbox"]["x2"] = bx2
+                    else:
+                        # ใช้ Manual Bounding Box ที่ผู้ใช้กำหนดไว้โดยตรง
+                        bx1, by1, bx2, by2 = manual_box
+                        cfg["staff_gauge_bbox"] = {
+                            "x1": bx1, "y1": by1, "x2": bx2, "y2": by2,
+                            "width": bx2 - bx1, "height": by2 - by1
+                        }
+                        loc_res = {
+                            "bbox": manual_box,
+                            "confidence": 1.0,
+                            "is_manual": True,
+                            "is_camera_shifted": False,
+                            "staff_gauge_detected": True
+                        }
 
                     pole_mgr = PoleCoordinateManager(cfg)
                     rectified, enhanced, pts_src = pole_mgr.extract_and_rectify(frame)
@@ -440,11 +472,13 @@ class VisionService:
         raw_detections = self.localizer.detect_raw(frame, conf_thresh=0.12)
         gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]
         has_gauge = len(gauges) > 0
+        manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
 
         if has_gauge:
             best_g = max(gauges, key=lambda x: x["confidence"])
             return {
                 "detected": True,
+                "is_manual": False,
                 "confidence": round(float(best_g["confidence"]), 3),
                 "bbox": best_g["bbox"],
                 "station_code": station_code,
@@ -454,18 +488,214 @@ class VisionService:
                 "recommendation": None,
                 "message": f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {best_g['confidence']*100:.1f}%) พร้อมสำหรับการวิเคราะห์สเกลเสา"
             }
+        elif manual_box:
+            return {
+                "detected": True,
+                "is_manual": True,
+                "confidence": 1.0,
+                "bbox": manual_box,
+                "station_code": station_code,
+                "station_name": stn_name,
+                "mode": mode,
+                "can_analyze_gauge": True,
+                "recommendation": "manual_active",
+                "message": "ใช้งานพิกัดเสาวัดระดับน้ำที่กำหนดด้วยตนเอง (Manual BBox) พร้อมสำหรับวิเคราะห์สเกลเสาและเตรียม Re-train โมเดล"
+            }
         else:
             return {
                 "detected": False,
+                "is_manual": False,
                 "confidence": 0.0,
                 "bbox": None,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
                 "can_analyze_gauge": False,
-                "recommendation": "calibrate_pole",
-                "message": "ไม่พบเสาวัดระดับน้ำในภาพด้วยโมเดล AI (model_best_v2.pt) แนะนำให้ใช้ฟีเจอร์ 'ปรับเทียบเสา' เพื่อระบุพิกัดและนำไป Re-train โมเดลใหม่"
+                "recommendation": "manual_bbox",
+                "message": "ไม่พบเสาวัดระดับน้ำในภาพด้วยโมเดล AI (model_best_v2.pt) แนะนำให้ใช้ฟีเจอร์ 'วาดกรอบเสาด้วยมือ (Manual BBox)' เพื่อกำหนดตำแหน่งเสาและบันทึกเข้า Dataset เตรียม Re-train โมเดลใหม่"
             }
+
+    def save_manual_bbox(
+        self,
+        station_code: str,
+        bbox: List[int],
+        image_resolution: Optional[List[int]] = None,
+        mode: str = "live",
+        label: str = "Staff Gauge",
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        บันทึกกรอบ Bounding Box เสาวัดระดับน้ำที่ผู้ใช้วาดด้วยมือ (Manual Annotation)
+        1. จัดเก็บลงโฟลเดอร์ dataset/manual_annotations เป็นคู่ภาพ .jpg + yolo .txt + metadata .json
+        2. อัปเดต manual_staff_gauge_bbox ลงใน station config และ memory ทันที
+        3. ปลดล็อกการวิเคราะห์สเกลเสา (view=gauge, view=composite) ทันที
+        4. เพิ่ม pending_count ใน retrain_state.json
+        """
+        stn_key = self._resolve_station_key(station_code)
+        if not stn_key:
+            return {"status": "error", "message": f"ไม่พบสถานีรหัส {station_code}"}
+
+        station_num = "station1_muangkong" if "MUANGKONG" in stn_key or "173A" in stn_key else \
+                      "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
+                      "station3_hatyainai"
+
+        frame = None
+        if mode == "live":
+            frame = self.fetch_live_frame(station_code)
+
+        if frame is None:
+            sample_candidates = [
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_{mode}.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_{mode}.png"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}_{mode}.jpg"),
+                os.path.join(BASE_DIR, "..", "workers", "vision", "sample_images", f"{station_num}.jpg"),
+            ]
+            for p in sample_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p)
+                    if frame is not None:
+                        break
+
+        if frame is None:
+            return {"status": "error", "message": "ไม่สามารถดึงภาพสำหรับบันทึก Annotation ได้"}
+
+        fh, fw = frame.shape[:2]
+        bx1, by1, bx2, by2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+
+        # ปรับสเกลพิกัดถ้า frontend ส่งตามขนาดที่แสดงผลบนจอ (image_resolution)
+        if image_resolution and len(image_resolution) == 2:
+            disp_w, disp_h = image_resolution[0], image_resolution[1]
+            if disp_w > 0 and disp_h > 0 and (disp_w != fw or disp_h != fh):
+                scale_x = fw / float(disp_w)
+                scale_y = fh / float(disp_h)
+                bx1 = int(round(bx1 * scale_x))
+                by1 = int(round(by1 * scale_y))
+                bx2 = int(round(bx2 * scale_x))
+                by2 = int(round(by2 * scale_y))
+
+        # Clamp พิกัดให้อยู่ในขอบเขตภาพ
+        bx1, bx2 = min(bx1, bx2), max(bx1, bx2)
+        by1, by2 = min(by1, by2), max(by1, by2)
+        bx1 = max(0, min(fw - 2, bx1))
+        bx2 = max(bx1 + 2, min(fw, bx2))
+        by1 = max(0, min(fh - 2, by1))
+        by2 = max(by1 + 2, min(fh, by2))
+        clamped_bbox = [bx1, by1, bx2, by2]
+
+        box_w = bx2 - bx1
+        box_h = by2 - by1
+        x_center = (bx1 + bx2) / (2.0 * fw)
+        y_center = (by1 + by2) / (2.0 * fh)
+        w_norm = box_w / float(fw)
+        h_norm = box_h / float(fh)
+
+        # 1. บันทึกลง Dataset โฟลเดอร์ backend/dataset/manual_annotations/
+        dataset_dir = os.path.join(BASE_DIR, "dataset", "manual_annotations")
+        os.makedirs(dataset_dir, exist_ok=True)
+
+        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_prefix = f"{stn_key.lower()}_{mode}_{ts_str}"
+
+        img_path = os.path.join(dataset_dir, f"{file_prefix}.jpg")
+        txt_path = os.path.join(dataset_dir, f"{file_prefix}.txt")
+        json_path = os.path.join(dataset_dir, f"{file_prefix}.json")
+
+        # บันทึกรูปภาพ JPEG คุณภาพสูง
+        cv2.imwrite(img_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+        # บันทึก YOLO format (.txt): class_id x_center y_center width height
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(f"0 {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n")
+
+        # บันทึก Metadata JSON
+        meta = {
+            "station_code": station_code,
+            "station_key": stn_key,
+            "timestamp": datetime.now().isoformat(),
+            "mode": mode,
+            "label": label,
+            "bbox_xyxy": clamped_bbox,
+            "frame_resolution": [fw, fh],
+            "yolo_normalized": {
+                "class_id": 0,
+                "class_name": label,
+                "x_center": round(x_center, 6),
+                "y_center": round(y_center, 6),
+                "width": round(w_norm, 6),
+                "height": round(h_norm, 6)
+            },
+            "image_file": f"{file_prefix}.jpg",
+            "txt_file": f"{file_prefix}.txt",
+            "notes": notes,
+            "status": "ready_for_retrain"
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+
+        # 2. อัปเดต Memory & Config เพื่อใช้งานสเกลเสาได้ทันที
+        self.manual_bboxes[stn_key] = clamped_bbox
+        mgr = self.station_components.get(stn_key)
+        if mgr:
+            cfg = mgr["config"]
+            cfg["manual_staff_gauge_bbox"] = clamped_bbox
+            cfg["staff_gauge_bbox"] = {
+                "x1": clamped_bbox[0],
+                "y1": clamped_bbox[1],
+                "x2": clamped_bbox[2],
+                "y2": clamped_bbox[3],
+                "width": box_w,
+                "height": box_h
+            }
+            mgr["pole_mgr"] = PoleCoordinateManager(cfg)
+            mgr["detector"] = WaterSurfaceDetector(mgr["calibrator"], cfg)
+
+        # 3. Persist to station JSON config file
+        json_file = STATION_CONFIG_MAP.get(stn_key)
+        if json_file:
+            cfg_path = os.path.join(CONFIGS_DIR, json_file)
+            if os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        file_cfg = json.load(f)
+                    file_cfg["manual_staff_gauge_bbox"] = clamped_bbox
+                    file_cfg["staff_gauge_bbox"] = {
+                        "x1": clamped_bbox[0],
+                        "y1": clamped_bbox[1],
+                        "x2": clamped_bbox[2],
+                        "y2": clamped_bbox[3],
+                        "width": box_w,
+                        "height": box_h
+                    }
+                    with open(cfg_path, "w", encoding="utf-8") as f:
+                        json.dump(file_cfg, f, indent=2, ensure_ascii=False)
+                except Exception as ex:
+                    print(f"[VisionService] Persist config error: {ex}")
+
+        # 4. อัปเดต retrain_state.json (เพิ่ม pending_count)
+        retrain_path = os.path.join(CONFIGS_DIR, "retrain_state.json")
+        if os.path.exists(retrain_path):
+            try:
+                with open(retrain_path, "r", encoding="utf-8") as f:
+                    r_state = json.load(f)
+                r_state["pending_count"] = r_state.get("pending_count", 0) + 1
+                with open(retrain_path, "w", encoding="utf-8") as f:
+                    json.dump(r_state, f, indent=2, ensure_ascii=False)
+            except Exception as ex:
+                print(f"[VisionService] Retrain state update error: {ex}")
+
+        # Invalidate dashboard cache
+        self._cached_dashboards.clear()
+
+        return {
+            "status": "success",
+            "station_code": station_code,
+            "bbox": clamped_bbox,
+            "yolo_normalized": [round(x_center, 6), round(y_center, 6), round(w_norm, 6), round(h_norm, 6)],
+            "dataset_file": f"{file_prefix}.jpg",
+            "message": "บันทึกกรอบเสาวัดระดับน้ำ (Manual BBox) และจัดเก็บเข้า Dataset พร้อมนำไป Re-train โมเดลเรียบร้อยแล้ว"
+        }
 
 
 vision_service = VisionService()

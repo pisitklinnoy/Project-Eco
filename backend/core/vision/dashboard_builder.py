@@ -304,9 +304,11 @@ def render_model_v2_detection_view(
     for g in gauges:
         bx1, by1, bx2, by2 = g["bbox"]
         conf = g.get("confidence", 0.0)
+        is_manual = g.get("is_manual", False)
 
-        # วาดกรอบสี่เหลี่ยม Bounding Box เขียว
-        cv2.rectangle(out, (bx1, by1), (bx2, by2), (0, 255, 100), 3)
+        # วาดกรอบสี่เหลี่ยม Bounding Box (สีส้มทองถ้า Manual, สีเขียวถ้า AI)
+        box_color = (0, 165, 255) if is_manual else (0, 255, 100)
+        cv2.rectangle(out, (bx1, by1), (bx2, by2), box_color, 3)
 
         # เพิ่ม Corner brackets สำหรับความคมชัด
         c_len = min(20, max(6, (bx2 - bx1) // 3))
@@ -316,10 +318,11 @@ def render_model_v2_detection_view(
         cv2.line(out, (bx2, by2), (bx2, by2 - c_len), (255, 255, 255), 4)
 
         # Badge กำกับเสา
-        badge_txt = f"Staff Gauge: {conf*100:.1f}%"
+        badge_txt = "Staff Gauge: Manual (Dataset Saved)" if is_manual else f"Staff Gauge: {conf*100:.1f}%"
+        badge_bg = (0, 120, 220) if is_manual else (0, 160, 60)
         (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
         by_top = max(0, by1 - th - 12)
-        cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), (0, 160, 60), -1)
+        cv2.rectangle(out, (bx1 - 2, by_top), (bx1 + tw + 16, by1), badge_bg, -1)
         cv2.putText(out, badge_txt, (bx1 + 6, by1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
 
     return out
@@ -332,7 +335,7 @@ def render_gauge_not_detected_image(
 ) -> np.ndarray:
     """
     สร้างภาพแจ้งเตือนเมื่อ AI ตรวจไม่พบเสาวัดระดับน้ำ สำหรับโหมด Gauge Ruler หรือ Composite
-    แจ้งเตือนผู้ใช้ให้ใช้ฟีเจอร์ ปรับเทียบเสา เพื่อนำไป Retrain Model
+    แจ้งเตือนผู้ใช้ให้ใช้ฟีเจอร์ วาดกรอบเสาด้วยมือ (Manual BBox) เพื่อนำไป Retrain Model
     """
     h = max(720, frame_shape[0])
     w = max(1280, frame_shape[1])
@@ -374,9 +377,9 @@ def render_gauge_not_detected_image(
 
     cv2.putText(canvas, "RECOMMENDED ACTION:", (bx1 + 75, rec_y1 + 45),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 210, 255), 2, cv2.LINE_AA)
-    cv2.putText(canvas, "Please use the 'Calibrate Pole' feature to locate the gauge coordinates",
+    cv2.putText(canvas, "Please use 'Manual Staff Gauge BBox' to draw the gauge box manually,",
                 (bx1 + 75, rec_y1 + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 245, 255), 1, cv2.LINE_AA)
-    cv2.putText(canvas, "and submit this frame to RE-TRAIN the YOLO model.",
+    cv2.putText(canvas, "save it to the retraining dataset, and immediately unblock gauge analysis.",
                 (bx1 + 75, rec_y1 + 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 245, 255), 1, cv2.LINE_AA)
 
     return canvas

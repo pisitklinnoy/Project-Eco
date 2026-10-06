@@ -1,4 +1,4 @@
-import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse, OnDemandPredictResponse } from '../types';
+import type { Station, WaterMeasurement, ForecastRecord, AlertEvent, ReviewPackage, RetrainStatus, RetrainTriggerResponse, OnDemandPredictResponse, DetectionStatus, ManualBBoxPayload, ManualBBoxResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -81,7 +81,13 @@ export const floodlensApi = {
     return res.json();
   },
 
-  // 6. Camera Calibration
+  // 6. Camera Calibration & Detection
+  getDetectionStatus: async (stationCode: string, mode = 'live'): Promise<DetectionStatus> => {
+    const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/detection-status?mode=${encodeURIComponent(mode)}`);
+    if (!res.ok) throw new Error('Failed to fetch detection status');
+    return res.json();
+  },
+
   saveCalibration: async (stationCode: string, calibrationData: any) => {
     const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/calibrate`, {
       method: 'POST',
@@ -89,6 +95,19 @@ export const floodlensApi = {
       body: JSON.stringify(calibrationData),
     });
     if (!res.ok) throw new Error('Failed to save calibration');
+    return res.json();
+  },
+
+  saveManualBBox: async (stationCode: string, payload: ManualBBoxPayload): Promise<ManualBBoxResponse> => {
+    const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/manual-bbox`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to save manual bounding box');
+    }
     return res.json();
   },
 

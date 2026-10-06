@@ -15,6 +15,14 @@ class CalibrationPayload(BaseModel):
     pixels_per_meter: float
     formula_str: Optional[str] = None
 
+class ManualBBoxPayload(BaseModel):
+    station_code: str
+    bbox: List[int]
+    image_resolution: Optional[List[int]] = None
+    mode: str = "live"
+    label: str = "Staff Gauge"
+    notes: Optional[str] = None
+
 @router.get("", response_model=List[StationResponse])
 def list_stations(db: Session = Depends(get_db)):
     """รายการสถานีเฝ้าระวังระดับน้ำและกล้อง CCTV ทั้งหมดในหาดใหญ่"""
@@ -49,6 +57,31 @@ def save_station_calibration(
         "formula_str": payload.formula_str,
         "message": f"บันทึกค่าปรับเทียบสเกลเสาสำเร็จ ({payload.pixels_per_meter:.1f} พิกเซล/เมตร)"
     }
+
+
+@router.post("/{station_code}/manual-bbox")
+def save_station_manual_bbox(
+    station_code: str,
+    payload: ManualBBoxPayload,
+    db: Session = Depends(get_db)
+):
+    """
+    บันทึกกรอบ Bounding Box เสาวัดน้ำด้วยมือ (Manual BBox Annotation)
+    และจัดเก็บภาพ+พิกัดเข้า Dataset เพื่อนำไป Re-train โมเดล YOLO ในภายหลัง
+    พร้อมทั้งเปิดใช้งานการวิเคราะห์สเกลเสาและแดชบอร์ดทันที
+    """
+    from services.vision_service import vision_service
+    res = vision_service.save_manual_bbox(
+        station_code=station_code,
+        bbox=payload.bbox,
+        image_resolution=payload.image_resolution,
+        mode=payload.mode,
+        label=payload.label,
+        notes=payload.notes
+    )
+    if res.get("status") == "error":
+        raise HTTPException(status_code=400, detail=res.get("message", "Failed to save manual bbox"))
+    return res
 
 
 @router.get("/{station_code}/detection-status")

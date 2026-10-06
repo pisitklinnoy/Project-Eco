@@ -28,6 +28,7 @@ interface CameraViewerProps {
   onOpenReview: () => void;
   onOpenCalibrate?: () => void;
   onOpenOnDemand?: () => void;
+  onOpenManualBBox?: () => void;
 }
 
 export const CameraViewer: React.FC<CameraViewerProps> = ({
@@ -36,6 +37,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   onOpenReview,
   onOpenCalibrate,
   onOpenOnDemand,
+  onOpenManualBBox,
 }) => {
   const [imgError, setImgError] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
@@ -55,6 +57,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // AI Staff Gauge Detection Status
   interface DetectionStatus {
     detected: boolean;
+    is_manual?: boolean;
     confidence: number;
     bbox?: number[];
     station_code: string;
@@ -288,39 +291,52 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
       </div>
 
       <p className="text-xs text-slate-300 mb-4 leading-relaxed max-w-md">
-        ระบบ AI ไม่สามารถตรวจจับเสาวัดระดับน้ำในภาพมุมกล้องนี้ได้ จึง<strong>ไม่สามารถแสดงภาพสเกลเสาหรือวิเคราะห์ระดับน้ำอัตโนมัติได้</strong>
+        ระบบ AI ยังไม่สามารถตรวจจับเสาวัดระดับน้ำในภาพมุมกล้องนี้ได้ จึง<strong>ไม่สามารถแสดงภาพสเกลเสาหรือวิเคราะห์ระดับน้ำอัตโนมัติได้</strong>
       </p>
 
       <div className="w-full bg-amber-950/40 border border-amber-600/30 rounded-2xl p-3.5 mb-5 text-left text-xs text-amber-100">
         <div className="flex items-center space-x-2 text-amber-300 font-extrabold text-xs mb-1">
-          <Target className="w-4 h-4 shrink-0 text-amber-400" />
+          <Sliders className="w-4 h-4 shrink-0 text-amber-400" />
           <span>คำแนะนำสำหรับเจ้าหน้าที่ / ผู้ดูแลระบบ:</span>
         </div>
         <p className="text-[11px] text-amber-200/90 leading-normal">
-          กรุณาใช้ฟีเจอร์ <strong>"ปรับเทียบเสา" (Calibrate Pole)</strong> เพื่อระบุพิกัดตำแหน่งเสาจริงในภาพนี้ จากนั้นนำภาพที่บันทึกไป <strong>Re-train โมเดล AI</strong> เพื่อให้สามารถตรวจจับเสาวัดระดับน้ำในมุมกล้องนี้ได้อย่างถูกต้อง
+          กรุณาใช้ฟีเจอร์ <strong>"วาดกรอบเสาด้วยมือ" (Manual BBox)</strong> เพื่อกำหนดตำแหน่งเสาจริงในภาพนี้ ระบบจะจัดเก็บภาพและพิกัดเข้า <strong>Retrain Dataset</strong> ทันที พร้อมทั้งเปิดใช้งานการแสดงสเกลเสาวัดน้ำได้ทันทีโดยไม่ต้องรอเทรนโมเดลใหม่
         </p>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+        {onOpenManualBBox && (
+          <button
+            onClick={() => {
+              if (isModal) setIsFullscreen(false);
+              onOpenManualBBox();
+            }}
+            className="flex-1 w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-orange-500/25 transition flex items-center justify-center space-x-2 cursor-pointer"
+          >
+            <Sliders className="w-4 h-4" />
+            <span>วาดกรอบเสาด้วยมือ (Manual BBox)</span>
+          </button>
+        )}
+
         {onOpenCalibrate && (
           <button
             onClick={() => {
               if (isModal) setIsFullscreen(false);
               onOpenCalibrate();
             }}
-            className="flex-1 w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
+            className="w-full sm:w-auto py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-white/10 transition flex items-center justify-center space-x-1.5 cursor-pointer"
           >
-            <Target className="w-4 h-4" />
-            <span>เปิดฟีเจอร์ "ปรับเทียบเสา"</span>
+            <Target className="w-3.5 h-3.5 text-blue-400" />
+            <span>ปรับเทียบเสา</span>
           </button>
         )}
 
         <button
           onClick={() => setAiViewType('cctv')}
-          className="w-full sm:w-auto py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-white/10 transition flex items-center justify-center space-x-1.5 cursor-pointer"
+          className="w-full sm:w-auto py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-white/10 transition flex items-center justify-center space-x-1.5 cursor-pointer"
         >
           <Camera className="w-3.5 h-3.5" />
-          <span>ดูมุมกล้อง CCTV</span>
+          <span>ดูมุมกล้อง</span>
         </button>
       </div>
     </div>
@@ -508,11 +524,22 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}
-                className="bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-700 px-2.5 py-1 rounded-lg border border-slate-200 font-bold transition flex items-center space-x-1 text-[11px]"
+                className="bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-700 px-2.5 py-1 rounded-lg border border-slate-200 font-bold transition flex items-center space-x-1 text-[11px] cursor-pointer"
                 title="ปรับเทียบพิกัดสเกลเสาวัดน้ำ"
               >
                 <Target className="w-3 h-3 text-blue-600 shrink-0" />
                 <span>ปรับเทียบเสา</span>
+              </button>
+            )}
+
+            {onOpenManualBBox && (
+              <button
+                onClick={onOpenManualBBox}
+                className="bg-amber-50 hover:bg-amber-100 text-amber-800 hover:text-amber-900 px-2.5 py-1 rounded-lg border border-amber-300 font-bold transition flex items-center space-x-1 text-[11px] shadow-xs cursor-pointer"
+                title="วาดกรอบเสาวัดระดับน้ำด้วยตนเอง (Manual BBox) และจัดเก็บเข้า Retrain Dataset"
+              >
+                <Sliders className="w-3 h-3 text-amber-600 shrink-0" />
+                <span>วาดกรอบเสา</span>
               </button>
             )}
 
@@ -929,14 +956,20 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
                 {detectionStatus?.detected ? (
                   <div className="space-y-1.5">
-                    <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                    <div className={`flex items-center space-x-2 font-bold text-xs ${
+                      detectionStatus.is_manual ? 'text-amber-400' : 'text-emerald-400'
+                    }`}>
                       <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>[DETECTED] Found Staff Gauge | Conf: {(detectionStatus.confidence * 100).toFixed(1)}%</span>
+                      <span>
+                        {detectionStatus.is_manual
+                          ? '[MANUAL BBOX] Active Staff Gauge Annotation'
+                          : `[DETECTED] Found Staff Gauge | Conf: ${(detectionStatus.confidence * 100).toFixed(1)}%`}
+                      </span>
                     </div>
                     {detectionStatus.bbox && detectionStatus.bbox.length === 4 && (
                       <div className="font-mono text-[11px] text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 flex items-center justify-between">
                         <span>BBox: [{detectionStatus.bbox.join(', ')}]</span>
-                        <span className="text-sky-300 ml-2 font-bold">
+                        <span className={`ml-2 font-bold ${detectionStatus.is_manual ? 'text-amber-300' : 'text-sky-300'}`}>
                           (W={detectionStatus.bbox[2] - detectionStatus.bbox[0]}px, H={detectionStatus.bbox[3] - detectionStatus.bbox[1]}px)
                         </span>
                       </div>

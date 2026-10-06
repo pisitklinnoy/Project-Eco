@@ -128,3 +128,34 @@ export interface OnDemandPredictResponse {
   scale_cm_per_pixel?: number | null;
 }
 
+export interface DetectionStatus {
+  detected: boolean;
+  is_manual?: boolean;
+  confidence: number;
+  bbox: [number, number, number, number] | null;
+  station_code?: string;
+  station_name?: string;
+  mode?: string;
+  can_analyze_gauge: boolean;
+  recommendation?: 'manual_bbox' | 'manual_active' | 'calibrate_pole' | 'camera_offline' | null;
+  message?: string;
+}
+
+export interface ManualBBoxPayload {
+  station_code: string;
+  bbox: [number, number, number, number];
+  image_resolution?: [number, number];
+  mode?: string;
+  label?: string;
+  notes?: string;
+}
+
+export interface ManualBBoxResponse {
+  status: string;
+  station_code: string;
+  bbox: [number, number, number, number];
+  yolo_normalized: [number, number, number, number];
+  dataset_file: string;
+  message: string;
+}
+

@@ -14,6 +14,7 @@ import { AlertsList } from './components/AlertsList';
 import { ReviewModal } from './components/ReviewModal';
 import { ClickToCalibrateModal } from './components/ClickToCalibrateModal';
 import { OnDemandPredictorModal } from './components/OnDemandPredictorModal';
+import { ManualBBoxModal } from './components/ManualBBoxModal';
 import { ReviewHub } from './components/ReviewHub';
 import { Waves } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export const App: React.FC = () => {
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState<boolean>(false);
   const [isOnDemandOpen, setIsOnDemandOpen] = useState<boolean>(false);
+  const [isManualBBoxOpen, setIsManualBBoxOpen] = useState<boolean>(false);
 
   // Active section tracking for floating navbar & sidebar
   const [activeSection, setActiveSection] = useState<string>('hero');
@@ -263,6 +265,7 @@ export const App: React.FC = () => {
                 onOpenReview={() => setIsReviewOpen(true)}
                 onOpenCalibrate={() => setIsCalibrateOpen(true)}
                 onOpenOnDemand={() => setIsOnDemandOpen(true)}
+                onOpenManualBBox={() => setIsManualBBoxOpen(true)}
               />
             </div>
           </div>
@@ -334,6 +337,14 @@ export const App: React.FC = () => {
         onClose={() => setIsCalibrateOpen(false)}
         station={selectedStation}
         onCalibrationSaved={loadStationData}
+      />
+
+      {/* Manual Staff Gauge BBox Modal */}
+      <ManualBBoxModal
+        isOpen={isManualBBoxOpen}
+        onClose={() => setIsManualBBoxOpen(false)}
+        station={selectedStation}
+        onSaved={loadStationData}
       />
 
       {/* On-Demand Water Level Image Predictor Modal */}

@@ -62,8 +62,8 @@ class WaterSurfaceDetector:
 
         # กำหนดขอบเขตสแกนหาจุดน้ำท่วม (Flood Search Range)
         if self.station_code == "X.44":
-            scan_top = 300
-            scan_bottom = h - 300
+            scan_top = 200
+            scan_bottom = h - 35   # scan all the way to near-bottom (waterline ≈ Y 2130 in 2252px image)
         elif self.station_code == "X.90":
             scan_top = 550 if is_night else 200
             scan_bottom = min(h - 50, (self.baseline_y - 80) if self.baseline_y else 1600)
@@ -87,20 +87,29 @@ class WaterSurfaceDetector:
         confidence = 0.92
 
         if self.station_code == "X.44":
-            if best_flood_score > 25.0 and best_flood_y is not None and best_flood_y < 1700:
+            if best_flood_score > 15.0 and best_flood_y is not None:
                 y1_ab = max(0, best_flood_y - 150)
                 c_above = float(np.mean(rolling_max[y1_ab:best_flood_y]))
-                c_below = float(np.mean(rolling_max[best_flood_y:min(h, best_flood_y + 350)]))
+                c_below = float(np.mean(rolling_max[best_flood_y:min(h, best_flood_y + 200)]))
                 contrast_ratio = c_above / max(1e-3, c_below)
-                if contrast_ratio > 1.50:
+                if contrast_ratio > 1.25:
                     is_flood = True
+                    # Refine: find first Y in neighbourhood where STD drops below 25
+                    sr_min = max(0, best_flood_y - 80)
+                    sr_max = min(h - 10, best_flood_y + 80)
                     exact_y = best_flood_y
-                    for y_cand in range(max(0, best_flood_y - 30), min(h, best_flood_y + 30)):
-                        if stds[y_cand] < 35.0:
+                    found = False
+                    for y_cand in range(sr_min, sr_max):
+                        if stds[y_cand] < 25.0:
                             exact_y = y_cand
+                            found = True
                             break
+                    if not found:
+                        g_seg = np.gradient(-stds[sr_min:sr_max])
+                        if len(g_seg) > 0:
+                            exact_y = sr_min + int(np.argmax(g_seg))
                     water_y = exact_y
-                    confidence = float(np.clip(best_flood_score / 45.0, 0.88, 0.98))
+                    confidence = float(np.clip(best_flood_score / 80.0, 0.75, 0.96))
         else:
             flood_limit = self.flood_score_thresh
             if best_flood_score > flood_limit and best_flood_y is not None:
@@ -116,23 +125,66 @@ class WaterSurfaceDetector:
                     confidence = float(np.clip(best_flood_score / 60.0, 0.60, 0.98))
 
         if not is_flood or water_y is None:
-            # สภาวะปกติ (Baseline Detection)
-            if self.station_code == "X.173A" and not is_night and h >= 1950:
-                # Muangkong กลางวัน: ตรวจหาจุดตัดผิวน้ำที่โคนเสาจริง (ช่วง 1950 - 2028 px)
-                bottom_zone = stds[1950:]
-                grad = np.gradient(-bottom_zone)
-                if len(grad) > 0 and np.max(grad) > 3.0:
-                    water_y = 1950 + int(np.argmax(grad))
-                else:
-                    water_y = self.baseline_y if self.baseline_y else 1985
-            elif self.baseline_y is not None:
-                water_y = self.baseline_y
-            elif self.baseline_lvl is not None:
-                water_y = self.calibrator.level_to_pixel(self.baseline_lvl)
-            else:
-                water_y = int(h * 0.90)
+            # ลองค้นหาผิวน้ำในโซนล่างก่อน (Bottom-Zone Gradient Scan)
+            # -- X.44 (Hat Yai Nai): สแกน 500 px ล่างสุด
+            if self.station_code == "X.44":
+                bz_start = max(0, h - 500)
+                bz_stds = stds[bz_start:]
+                found_bottom = False
+                for y_c in range(len(bz_stds)):
+                    if bz_stds[y_c] < 25.0:
+                        water_y = bz_start + y_c
+                        confidence = 0.78
+                        found_bottom = True
+                        break
+                if not found_bottom:
+                    g_seg = np.gradient(-bz_stds)
+                    if len(g_seg) > 0 and np.max(g_seg) > 2.0:
+                        water_y = bz_start + int(np.argmax(g_seg))
+                        confidence = 0.72
+                        found_bottom = True
+                if not found_bottom:
+                    water_y = self.baseline_y if self.baseline_y is not None else int(h * 0.90)
+                    confidence = 0.55
 
-            confidence = 0.93 if is_night else 0.92
+            # -- X.90 (Bang Sala): สแกน 400 px ใกล้ baseline
+            elif self.station_code == "X.90":
+                bz_start = max(0, (self.baseline_y - 200) if self.baseline_y else h - 400)
+                bz_stds = stds[bz_start:]
+                found_bottom = False
+                for y_c in range(len(bz_stds)):
+                    if bz_stds[y_c] < 25.0:
+                        water_y = bz_start + y_c
+                        confidence = 0.78
+                        found_bottom = True
+                        break
+                if not found_bottom:
+                    g_seg = np.gradient(-bz_stds)
+                    if len(g_seg) > 0 and np.max(g_seg) > 2.0:
+                        water_y = bz_start + int(np.argmax(g_seg))
+                        confidence = 0.72
+                        found_bottom = True
+                if not found_bottom:
+                    water_y = self.baseline_y if self.baseline_y is not None else int(h * 0.90)
+                    confidence = 0.55
+
+            # -- X.173A (Muang Kong): สแกนโซน 1950-end กลางวัน, ทั้งหมดกลางคืน
+            else:
+                if not is_night and h >= 1950:
+                    bz_start = 1950
+                else:
+                    bz_start = max(0, h - 400)
+                bz_stds = stds[bz_start:]
+                grad = np.gradient(-bz_stds)
+                if len(grad) > 0 and np.max(grad) > 3.0:
+                    water_y = bz_start + int(np.argmax(grad))
+                    confidence = 0.75
+                else:
+                    water_y = self.baseline_y if self.baseline_y is not None else (
+                        1985 if h >= 1950 else int(h * 0.90)
+                    )
+                    confidence = 0.55
+
 
         raw_level = self.calibrator.pixel_to_level(water_y)
         water_level = round(raw_level - self.calibration_bias, 2)

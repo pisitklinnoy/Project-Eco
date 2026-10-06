@@ -166,20 +166,39 @@ class VisionService:
 
     def fetch_live_frame(self, station_code: str) -> Optional[np.ndarray]:
         """ดึงภาพสดจากกล้อง CCTV ของสถานีแบบเรียลไทม์"""
-        norm_key = "STN-MUANGKONG" if "MUANGKONG" in station_code.upper() else \
-                   "STN-BANGSALA" if "BANGSALA" in station_code.upper() else \
-                   "STN-HATYAINAI" if "HATYAINAI" in station_code.upper() else None
+        resolved = self._resolve_station_key(station_code)
+        norm_key = "STN-MUANGKONG" if (resolved and ("MUANGKONG" in resolved or "173A" in resolved)) else \
+                   "STN-BANGSALA" if (resolved and ("BANGSALA" in resolved or "90" in resolved)) else \
+                   "STN-HATYAINAI" if (resolved and ("HATYAINAI" in resolved or "44" in resolved)) else \
+                   ("STN-MUANGKONG" if "MUANGKONG" in station_code.upper() else
+                    "STN-BANGSALA" if "BANGSALA" in station_code.upper() else
+                    "STN-HATYAINAI" if ("HATYAINAI" in station_code.upper() or "44" in station_code.upper()) else None)
         
         stream_url = STATION_STREAM_MAP.get(norm_key, None)
         if not stream_url:
             return None
 
         # กรณีเป็นกล้อง Axis สะพานหาดใหญ่นอก / ที่ว่าการ อ.หาดใหญ่
-        if "ta200304" in stream_url:
+        if "ta200304" in stream_url or norm_key == "STN-HATYAINAI":
             axis_frame = self._fetch_axis_frame(stream_url)
             if axis_frame is not None:
+                self._cached_frames[station_code] = (time.monotonic(), axis_frame)
                 return axis_frame
-            # Fallback ไปยัง hatyaicityclimate ถ้า Axis ออฟไลน์
+
+            # ผู้ใช้ระบุภาพทดสอบเฉพาะกิจกรณีกล้อง Axis ออฟไลน์ / พัง
+            test_candidates = [
+                r"C:\Project\hatyai_flood\dataset\dwr_ta200304\gauge_detected\predict\TA200304_20260921-133636.jpg",
+                os.path.join(BASE_DIR, "sample_images", "station3_hatyainai_daytime.jpg"),
+                os.path.join(BASE_DIR, "sample_images", "station3_hatyainai.jpg"),
+            ]
+            for p in test_candidates:
+                if os.path.exists(p):
+                    frame = cv2.imread(p)
+                    if frame is not None:
+                        self._cached_frames[station_code] = (time.monotonic(), frame)
+                        return frame
+
+            # Fallback ไปยัง hatyaicityclimate ถ้าไม่มีภาพทดสอบ
             stream_url = "https://hatyaicityclimate.org/floodphoto/last/hatyainai.jpg"
 
         try:

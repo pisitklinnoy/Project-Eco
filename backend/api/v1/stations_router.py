@@ -150,11 +150,12 @@ def get_station_live_camera_feed(station_code: str):
                       "station2_bangsala" if "BANGSALA" in stn_key or "90" in stn_key else \
                       "station3_hatyainai"
         candidates = [
+            r"C:\Project\hatyai_flood\dataset\dwr_ta200304\gauge_detected\predict\TA200304_20260921-133636.jpg" if "hatyainai" in station_num else None,
             os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
             os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
         ]
         for p in candidates:
-            if os.path.exists(p):
+            if p and os.path.exists(p):
                 frame = cv2.imread(p)
                 if frame is not None:
                     break
@@ -203,13 +204,14 @@ def get_station_raw_frame(station_code: str):
                   "station3_hatyainai"
 
     candidates = [
+        r"C:\Project\hatyai_flood\dataset\dwr_ta200304\gauge_detected\predict\TA200304_20260921-133636.jpg" if "hatyainai" in station_num else None,
         os.path.join(BASE_DIR, "sample_images", f"{station_num}_daytime.jpg"),
         os.path.join(BASE_DIR, "sample_images", f"{station_num}.jpg"),
         os.path.join(BASE_DIR, "sample_images", f"{station_num}_flood.png"),
     ]
     frame = None
     for p in candidates:
-        if os.path.exists(p):
+        if p and os.path.exists(p):
             frame = cv2.imread(p)
             if frame is not None:
                 break

@@ -282,16 +282,18 @@ class TimeSeriesHITLService:
 
         # ค้นหา station_code และ measurement ID ที่เกี่ยวข้อง
         station_code = "STN-BANGSALA"
+        orig_timestamp = datetime.now(timezone.utc)
         vision_meas_id = None
         if review_id.startswith("ING-DB-"):
             try:
                 vision_meas_id = int(review_id.replace("ING-DB-", ""))
                 row = db.execute(
-                    text("SELECT station_code FROM water_measurements WHERE id = :id"),
+                    text("SELECT station_code, timestamp FROM water_measurements WHERE id = :id"),
                     {"id": vision_meas_id}
                 ).fetchone()
                 if row:
                     station_code = row[0]
+                    orig_timestamp = row[1] or orig_timestamp
                     # ปรับสถานะแถวเดิมว่าได้รับการตรวจทานแล้ว
                     db.execute(
                         text("UPDATE water_measurements SET is_reviewed_by_human = TRUE WHERE id = :id"),
@@ -300,11 +302,11 @@ class TimeSeriesHITLService:
             except Exception as e:
                 print(f"[TimeSeriesHITL] Lookup measurement {review_id} note: {e}")
 
-        # บันทึกค่ายืนยันลงฐานข้อมูลจริง
+        # บันทึกค่ายืนยันลงฐานข้อมูลจริงตาม Timestamp ของเหตุการณ์เดิมที่ตรวจทาน
         from models.measurement import WaterMeasurement
         meas = WaterMeasurement(
             station_code=station_code,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=orig_timestamp,
             water_level=verified_water_level,
             source_type="MANUAL_REVIEW",
             vision_confidence=1.0,

@@ -289,7 +289,7 @@ class VisionService:
 
             is_valid_gauge = (
                 alignment.get("is_manual", False) or
-                alignment.get("method") == "HYBRID_CONFIG_TOP_ANCHOR"
+                alignment.get("method") in ("YOLO_DIRECT_DETECTION", "HYBRID_CONFIG_TOP_ANCHOR")
             )
 
             if view == "cctv":
@@ -565,17 +565,17 @@ class VisionService:
                 "recommendation": "manual_active",
                 "message": "ใช้งานพิกัดเสาวัดระดับน้ำที่กำหนดด้วยตนเอง (Manual BBox) พร้อมสำหรับวิเคราะห์สเกลเสาและเตรียม Re-train โมเดล"
             }
-        elif alignment.get("method") == "HYBRID_CONFIG_TOP_ANCHOR":
+        elif alignment.get("method") in ("YOLO_DIRECT_DETECTION", "HYBRID_CONFIG_TOP_ANCHOR"):
             conf = alignment.get("confidence", 0.90)
             is_sub = alignment.get("is_submerged_occluded", False)
             is_shift = alignment.get("is_camera_shifted", False)
             shift_dx = alignment.get("camera_shift", {}).get("dx", 0.0)
 
-            status_msg = f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {conf*100:.1f}%) แบบ Hybrid Aligned"
+            status_msg = f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {conf*100:.1f}%) โดยโมเดล AI (YOLO)"
             if is_sub:
-                status_msg += " [ตรวจพบคราบน้ำท่วมบังเสา: ดึงสเกลเต็มความยาวอัตโนมัติ]"
+                status_msg += " [ตรวจพบคราบน้ำท่วมบังเสา]"
             elif is_shift:
-                status_msg += f" [ตรวจพบการสั่น/ขยับของกล้อง {shift_dx:+.1f}px: ชดเชยมุมกล้องแล้ว]"
+                status_msg += f" [ตรวจพบการสั่น/ขยับของกล้อง {shift_dx:+.1f}px]"
 
             return {
                 "detected": True,

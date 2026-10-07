@@ -321,36 +321,20 @@ def render_model_v2_detection_view(
     if hybrid_info:
         method = hybrid_info.get("method", "")
         is_manual = hybrid_info.get("is_manual", False)
-        is_submerged = hybrid_info.get("is_submerged_occluded", False)
-        is_shifted = hybrid_info.get("is_camera_shifted", False)
         conf = hybrid_info.get("confidence", 0.90)
-        shift = hybrid_info.get("camera_shift", {})
-        dx = shift.get("dx", 0.0)
-        ax1, ay1, ax2, ay2 = hybrid_info["aligned_bbox"]
-        raw_box = hybrid_info.get("raw_yolo_bbox")
+        # วาดพิกัดตรงตามที่โมเดล YOLO ทำนายจริง 100% ปราศจาก Offset
+        box_coords = hybrid_info.get("raw_yolo_bbox") or hybrid_info.get("aligned_bbox")
+        ax1, ay1, ax2, ay2 = box_coords
 
-        # 1. วาดกล่องเสา Staff Gauge หลักที่ Aligned แล้ว
+        # 1. วาดกล่องเสา Staff Gauge
         if is_manual:
             box_color = (0, 165, 255)  # Amber
-            badge_txt = "Staff Gauge: Manual BBox (Dataset Saved)"
+            badge_txt = "Staff Gauge: Manual BBox"
             badge_bg = (0, 120, 220)
-        elif is_submerged:
-            box_color = (0, 255, 120)  # Emerald
-            badge_txt = f"Staff Gauge: Extrapolated (Submerged) {conf*100:.1f}%"
-            badge_bg = (0, 140, 70)
-        elif is_shifted:
-            box_color = (0, 255, 120)
-            badge_txt = f"Staff Gauge: Shift Aligned (dx:{dx:+.0f}px) {conf*100:.1f}%"
-            badge_bg = (0, 150, 60)
-        elif method == "HYBRID_CONFIG_TOP_ANCHOR":
-            box_color = (0, 255, 120)
-            badge_txt = f"Staff Gauge: Hybrid Aligned ({conf*100:.1f}%)"
-            badge_bg = (0, 160, 60)
         else:
-            # CONFIG_GEOMETRY_BASELINE
-            box_color = (0, 200, 255)
-            badge_txt = "Staff Gauge: Config Baseline (AI Search Failed)"
-            badge_bg = (0, 120, 200)
+            box_color = (0, 255, 120)  # Emerald
+            badge_txt = f"Staff Gauge: {conf*100:.1f}%"
+            badge_bg = (0, 160, 60)
 
         # วาดกรอบเสาหลัก
         cv2.rectangle(out, (ax1, ay1), (ax2, ay2), box_color, 3)
@@ -361,16 +345,6 @@ def render_model_v2_detection_view(
         cv2.line(out, (ax1, ay1), (ax1, ay1 + c_len), (255, 255, 255), 4)
         cv2.line(out, (ax2, ay2), (ax2 - c_len, ay2), (255, 255, 255), 4)
         cv2.line(out, (ax2, ay2), (ax2, ay2 - c_len), (255, 255, 255), 4)
-
-        # หากมีน้ำท่วมบังเสา: แสดงพื้นที่ต่อยอดสเกลลงใต้น้ำ
-        if is_submerged and raw_box:
-            ry2 = raw_box[3]
-            if ay2 > ry2:
-                overlay_sub = out.copy()
-                cv2.rectangle(overlay_sub, (ax1, ry2), (ax2, ay2), (0, 180, 255), -1)
-                cv2.addWeighted(overlay_sub, 0.25, out, 0.75, 0, out)
-                cv2.putText(out, "[Scale Extrapolated Below Waterline]", (ax1 + 4, min(out.shape[0] - 10, ay2 - 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 220, 255), 1, cv2.LINE_AA)
 
         # Badge เหนือหัวเสา
         (tw, th), base = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)

@@ -53,15 +53,17 @@ class VisionService:
         self._cached_frames: Dict[str, Tuple[float, np.ndarray]] = {}
         self.cache_ttl_seconds = 15.0
 
-        # โหลดโมเดล model_best_v2.pt โดยตรงตามคำขอ
-        v2_candidates = [
-            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.pt"),
-            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.pt",
-            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.onnx"),
-            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.onnx"
+        # โหลดโมเดล YOLO ล่าสุด (ลำดับความสำคัญ: best.pt ที่เพิ่ง Retrain -> model_muangkong_seg)
+        model_candidates = [
+            os.path.join(BASE_DIR, "models", "best.pt"),
+            os.path.join(BASE_DIR, "models", "model_muangkong_seg.pt"),
+            os.path.join(BASE_DIR, "models", "model_muangkong_seg.onnx"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "best.pt"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_muangkong_seg.pt"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_muangkong_seg.onnx"),
         ]
         target_model = None
-        for p in v2_candidates:
+        for p in model_candidates:
             if os.path.exists(p):
                 target_model = p
                 break

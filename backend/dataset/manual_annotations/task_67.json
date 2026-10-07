@@ -1,0 +1,15 @@
+{
+  "task_id": 67,
+  "station": "STN-BANGSALA",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-07T11:50:46.872328",
+  "verified_water_level_m": 7.466,
+  "pixel_y": 900.0,
+  "yolo_normalized": null,
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 0.0,
+    "mae_meters": 0.0,
+    "iou": 0.0
+  }
+}

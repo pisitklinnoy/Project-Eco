@@ -120,7 +120,7 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
     # ดึงข้อมูลจาก Local dataset/manual_annotations เสริม
     local_manual_dir = ROOT_DIR / "backend" / "dataset" / "manual_annotations"
     if not local_manual_dir.exists():
-        local_manual_dir = ROOT_DIR / "app" / "dataset" / "manual_annotations"
+        local_manual_dir = Path("/app/dataset/manual_annotations")
     if local_manual_dir.exists():
         for f in local_manual_dir.glob("*.txt"):
             shutil.copy(f, labels_dir / f.name)
@@ -174,7 +174,7 @@ def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path) ->
         if alt.exists():
             base_model_path = alt
         else:
-            alt2 = ROOT_DIR / "app" / "models" / "model_muangkong_seg.pt"
+            alt2 = Path("/app/models/model_muangkong_seg.pt")
             if alt2.exists():
                 base_model_path = alt2
 
@@ -375,8 +375,9 @@ def deploy_model_to_production(weights_path: Path):
     target_paths = [
         MODELS_DIR / "best.pt",
         ROOT_DIR / "backend" / "models" / "best.pt",
-        ROOT_DIR / "app" / "models" / "best.pt"
     ]
+    if Path("/app/models").exists():
+        target_paths.append(Path("/app/models/best.pt"))
     for tp in target_paths:
         try:
             tp.parent.mkdir(parents=True, exist_ok=True)

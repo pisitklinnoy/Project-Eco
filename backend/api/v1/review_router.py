@@ -98,18 +98,18 @@ async def label_studio_webhook(payload: dict = Body(...), db: Session = Depends(
 
 
 # =============================================================================
-# Time Series Human-in-the-Loop (HITL) Validation Routes
+# Time Series Human-in-the-Loop (HITL) Validation Routes (Real Database 100%)
 # =============================================================================
 
 # 1. ด่านตรวจสอบข้อมูลนำเข้า (Data Ingestion Verification - Cross-Validation)
 @router.get("/timeseries/ingestion-queue")
-def get_ingestion_queue():
-    """ดึงรายการข้อมูลที่ถูกระงับชั่วคราว (Quarantined) จากการ Cross-Validation ระหว่าง Vision AI vs RID Sensor"""
-    return timeseries_hitl_service.get_ingestion_queue()
+def get_ingestion_queue(db: Session = Depends(get_db)):
+    """ดึงรายการข้อมูลที่ถูกระงับชั่วคราว (Quarantined) จากการ Cross-Validation ระหว่าง Vision AI vs RID Sensor ในฐานข้อมูลจริง"""
+    return timeseries_hitl_service.get_ingestion_queue(db=db)
 
 @router.post("/timeseries/ingestion-override")
 def apply_ingestion_override(payload: IngestionOverrideSubmit, db: Session = Depends(get_db)):
-    """ผู้เชี่ยวชาญ Review และทำ Manual Override ยืนยันค่าจริงหน้างาน พร้อมปลดสถานะระงับ"""
+    """ผู้เชี่ยวชาญ Review และทำ Manual Override ยืนยันค่าจริงหน้างาน พร้อมปลดสถานะระงับและบันทึกลง DB จริง"""
     return timeseries_hitl_service.apply_ingestion_override(
         db=db,
         review_id=payload.review_id,
@@ -119,28 +119,25 @@ def apply_ingestion_override(payload: IngestionOverrideSubmit, db: Session = Dep
         reviewer_notes=payload.reviewer_notes or "Manual override applied"
     )
 
+@router.post("/timeseries/run-cross-validation")
 @router.post("/timeseries/ingestion-simulate")
-def simulate_ingestion_discrepancy(payload: IngestionSimulateRequest):
-    """จำลองข้อมูลนำเข้าที่ผิดปกติเกินเกณฑ์ความปลอดภัย เพื่อทดสอบระบบ Quarantined"""
-    return timeseries_hitl_service.check_and_quarantine_ingestion(
-        station_code=payload.station_code,
-        station_name=payload.station_name,
-        vision_val=payload.vision_water_level,
-        sensor_val=payload.sensor_water_level
-    )
+def run_cross_validation_evaluation(db: Session = Depends(get_db)):
+    """รันการตรวจสอบ Cross-Validation จากฐานข้อมูลจริง PostgreSQL สดๆ ทันที (ไม่มี Mock)"""
+    return timeseries_hitl_service.evaluate_live_ingestion(db=db)
 
 # 2. ด่านประเมินผลการพยากรณ์ (Forecast Drift & Retrain Trigger)
 @router.get("/timeseries/forecast-drift")
 def get_forecast_drift(db: Session = Depends(get_db)):
-    """รายงานการเปรียบเทียบค่าจริง vs ผลพยากรณ์ล่วงหน้าของ LightGBM พร้อม Residual Error และ Drift Status"""
+    """รายงานการเปรียบเทียบค่าจริง vs ผลพยากรณ์ล่วงหน้าของ LightGBM จากฐานข้อมูลจริง พร้อม Residual Error และ Drift Status"""
     return timeseries_hitl_service.get_forecast_drift_report(db=db)
 
 @router.post("/timeseries/trigger-drift-retrain")
-def trigger_drift_retrain(payload: DriftRetrainRequest):
+def trigger_drift_retrain(payload: DriftRetrainRequest, db: Session = Depends(get_db)):
     """ผู้เชี่ยวชาญสั่ง Retrain โมเดลใหม่ทันทีผ่านไปป์ไลน์ MLOps เมื่อตรวจพบ Forecast Drift"""
     return timeseries_hitl_service.trigger_drift_retrain(
         reviewer_name=payload.reviewer_name,
-        reviewer_notes=payload.reviewer_notes or "Retrain triggered from drift alert"
+        reviewer_notes=payload.reviewer_notes or "Retrain triggered from drift alert",
+        db=db
     )
 
 @router.post("/timeseries/acknowledge-drift")
@@ -151,8 +148,10 @@ def acknowledge_drift(payload: DriftAcknowledgeRequest):
         reviewer_notes=payload.reviewer_notes or "Acknowledged"
     )
 
+@router.post("/timeseries/evaluate-drift")
 @router.post("/timeseries/simulate-drift")
-def simulate_forecast_drift(payload: DriftSimulateRequest):
-    """จำลองเหตุการณ์ Forecast Drift สำหรับทดสอบบนหน้า Dashboard"""
-    return timeseries_hitl_service.simulate_drift_event(residual_error=payload.residual_error)
+def evaluate_live_drift(db: Session = Depends(get_db)):
+    """รันการคำนวณและประเมิน Forecast Drift จากฐานข้อมูลจริง PostgreSQL สดๆ ทันที (ไม่มี Mock)"""
+    return timeseries_hitl_service.get_forecast_drift_report(db=db)
+
 

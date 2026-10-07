@@ -7,7 +7,10 @@
   "station_id": 486,
   "station_group_id": 1250,
   "stream_url": "http://live:Live2025!@ta200304.dyndns.info:5001/axis-cgi/mjpg/video.cgi",
-  "reference_frame_resolution": [3200, 1800],
+  "reference_frame_resolution": [
+    3200,
+    1800
+  ],
   "staff_gauge_bbox": {
     "x1": 1810,
     "y1": 335,
@@ -22,15 +25,42 @@
     "height": 2028
   },
   "piecewise_anchors": [
-    [18.0, 106],
-    [17.0, 345],
-    [16.0, 585],
-    [15.0, 825],
-    [14.0, 1060],
-    [13.0, 1295],
-    [12.0, 1520],
-    [11.0, 1740],
-    [10.0, 1965]
+    [
+      18.0,
+      106
+    ],
+    [
+      17.0,
+      345
+    ],
+    [
+      16.0,
+      585
+    ],
+    [
+      15.0,
+      825
+    ],
+    [
+      14.0,
+      1060
+    ],
+    [
+      13.0,
+      1295
+    ],
+    [
+      12.0,
+      1520
+    ],
+    [
+      11.0,
+      1740
+    ],
+    [
+      10.0,
+      1965
+    ]
   ],
   "unit": "meters",
   "datum": "R.T.K.",
@@ -41,5 +71,6 @@
   },
   "baseline_y": 1985,
   "flood_threshold_score": 12.0,
-  "calibration_bias_m": 0.0
+  "calibration_bias_m": -1.087,
+  "last_calibrated_at": "2026-10-07T06:31:15.674677"
 }

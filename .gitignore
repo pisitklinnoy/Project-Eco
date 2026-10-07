@@ -34,6 +34,9 @@ mlruns/
 .mlflow/
 workers/vision/output/
 non_time_series/output/
+backend/dataset/manual_annotations/*.jpg
+backend/dataset/manual_annotations/*.json
+backend/dataset/manual_annotations/*.txt
 
 # IDE
 .idea/

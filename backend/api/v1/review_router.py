@@ -9,7 +9,9 @@ from schemas.review import (
     IngestionSimulateRequest,
     DriftRetrainRequest,
     DriftAcknowledgeRequest,
-    DriftSimulateRequest
+    DriftSimulateRequest,
+    VisionCorrectionSubmit,
+    VisionCorrectionResponse
 )
 from schemas.measurement import WaterMeasurementResponse
 from services.review_service import review_service

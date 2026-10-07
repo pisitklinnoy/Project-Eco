@@ -47,3 +47,24 @@ class DriftAcknowledgeRequest(BaseModel):
 
 class DriftSimulateRequest(BaseModel):
     residual_error: float = 0.65
+
+class VisionCorrectionSubmit(BaseModel):
+    """Schema สำหรับปุ่มตรวจทาน: มนุษย์กรอกระดับน้ำที่ถูกต้องหลัง AI วิเคราะห์ผิด"""
+    station_code: str                          # เช่น "STN-MUANGKONG"
+    corrected_water_level_m: float             # ระดับน้ำจริง (เมตร รทก.)
+    ai_detected_level_m: Optional[float] = None  # ค่าที่ AI ตรวจได้ (เพื่อคำนวณ error)
+    reviewer_name: str = "Hydrologist Operator"
+    reviewer_notes: Optional[str] = None
+    save_for_retrain: bool = True              # บันทึกลง active_learning dataset หรือไม่
+
+class VisionCorrectionResponse(BaseModel):
+    status: str
+    station_code: str
+    corrected_water_level_m: float
+    ai_detected_level_m: Optional[float]
+    error_m: Optional[float]
+    saved_image_path: Optional[str]
+    saved_label_path: Optional[str]
+    saved_meta_path: Optional[str]
+    active_learning_count: int
+    message: str

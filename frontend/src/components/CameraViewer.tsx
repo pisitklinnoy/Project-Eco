@@ -262,7 +262,6 @@ interface CameraViewerProps {
 export const CameraViewer: React.FC<CameraViewerProps> = ({
   station,
   measurement,
-  onOpenReview,
   onOpenCalibrate,
   onOpenManualBBox,
   onOpenOnDemand,
@@ -856,17 +855,6 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               >
                 <Target className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>ปรับเทียบ</span>
-              </button>
-            )}
-
-            {onOpenReview && (
-              <button
-                onClick={onOpenReview}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-xl font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer active:scale-95"
-                title="ตรวจทานภาพและยืนยันระดับน้ำ"
-              >
-                <Eye className="w-3.5 h-3.5 shrink-0" />
-                <span>ตรวจทาน</span>
               </button>
             )}
 

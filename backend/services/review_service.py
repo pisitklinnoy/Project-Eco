@@ -458,4 +458,161 @@ class ReviewService:
             "trigger_type": trigger_type
         }
 
+    # =========================================================================
+    # Vision Correction — บันทึกข้อมูลลง Active Learning Dataset (hatyai_flood)
+    # =========================================================================
+
+    @classmethod
+    def save_to_active_learning(
+        cls,
+        station_code: str,
+        corrected_level_m: float,
+        ai_level_m: float | None,
+        reviewer_name: str = "Hydrologist Operator",
+        reviewer_notes: str | None = None,
+    ) -> dict:
+        """
+        บันทึกภาพปัจจุบันจาก vision_service + YOLOv8 label + metadata
+        ลงใน C:/Project/hatyai_flood/dataset/active_learning/
+        เพื่อนำไป retrain model ในอนาคต
+
+        Format ที่บันทึก:
+          images/<timestamp>_<station>.jpg   — raw CCTV frame (full resolution)
+          labels/<timestamp>_<station>.txt   — YOLOv8 format: class cx cy w h
+          meta/<timestamp>_<station>.json    — metadata รวมถึงระดับน้ำที่ถูกต้อง
+        """
+        import cv2
+        import time
+
+        # กำหนด paths
+        ACTIVE_LEARNING_ROOT = r"C:\Project\hatyai_flood\dataset\active_learning"
+        img_dir  = os.path.join(ACTIVE_LEARNING_ROOT, "images")
+        lbl_dir  = os.path.join(ACTIVE_LEARNING_ROOT, "labels")
+        meta_dir = os.path.join(ACTIVE_LEARNING_ROOT, "meta")
+        for d in [img_dir, lbl_dir, meta_dir]:
+            os.makedirs(d, exist_ok=True)
+
+        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        stn_slug = station_code.replace("STN-", "").lower()
+        base_name = f"{ts}_{stn_slug}"
+
+        # --- ดึง frame ปัจจุบันจาก vision_service ---
+        frame = None
+        bbox_info = None
+        try:
+            from services.vision_service import vision_service
+            # ดึง frame + alignment info
+            raw_frame, alignment, cfg = vision_service.get_current_frame_and_alignment(station_code)
+            if raw_frame is not None:
+                frame = raw_frame
+                bbox_info = alignment
+        except Exception as e:
+            print(f"[ReviewService] Could not get live frame: {e}")
+
+        # fallback: ใช้ sample image ถ้าไม่มี live frame
+        if frame is None:
+            try:
+                from services.vision_service import vision_service
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                stn_key  = vision_service._resolve_station_key(station_code)
+                cfg = vision_service.station_components.get(stn_key, {}).get("config", {}) if stn_key else {}
+                stn_num  = cfg.get("station_num", stn_slug)
+                for img_name in [f"{stn_num}_daytime.jpg", f"{stn_num}.jpg", f"{stn_num}.png"]:
+                    candidate = os.path.join(base_dir, "sample_images", img_name)
+                    if os.path.exists(candidate):
+                        frame = cv2.imread(candidate)
+                        break
+            except Exception:
+                pass
+
+        saved_img_path  = None
+        saved_lbl_path  = None
+        saved_meta_path = None
+
+        if frame is not None:
+            fh, fw = frame.shape[:2]
+
+            # 1. บันทึก raw image
+            img_path = os.path.join(img_dir, f"{base_name}.jpg")
+            cv2.imwrite(img_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            saved_img_path = img_path
+
+            # 2. สร้าง YOLOv8 label (class 0 = Staff Gauge)
+            #    ใช้ bounding box จาก alignment ถ้ามี ไม่งั้นใช้ cfg bbox
+            try:
+                if bbox_info and "bbox" in bbox_info:
+                    bx1, by1, bx2, by2 = bbox_info["bbox"]
+                else:
+                    try:
+                        from services.vision_service import vision_service
+                        stn_key = vision_service._resolve_station_key(station_code)
+                        cfg_tmp = vision_service.station_components.get(stn_key, {}).get("config", {}) if stn_key else {}
+                        bb  = cfg_tmp.get("staff_gauge_bbox", {})
+                        bx1 = bb.get("x1", int(fw * 0.45))
+                        by1 = bb.get("y1", int(fh * 0.10))
+                        bx2 = bb.get("x2", int(fw * 0.55))
+                        by2 = bb.get("y2", int(fh * 0.90))
+                    except Exception:
+                        bx1, by1 = int(fw * 0.45), int(fh * 0.10)
+                        bx2, by2 = int(fw * 0.55), int(fh * 0.90)
+
+                # YOLOv8 format: class cx_norm cy_norm w_norm h_norm
+                cx = ((bx1 + bx2) / 2.0) / fw
+                cy = ((by1 + by2) / 2.0) / fh
+                bw = (bx2 - bx1) / fw
+                bh = (by2 - by1) / fh
+                yolo_line = f"0 {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}\n"
+
+                lbl_path = os.path.join(lbl_dir, f"{base_name}.txt")
+                with open(lbl_path, "w") as f:
+                    f.write(yolo_line)
+                saved_lbl_path = lbl_path
+            except Exception as e:
+                print(f"[ReviewService] Label creation warning: {e}")
+
+        # 3. บันทึก metadata JSON
+        error_m = round(abs(corrected_level_m - ai_level_m), 3) if ai_level_m is not None else None
+        meta = {
+            "timestamp_utc":          datetime.utcnow().isoformat(),
+            "station_code":           station_code,
+            "corrected_water_level_m": corrected_level_m,
+            "ai_detected_level_m":    ai_level_m,
+            "error_m":                error_m,
+            "reviewer_name":          reviewer_name,
+            "reviewer_notes":         reviewer_notes,
+            "image_file":             os.path.basename(saved_img_path) if saved_img_path else None,
+            "label_file":             os.path.basename(saved_lbl_path) if saved_lbl_path else None,
+            "yolo_class":             {"0": "Staff Gauge"},
+            "datum":                  "R.T.K.",
+        }
+        meta_path = os.path.join(meta_dir, f"{base_name}.json")
+        try:
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=2, ensure_ascii=False)
+            saved_meta_path = meta_path
+        except Exception as e:
+            print(f"[ReviewService] Metadata save warning: {e}")
+
+        # นับจำนวนภาพใน active_learning ทั้งหมด
+        try:
+            count = len([x for x in os.listdir(img_dir) if x.endswith(".jpg")])
+        except Exception:
+            count = 0
+
+        print(f"[ReviewService] ✅ Saved correction to active_learning: {base_name} | level={corrected_level_m}m | err={error_m}m | total={count}")
+
+        return {
+            "status":                  "saved" if saved_img_path else "meta_only",
+            "station_code":            station_code,
+            "corrected_water_level_m": corrected_level_m,
+            "ai_detected_level_m":     ai_level_m,
+            "error_m":                 error_m,
+            "saved_image_path":        saved_img_path,
+            "saved_label_path":        saved_lbl_path,
+            "saved_meta_path":         saved_meta_path,
+            "active_learning_count":   count,
+            "message":                 f"บันทึกข้อมูลตรวจทานลง active_learning แล้ว ({count} ภาพ)"
+        }
+
+
 review_service = ReviewService()

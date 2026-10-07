@@ -228,6 +228,32 @@ class VisionService:
                 return cached[1].copy()
             return None
 
+    def get_current_frame_and_alignment(self, station_code: str):
+        """
+        ดึง frame ล่าสุด + alignment (bbox จาก YOLO) + config สำหรับ active_learning
+        คืนค่า: (frame, alignment_dict, cfg) — frame อาจเป็น None ถ้าออฟไลน์
+        """
+        stn_key = self._resolve_station_key(station_code)
+        cfg = self.station_components.get(stn_key, {}).get("config", {}) if stn_key else {}
+
+        frame = self.fetch_live_frame(station_code)
+
+        alignment = None
+        if frame is not None and stn_key:
+            try:
+                raw_dets = self.localizer.detect_raw(frame, conf_thresh=0.12)
+                manual_box = self.manual_bboxes.get(stn_key) or cfg.get("manual_staff_gauge_bbox")
+                alignment = self.localizer.align_hybrid_pole(
+                    frame=frame,
+                    station_config=cfg,
+                    raw_detections=raw_dets,
+                    manual_bbox=manual_box
+                )
+            except Exception as e:
+                print(f"[VisionService] alignment error during active_learning capture: {e}")
+
+        return frame, alignment, cfg
+
     def get_realtime_analysis_dashboard(
         self,
         station_code: str,

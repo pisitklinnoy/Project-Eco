@@ -35,9 +35,9 @@ export const AdminObservability: React.FC = () => {
       role: 'Unified Telemetry & Tracing Metrics',
       port: '3000',
       category: 'observability',
-      externalUrl: `http://${host}:3000`,
+      externalUrl: `http://${host}:3000/d/floodlens-unified-overview`,
       status: 'online',
-      description: 'ศูนย์ควบคุมกราฟและแดชบอร์ดแสดงผล Metrics, OpenTelemetry Traces และ System Logs',
+      description: 'ศูนย์ควบคุมกราฟและแดชบอร์ดแสดงผล Metrics, OpenTelemetry Traces และ System Logs ของ FloodLens แบบ Real-Time',
       icon: <BarChart3 className="w-5 h-5 text-amber-500" />,
     },
     {

@@ -12,12 +12,12 @@
     1800
   ],
   "staff_gauge_bbox": {
-    "x1": 1806,
-    "y1": 304,
-    "x2": 2014,
-    "y2": 1392,
+    "x1": 1877,
+    "y1": 264,
+    "x2": 2085,
+    "y2": 1468,
     "width": 208,
-    "height": 1080
+    "height": 1322
   },
   "enhanced_roi": {
     "upscale_factor": 3.0,

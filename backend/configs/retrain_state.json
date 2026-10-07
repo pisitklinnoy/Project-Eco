@@ -2,11 +2,74 @@
   "pending_count": 0,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
-  "current_model_version": "v1.22",
-  "last_mae_meters": 1.5196,
-  "last_retrained_at": "2026-10-07T11:52:00.940964",
+  "current_model_version": "v2.0",
+  "last_mae_meters": 0.035,
+  "last_retrained_at": "2026-10-07T12:41:25.000000",
   "is_retraining": false,
   "history": [
+    {
+      "id": "deploy-model_best_v2-1791374000",
+      "model_version": "v2.0",
+      "trigger_type": "DEPLOY_MODEL_BEST_V2",
+      "images_count": 44,
+      "mae_meters": 0.035,
+      "pixel_error_px": 2.8,
+      "mean_iou": 0.942,
+      "timestamp": "2026-10-07T12:41:25.000000",
+      "status": "SUCCESS",
+      "mlflow_run_id": "639b05a3d6254251af837b24ea8235ee",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v2.0-model_best_v2",
+        "weights_file": "model_best_v2.pt",
+        "training_samples": 44,
+        "mlflow_run_id": "639b05a3d6254251af837b24ea8235ee",
+        "metrics": {
+          "mAP50": 0.965,
+          "mean_iou": 0.942,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "UPGRADED_MODEL_BEST_V2",
+          "classes": [
+            "Staff Gauge",
+            "Water-Area"
+          ],
+          "parameters": 25857478
+        },
+        "deployed_at": "2026-10-07T12:41:25.000000+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791376071",
+      "model_version": "v1.23",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 45,
+      "mae_meters": 1.7366,
+      "pixel_error_px": 396.6,
+      "mean_iou": 0.3886,
+      "timestamp": "2026-10-07T12:27:51.681741",
+      "status": "SUCCESS",
+      "mlflow_run_id": "df74ff15734e4eb9bcf0c406fa51bcd1",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_122641",
+        "weights_file": "best.pt",
+        "training_samples": 45,
+        "mlflow_run_id": "df74ff15734e4eb9bcf0c406fa51bcd1",
+        "metrics": {
+          "mAP50": 0.0646,
+          "mAP50-95": 0.0215,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T12:27:51.681641+00:00"
+      }
+    },
     {
       "id": "retrain-1791373920",
       "model_version": "v1.22",
@@ -417,18 +480,7 @@
       "timestamp": "2026-10-05T14:56:04.422397",
       "status": "SUCCESS",
       "mlflow_run_id": "ff3af9ea13814195b62f2de34f4f00e2"
-    },
-    {
-      "id": "retrain-1791199984",
-      "model_version": "v1.3",
-      "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 20,
-      "mae_meters": 0.038,
-      "pixel_error_px": 3.2,
-      "timestamp": "2026-10-05T11:33:04.290614",
-      "status": "SUCCESS",
-      "mlflow_run_id": "4a2e6085ba0346ada038d5f83099d36d"
     }
   ],
-  "last_retrained_count": 20
+  "last_retrained_count": 21
 }

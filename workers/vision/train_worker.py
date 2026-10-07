@@ -158,7 +158,10 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
         except Exception:
             pass
 
-    print(f"[TrainingWorker] 📥 Pulled {count} ground-truth label files for training.")
+    # นับจำนวนชุดข้อมูล Label ที่มีอยู่จริงและไม่นับซ้ำ
+    unique_label_files = list(labels_dir.glob("*.txt"))
+    count = len(unique_label_files)
+    print(f"[TrainingWorker] 📥 Pulled {count} unique ground-truth label files for training.")
     return count
 
 

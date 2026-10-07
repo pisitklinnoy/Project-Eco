@@ -1,5 +1,5 @@
 {
-  "pending_count": 6,
+  "pending_count": 0,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
   "current_model_version": "v1.22",
@@ -11,7 +11,7 @@
       "id": "retrain-1791373920",
       "model_version": "v1.22",
       "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 64,
+      "images_count": 44,
       "mae_meters": 1.5196,
       "pixel_error_px": 347.0,
       "mean_iou": 0.9321,
@@ -22,7 +22,7 @@
         "status": "success",
         "version": "v20261007_115129",
         "weights_file": "best.pt",
-        "training_samples": 84,
+        "training_samples": 44,
         "mlflow_run_id": "b6b2687caff448afbcb7fe6214fd6372",
         "metrics": {
           "mAP50": 0.0593,
@@ -430,5 +430,5 @@
       "mlflow_run_id": "4a2e6085ba0346ada038d5f83099d36d"
     }
   ],
-  "last_retrained_count": 14
+  "last_retrained_count": 20
 }

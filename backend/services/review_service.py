@@ -674,6 +674,7 @@ class ReviewService:
         }
 
         # 1. อ่านจาก Database (Label Studio task_completion)
+        seen_task_ids = set()
         should_close = False
         if db is None:
             try:
@@ -694,6 +695,7 @@ class ReviewService:
                 rows = db.execute(query).fetchall()
                 for r in rows:
                     cid, tid, res_raw, tdata = r[0], r[1], r[2], r[3]
+                    seen_task_ids.add(str(tid))
                     parsed = cls.parse_ls_result(res_raw)
                     stn_name = (tdata.get("station_name") if isinstance(tdata, dict) else "") or "Muangkong"
 
@@ -729,13 +731,18 @@ class ReviewService:
                 if should_close and db is not None:
                     db.close()
 
-        # 2. อ่านจาก dataset/manual_annotations/*.json
+        # 2. อ่านจาก dataset/manual_annotations/*.json (ข้ามรายการที่มีอยู่ใน DB แล้วเพื่อไม่ให้นับซ้ำ)
         manual_dir = os.path.join(base_dir, "dataset", "manual_annotations")
         if os.path.exists(manual_dir):
             for jf in glob.glob(os.path.join(manual_dir, "*.json")):
                 try:
                     with open(jf, "r", encoding="utf-8") as f:
                         mdata = json.load(f)
+                    tid = str(mdata.get("task_id", ""))
+                    if tid and tid in seen_task_ids:
+                        continue
+                    if tid:
+                        seen_task_ids.add(tid)
                     stn_code = mdata.get("station_code") or mdata.get("station") or ""
                     stn_key = "bangsala" if "bangsala" in stn_code.lower() or "90" in stn_code else ("hatyainai" if "hatyainai" in stn_code.lower() or "44" in stn_code else "muangkong")
                     bbox = mdata.get("bbox_xyxy", [])
@@ -955,12 +962,15 @@ class ReviewService:
         except Exception as tw_err:
             print(f"[RetrainJob] Training Worker invocation note: {tw_err}")
 
-        # 6. บันทึกผลลัพธ์ลง History และ State
+        # ใช้ actual_samples จาก Training Worker เพื่อให้ขนาดชุดข้อมูลบนเว็บและ MLflow ตรงกัน 100%
+        actual_samples = tw_result.get("training_samples", total_samples) if tw_result else total_samples
+
+        # 6. บันทึกผลลัพธ์ลง History และ State พร้อมรีเซ็ตตัวนับโควตารอบปัจจุบัน (Batch Quota) เป็น 0
         history_entry = {
             "id": f"retrain-{int(datetime.utcnow().timestamp())}",
             "model_version": next_v,
             "trigger_type": trigger_type,
-            "images_count": total_samples,
+            "images_count": actual_samples,
             "mae_meters": calculated_mae,
             "pixel_error_px": calculated_pixel_mae,
             "mean_iou": mean_iou,
@@ -970,6 +980,21 @@ class ReviewService:
             "neural_network_training": tw_result
         }
 
+        # รีเซ็ตโควตารอบปัจจุบันเป็น 0 และอัปเดต baseline last_retrained_count ให้ตรงกับ DB
+        if db is not None:
+            try:
+                from sqlalchemy import text
+                count_query = text("SELECT COUNT(*) FROM task_completion WHERE was_cancelled = FALSE")
+                real_count = db.execute(count_query).scalar()
+                if real_count is not None:
+                    state["last_retrained_count"] = real_count
+            except Exception as e:
+                print(f"[RetrainJob] DB sync count note: {e}")
+                state["last_retrained_count"] = state.get("last_retrained_count", 0) + state.get("pending_count", 0)
+        else:
+            state["last_retrained_count"] = state.get("last_retrained_count", 0) + state.get("pending_count", 0)
+
+        state["pending_count"] = 0
         state["current_model_name"] = "StaffGauge-Vision-Detector"
         state["current_model_version"] = next_v
         state["last_mae_meters"] = calculated_mae
@@ -980,7 +1005,7 @@ class ReviewService:
         state["history"] = hist[:20]
         cls.save_retrain_state(state)
 
-        print(f"[RetrainJob] ✅ Finished Retraining! Model promoted to {next_v} (MAE {calculated_mae}m, Samples: {total_samples})")
+        print(f"[RetrainJob] ✅ Finished Retraining! Model promoted to {next_v} (MAE {calculated_mae}m, Samples: {actual_samples})")
         return {
             "status": "success",
             "model_name": "StaffGauge-Vision-Detector",
@@ -989,7 +1014,7 @@ class ReviewService:
             "pixel_error_px": calculated_pixel_mae,
             "mean_iou": mean_iou,
             "improvement_pct": improvement_pct,
-            "samples_count": total_samples,
+            "samples_count": actual_samples,
             "mlflow_run_id": run_id,
             "neural_network_training": tw_result,
             "timestamp": state["last_retrained_at"],

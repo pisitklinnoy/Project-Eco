@@ -2,11 +2,42 @@
   "pending_count": 0,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
-  "current_model_version": "v2.0",
-  "last_mae_meters": 0.035,
-  "last_retrained_at": "2026-10-07T12:41:25.000000",
+  "current_model_version": "v2.1",
+  "last_mae_meters": 1.8767,
+  "last_retrained_at": "2026-10-07T15:56:31.217999",
   "is_retraining": false,
   "history": [
+    {
+      "id": "retrain-1791388591",
+      "model_version": "v2.1",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 46,
+      "mae_meters": 1.8767,
+      "pixel_error_px": 428.6,
+      "mean_iou": 0.5171,
+      "timestamp": "2026-10-07T15:56:31.207928",
+      "status": "SUCCESS",
+      "mlflow_run_id": "b3181a33a48a41479e1a5915b841416c",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_155328",
+        "weights_file": "best.pt",
+        "training_samples": 46,
+        "mlflow_run_id": "b3181a33a48a41479e1a5915b841416c",
+        "metrics": {
+          "mAP50": 0.0438,
+          "mAP50-95": 0.0169,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T15:56:31.207864+00:00"
+      }
+    },
     {
       "id": "deploy-model_best_v2-1791374000",
       "model_version": "v2.0",
@@ -458,29 +489,7 @@
       "timestamp": "2026-10-06T17:03:38.737393",
       "status": "SUCCESS",
       "mlflow_run_id": "4518b89319d74030b914b482e377728a"
-    },
-    {
-      "id": "retrain-1791304685",
-      "model_version": "v1.5",
-      "trigger_type": "AUTO_BATCH_20",
-      "images_count": 20,
-      "mae_meters": 0.03,
-      "pixel_error_px": 2.5,
-      "timestamp": "2026-10-06T16:38:05.633907",
-      "status": "SUCCESS",
-      "mlflow_run_id": "8b1773bb59fb4e45b0637878f171951a"
-    },
-    {
-      "id": "retrain-1791212164",
-      "model_version": "v1.4",
-      "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 20,
-      "mae_meters": 0.034,
-      "pixel_error_px": 2.9,
-      "timestamp": "2026-10-05T14:56:04.422397",
-      "status": "SUCCESS",
-      "mlflow_run_id": "ff3af9ea13814195b62f2de34f4f00e2"
     }
   ],
-  "last_retrained_count": 21
+  "last_retrained_count": 28
 }

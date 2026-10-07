@@ -12,12 +12,12 @@
     1800
   ],
   "staff_gauge_bbox": {
-    "x1": 1810,
-    "y1": 330,
-    "x2": 1860,
-    "y2": 1010,
-    "width": 50,
-    "height": 680
+    "x1": 1955,
+    "y1": 179,
+    "x2": 2084,
+    "y2": 1350,
+    "width": 208,
+    "height": 1662
   },
   "enhanced_roi": {
     "upscale_factor": 3.0,
@@ -71,5 +71,5 @@
   },
   "baseline_y": 1985,
   "flood_threshold_score": 12.0,
-  "calibration_bias_m": 0.0
+  "calibration_bias_m": -6.8064
 }

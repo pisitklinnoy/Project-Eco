@@ -91,10 +91,10 @@
   "baseline_water_y_px": 2140,
   "calibration_bias_m": 0.0003,
   "staff_gauge_bbox": {
-    "x1": 894,
-    "y1": 134,
-    "x2": 1200,
-    "y2": 912,
+    "x1": 850,
+    "y1": 137,
+    "x2": 1157,
+    "y2": 915,
     "width": 307,
     "height": 778
   }

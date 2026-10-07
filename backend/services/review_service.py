@@ -97,14 +97,35 @@ class ReviewService:
 
             prediction_result = []
             if bbox:
+                if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+                    bx1, by1, bx2, by2 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+                    try:
+                        import numpy as np
+                        nparr = np.frombuffer(image_bytes, np.uint8)
+                        img_tmp = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                        ih, iw = img_tmp.shape[:2]
+                    except Exception:
+                        iw, ih = 3200, 1800
+                    box_x = round((bx1 / float(iw)) * 100.0, 2)
+                    box_y = round((by1 / float(ih)) * 100.0, 2)
+                    box_w = round(((bx2 - bx1) / float(iw)) * 100.0, 2)
+                    box_h = round(((by2 - by1) / float(ih)) * 100.0, 2)
+                elif isinstance(bbox, dict):
+                    box_x = bbox.get("x", 20.0)
+                    box_y = bbox.get("y", 20.0)
+                    box_w = bbox.get("width", 15.0)
+                    box_h = bbox.get("height", 60.0)
+                else:
+                    box_x, box_y, box_w, box_h = 20.0, 20.0, 15.0, 60.0
+
                 prediction_result.append({
                     "id": f"box_{uuid.uuid4().hex[:6]}",
                     "type": "rectanglelabels",
                     "value": {
-                        "x": bbox.get("x", 20.0),
-                        "y": bbox.get("y", 20.0),
-                        "width": bbox.get("width", 15.0),
-                        "height": bbox.get("height", 60.0),
+                        "x": box_x,
+                        "y": box_y,
+                        "width": box_w,
+                        "height": box_h,
                         "rotation": 0,
                         "rectanglelabels": ["Staff Gauge"]
                     },

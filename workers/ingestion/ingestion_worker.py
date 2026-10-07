@@ -77,14 +77,18 @@ async def run_ingestion_cycle(ctx, station_code: str = None):
 
         # Verified HII hourly rain was ingested above, independently of camera processing.
 
-        # 4. ส่งต่อให้ Vision Worker ประมวลผลภาพทันที
-        from vision.vision_worker import process_vision_task
-        task_res = await process_vision_task(ctx, {
-            "station_code": stn_code,
-            "bucket": bucket,
-            "object_name": object_name
-        })
-        results.append(task_res)
+        # 4. ส่งต่อให้ AI Staff Gauge Detection ประมวลผลภาพ (YOLO model_best_v2.pt + Quality Gate + Label Studio)
+        try:
+            base = os.getenv("BACKEND_API_URL", "http://backend:8000").rstrip("/")
+            res = requests.get(f"{base}/api/v1/stations/{stn_code}/detection-status?mode=live", timeout=(5, 60))
+            if res.status_code == 200:
+                task_res = res.json()
+                print(f"[Ingestion Worker] 🎯 AI Staff Gauge Detection for {stn_code}: conf={task_res.get('confidence')} water_level={task_res.get('water_level')}m")
+                results.append(task_res)
+            else:
+                print(f"[Ingestion Worker] ⚠️ AI Detection API returned {res.status_code} for {stn_code}")
+        except Exception as e:
+            print(f"[Ingestion Worker] ⚠️ AI Detection API error for {stn_code}: {e}")
 
     print(f"\n[Ingestion Worker] ✅ Ingestion cycle completed for all {len(targets)} stations.")
     return {"status": "success", "processed_stations": len(results), "telemetry": telemetry_result}

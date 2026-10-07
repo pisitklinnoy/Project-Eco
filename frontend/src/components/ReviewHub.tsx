@@ -619,7 +619,12 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           </span>
                         </td>
                         <td className="py-3.5 px-3 font-semibold text-slate-700">
-                          {item.images_count} ภาพ
+                          <div>{item.images_count} ภาพ</div>
+                          {item.train_samples ? (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              Train {item.train_samples} / Val {item.val_samples || 0}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-3.5 px-3 font-black text-emerald-600">
                           {item.mae_meters} ม. <span className="text-slate-400 text-[10px] font-normal">(~{Math.round(item.mae_meters * 100)} ซม.)</span>

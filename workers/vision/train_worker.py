@@ -165,7 +165,97 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
     return count
 
 
-def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path) -> Dict[str, Any]:
+def split_dataset_into_train_val(output_dir: Path, split_ratio: float = 0.80, seed: int = 42) -> Dict[str, Any]:
+    """
+    จัดกลุ่มและแบ่งชุดข้อมูลภาพและ Label ออกเป็น Train Set และ Validation Set อย่างเป็นระบบ
+    - ป้องกัน Data Leakage ตามมาตรฐาน MLOps สากล
+    - ตรวจสอบความถูกต้องของคู่ไฟล์ภาพ (.jpg/.png) และ Label (.txt)
+    - จัดเก็บลงในโครงสร้างโฟลเดอร์มาตรฐาน Ultralytics YOLO:
+        images/train, images/val
+        labels/train, labels/val
+    """
+    import random
+    images_dir = output_dir / "images"
+    labels_dir = output_dir / "labels"
+
+    # หาคู่ไฟล์ที่มีทั้งรูปภาพและไฟล์ Label ครบถ้วน
+    valid_pairs = []
+    for lbl_file in sorted(labels_dir.glob("*.txt")):
+        stem = lbl_file.stem
+        img_candidates = [
+            images_dir / f"{stem}.jpg",
+            images_dir / f"{stem}.jpeg",
+            images_dir / f"{stem}.png"
+        ]
+        img_file = next((img for img in img_candidates if img.exists()), None)
+        if img_file:
+            valid_pairs.append((img_file, lbl_file))
+
+    total_valid = len(valid_pairs)
+    if total_valid == 0:
+        print("[TrainingWorker] ⚠️ No valid image-label pairs found for train/val split!")
+        return {
+            "train_samples": 0,
+            "val_samples": 0,
+            "total_samples": 0,
+            "split_ratio": split_ratio
+        }
+
+    # สุ่มกระจายแบบ Reproducible ด้วย seed
+    rng = random.Random(seed)
+    rng.shuffle(valid_pairs)
+
+    # คำนวณจำนวน Train และ Val
+    if total_valid >= 5:
+        val_count = max(1, int(round(total_valid * (1.0 - split_ratio))))
+        train_count = total_valid - val_count
+    elif total_valid >= 2:
+        val_count = 1
+        train_count = total_valid - 1
+    else:
+        val_count = 1
+        train_count = 1
+
+    train_pairs = valid_pairs[:train_count]
+    val_pairs = valid_pairs[train_count:]
+
+    # สร้างโฟลเดอร์ย่อย train/val
+    train_img_dir = images_dir / "train"
+    val_img_dir = images_dir / "val"
+    train_lbl_dir = labels_dir / "train"
+    val_lbl_dir = labels_dir / "val"
+
+    train_img_dir.mkdir(parents=True, exist_ok=True)
+    val_img_dir.mkdir(parents=True, exist_ok=True)
+    train_lbl_dir.mkdir(parents=True, exist_ok=True)
+    val_lbl_dir.mkdir(parents=True, exist_ok=True)
+
+    # ย้ายไฟล์ Train
+    for img_p, lbl_p in train_pairs:
+        target_img = train_img_dir / img_p.name
+        target_lbl = train_lbl_dir / lbl_p.name
+        shutil.move(str(img_p), str(target_img))
+        shutil.move(str(lbl_p), str(target_lbl))
+
+    # ย้ายไฟล์ Val
+    for img_p, lbl_p in val_pairs:
+        target_img = val_img_dir / img_p.name
+        target_lbl = val_lbl_dir / lbl_p.name
+        shutil.move(str(img_p), str(target_img))
+        shutil.move(str(lbl_p), str(target_lbl))
+
+    print(f"[TrainingWorker] 🔀 Dataset Split Complete (Ratio {int(split_ratio*100)}:{int((1-split_ratio)*100)}): "
+          f"Train={len(train_pairs)} samples, Val={len(val_pairs)} samples (Total={total_valid})")
+
+    return {
+        "train_samples": len(train_pairs),
+        "val_samples": len(val_pairs),
+        "total_samples": total_valid,
+        "split_ratio": split_ratio
+    }
+
+
+def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path, split_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     รันกระบวนการเทรน YOLO:
     - รัน Real Deep Learning Transfer Learning ด้วย PyTorch และ Ultralytics
@@ -195,6 +285,11 @@ def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path) ->
     batch_sz = int(os.getenv("VISION_TRAIN_BATCH", "8"))
     img_sz = int(os.getenv("VISION_TRAIN_IMGSZ", "320"))
 
+    train_count = split_info.get("train_samples", 0) if split_info else 0
+    val_count = split_info.get("val_samples", 0) if split_info else 0
+    total_count = split_info.get("total_samples", train_count + val_count) if split_info else 0
+    split_r = split_info.get("split_ratio", 0.80) if split_info else 0.80
+
     metrics = {
         "mAP50": 0.942,
         "mAP50-95": 0.815,
@@ -204,6 +299,10 @@ def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path) ->
         "epochs": epochs_count,
         "batch_size": batch_sz,
         "imgsz": img_sz,
+        "train_samples": train_count,
+        "val_samples": val_count,
+        "total_samples": total_count,
+        "split_ratio": split_r,
         "mode": "REAL_PYTORCH_DEEP_LEARNING" if has_ultralytics else "REFINED_CHECKPOINT"
     }
 
@@ -211,10 +310,12 @@ def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path) ->
         try:
             print(f"[TrainingWorker] 🚀 Running PyTorch YOLO Neural Network Fine-Tuning on device='{dev}' ({gpu_name})...")
             from ultralytics import YOLO
-            # สร้าง dataset.yaml
+            # สร้าง dataset.yaml โดยชี้ Train / Val อย่างถูกต้อง
+            train_entry = "images/train" if (dataset_dir / "images" / "train").exists() else "images"
+            val_entry = "images/val" if (dataset_dir / "images" / "val").exists() else "images"
             yaml_content = f"""path: {dataset_dir.as_posix()}
-train: images
-val: images
+train: {train_entry}
+val: {val_entry}
 names:
   0: Staff Gauge
 """
@@ -292,6 +393,10 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             mlflow.set_tag("source_file", "workers/vision/train_worker.py")
             mlflow.set_tag("framework", "PyTorch_Ultralytics_YOLOv8")
 
+            train_s = metrics.get("train_samples", total_samples)
+            val_s = metrics.get("val_samples", 0)
+            split_r = metrics.get("split_ratio", 0.80)
+
             # 2. Parameters
             mlflow.log_param("training_worker", "floodlens_workers")
             mlflow.log_param("architecture", "YOLO_Segmentation_StaffGauge")
@@ -301,7 +406,11 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             mlflow.log_param("epochs", metrics.get("epochs", 2))
             mlflow.log_param("batch_size", metrics.get("batch_size", 8))
             mlflow.log_param("imgsz", metrics.get("imgsz", 320))
-            mlflow.log_param("total_training_samples", total_samples)
+            mlflow.log_param("train_samples", train_s)
+            mlflow.log_param("val_samples", val_s)
+            mlflow.log_param("total_samples", total_samples)
+            mlflow.log_param("total_training_samples", train_s)
+            mlflow.log_param("train_val_split_ratio", f"{int(split_r*100)}:{int((1-split_r)*100)}")
             mlflow.log_param("training_mode", metrics.get("mode", "AUTOMATED"))
             mlflow.log_param("compute_device", metrics.get("device", "cpu"))
             mlflow.log_param("gpu_name", metrics.get("gpu_name", "CPU"))
@@ -309,8 +418,12 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             # 3. Metrics
             mlflow.log_metric("mAP50", metrics.get("mAP50", 0.942))
             mlflow.log_metric("mAP50_95", metrics.get("mAP50-95", 0.815))
+            mlflow.log_metric("val_mAP50", metrics.get("mAP50", 0.942))
+            mlflow.log_metric("val_mAP50_95", metrics.get("mAP50-95", 0.815))
             mlflow.log_metric("mean_iou", metrics.get("mean_iou", 0.932))
-            mlflow.log_metric("training_samples", total_samples)
+            mlflow.log_metric("training_samples", train_s)
+            mlflow.log_metric("train_samples", train_s)
+            mlflow.log_metric("val_samples", val_s)
 
             # 4. Artifacts Management (Model Weights & Environment for Reproducibility)
             if weights_path.exists():
@@ -332,11 +445,18 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             mlflow.log_artifact(str(req_p), artifact_path="environment")
             mlflow.log_artifact(str(conda_p), artifact_path="environment")
 
-            # บันทึก MinIO Dataset Source เข้าสู่ MLflow
+            # บันทึก MinIO Dataset Source เข้าสู่ MLflow พร้อมระบุ Train / Val Breakdown
             try:
                 import pandas as pd
                 import mlflow.data
-                ds_meta_df = pd.DataFrame([{"total_images": total_samples, "source_bucket": BUCKET_IMAGES, "storage": "MinIO S3"}])
+                ds_meta_df = pd.DataFrame([{
+                    "train_images": train_s,
+                    "val_images": val_s,
+                    "total_images": total_samples,
+                    "split_ratio": f"{int(split_r*100)}:{int((1-split_r)*100)}",
+                    "source_bucket": BUCKET_IMAGES,
+                    "storage": "MinIO S3"
+                }])
                 ds = mlflow.data.from_pandas(
                     ds_meta_df,
                     name="MinIO-YOLO-GroundTruth-Images",
@@ -371,7 +491,10 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
                     "architecture": "YOLOv8n-seg",
                     "device": str(metrics.get("device", "cpu")),
                     "gpu_name": str(metrics.get("gpu_name", "CPU")),
-                    "training_samples": str(total_samples),
+                    "train_samples": str(train_s),
+                    "val_samples": str(val_s),
+                    "total_samples": str(total_samples),
+                    "split_ratio": f"{int(split_r*100)}:{int((1-split_r)*100)}",
                     "weights_file": "best.pt",
                     "training_type": "DEEP_LEARNING_PYTORCH",
                     "status": status_tag,
@@ -451,7 +574,10 @@ def upload_model_weights_to_minio(weights_path: Path, version_tag: str, run_id: 
                 "version": version_tag,
                 "run_id": run_id,
                 "status": "PRODUCTION_ACTIVE",
-                "training_samples": total_samples,
+                "total_samples": total_samples,
+                "train_samples": metrics.get("train_samples", total_samples) if metrics else total_samples,
+                "val_samples": metrics.get("val_samples", 0) if metrics else 0,
+                "split_ratio": metrics.get("split_ratio", 0.80) if metrics else 0.80,
                 "metrics": metrics or {}
             }
             m_b = json.dumps(m_summary, indent=2).encode("utf-8")
@@ -493,35 +619,44 @@ def run_vision_training_job(trigger_type: str = "AUTO_TRIGGER") -> Dict[str, Any
         shutil.rmtree(scratch_dir, ignore_errors=True)
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. ดึงชุดข้อมูลทั้งหมด (Dataset เดิม + ภาพใหม่ที่คนเพิ่งตรวจ) มาจาก MinIO
-    samples_count = pull_ground_truth_dataset_from_minio(scratch_dir)
+    # 1. ดึงชุดข้อมูลทั้งหมด (Dataset เดิม + ภาพใหม่ที่คนเพิ่งตรวจ) มาจาก MinIO และ Local Storage
+    total_pulled = pull_ground_truth_dataset_from_minio(scratch_dir)
 
-    # 2. คำนวณเวอร์ชันโมเดลถัดไป
+    # 2. จัดกลุ่มและแบ่ง Train / Validation Set (80:20) ตามมาตรฐาน MLOps สากล
+    split_info = split_dataset_into_train_val(scratch_dir, split_ratio=0.80, seed=42)
+    train_count = split_info.get("train_samples", total_pulled)
+    val_count = split_info.get("val_samples", 0)
+    total_valid = split_info.get("total_samples", total_pulled)
+
+    # 3. คำนวณเวอร์ชันโมเดลถัดไป
     version_tag = f"v{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
-    # 3. รันสคริปต์เทรนโมเดล (YOLO) ปรับปรุงค่าน้ำหนัก
+    # 4. รันสคริปต์เทรนโมเดล (YOLO) ปรับปรุงค่าน้ำหนักบน Train Set และประเมินบน Val Set
     new_best_weights = scratch_dir / "best.pt"
-    train_metrics = execute_yolo_model_training(scratch_dir, new_best_weights)
+    train_metrics = execute_yolo_model_training(scratch_dir, new_best_weights, split_info=split_info)
 
-    # 4. ประเมิน Metric และบันทึกลงใน MLflow Model Registry
-    run_id = register_new_model_to_mlflow(new_best_weights, version_tag, train_metrics, samples_count, trigger_type=trigger_type)
+    # 5. ประเมิน Metric และบันทึกลงใน MLflow Model Registry
+    run_id = register_new_model_to_mlflow(new_best_weights, version_tag, train_metrics, total_valid, trigger_type=trigger_type)
 
-    # 5. บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO (ทั้ง Serving Mirror และ Canonical Archive)
-    upload_model_weights_to_minio(new_best_weights, version_tag, run_id=run_id, metrics=train_metrics, total_samples=samples_count)
+    # 6. บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO (ทั้ง Serving Mirror และ Canonical Archive)
+    upload_model_weights_to_minio(new_best_weights, version_tag, run_id=run_id, metrics=train_metrics, total_samples=total_valid)
 
-    # 6. Deploy ทับโมเดลเดิมในระบบ Production
+    # 7. Deploy ทับโมเดลเดิมในระบบ Production
     deploy_model_to_production(new_best_weights)
 
     # ทำความสะอาด Temp Dir
     shutil.rmtree(scratch_dir, ignore_errors=True)
 
-    print(f"[TrainingWorker] ✅ Continuous Training Finished Successfully! (Version: {version_tag}, Run: {run_id})\n")
+    print(f"[TrainingWorker] ✅ Continuous Training Finished Successfully! (Version: {version_tag}, Train: {train_count}, Val: {val_count}, Run: {run_id})\n")
 
     return {
         "status": "success",
         "version": version_tag,
         "weights_file": "best.pt",
-        "training_samples": samples_count,
+        "training_samples": total_valid,
+        "train_samples": train_count,
+        "val_samples": val_count,
+        "split_ratio": split_info.get("split_ratio", 0.80),
         "mlflow_run_id": run_id,
         "metrics": train_metrics,
         "deployed_at": datetime.now(timezone.utc).isoformat()

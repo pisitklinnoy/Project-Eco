@@ -997,6 +997,8 @@ class ReviewService:
             "model_version": next_v,
             "trigger_type": trigger_type,
             "images_count": actual_samples,
+            "train_samples": tw_result.get("train_samples", actual_samples) if tw_result else actual_samples,
+            "val_samples": tw_result.get("val_samples", 0) if tw_result else 0,
             "mae_meters": calculated_mae,
             "pixel_error_px": calculated_pixel_mae,
             "mean_iou": mean_iou,

@@ -115,6 +115,8 @@ export interface RetrainHistoryItem {
   model_version: string;
   trigger_type: string;
   images_count: number;
+  train_samples?: number;
+  val_samples?: number;
   mae_meters: number;
   pixel_error_px: number;
   timestamp: string;

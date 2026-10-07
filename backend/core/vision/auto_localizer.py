@@ -51,7 +51,7 @@ class StaffGaugeAutoLocalizer:
             project_roots.append(p)
             p = os.path.dirname(p)
 
-        search_names = ["best.pt", "model_muangkong_seg.pt", "model_muangkong_seg.onnx"]
+        search_names = ["model_best_v2.pt", "best.pt"]
         search_dirs = []
         for root in project_roots:
             search_dirs.extend([

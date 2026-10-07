@@ -53,14 +53,12 @@ class VisionService:
         self._cached_frames: Dict[str, Tuple[float, np.ndarray]] = {}
         self.cache_ttl_seconds = 15.0
 
-        # โหลดโมเดล YOLO ล่าสุด (ลำดับความสำคัญ: best.pt ที่เพิ่ง Retrain -> model_muangkong_seg)
+        # โหลดโมเดล YOLOv8m (model_best_v2.pt) เป็นโมเดลหลักประจำระบบ
         model_candidates = [
+            os.path.join(BASE_DIR, "models", "model_best_v2.pt"),
             os.path.join(BASE_DIR, "models", "best.pt"),
-            os.path.join(BASE_DIR, "models", "model_muangkong_seg.pt"),
-            os.path.join(BASE_DIR, "models", "model_muangkong_seg.onnx"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_best_v2.pt"),
             os.path.join(BASE_DIR, "..", "workers", "vision", "models", "best.pt"),
-            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_muangkong_seg.pt"),
-            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_muangkong_seg.onnx"),
         ]
         target_model = None
         for p in model_candidates:

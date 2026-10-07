@@ -88,7 +88,7 @@ class WaterlineDetector:
     def _load_yolo_model(self):
         """พยายามโหลดโมเดล YOLO หากมีไฟล์และมี library ultralytics"""
         possible_models = [
-            os.path.join(self.models_dir, "model_muangkong_seg.pt"),
+            os.path.join(self.models_dir, "model_best_v2.pt"),
             os.path.join(self.models_dir, "best.pt")
         ]
         model_found = None

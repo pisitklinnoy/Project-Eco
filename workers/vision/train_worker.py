@@ -261,15 +261,19 @@ def execute_yolo_model_training(dataset_dir: Path, output_weights_path: Path, sp
     - รัน Real Deep Learning Transfer Learning ด้วย PyTorch และ Ultralytics
     - ปรับปรุง Synaptic Weights ของโครงข่ายประสาทเทียมผ่าน Backpropagation
     """
-    base_model_path = MODELS_DIR / "model_muangkong_seg.pt"
+    base_model_path = MODELS_DIR / "model_best_v2.pt"
     if not base_model_path.exists():
-        alt = ROOT_DIR / "backend" / "models" / "model_muangkong_seg.pt"
+        alt = ROOT_DIR / "backend" / "models" / "model_best_v2.pt"
         if alt.exists():
             base_model_path = alt
         else:
-            alt2 = Path("/app/models/model_muangkong_seg.pt")
+            alt2 = Path("/app/models/model_best_v2.pt")
             if alt2.exists():
                 base_model_path = alt2
+            else:
+                alt3 = MODELS_DIR / "best.pt"
+                if alt3.exists():
+                    base_model_path = alt3
 
     has_ultralytics = False
     try:

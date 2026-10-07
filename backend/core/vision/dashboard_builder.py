@@ -378,17 +378,8 @@ def render_model_v2_detection_view(
         cv2.rectangle(out, (ax1 - 2, by_top), (ax1 + tw + 16, ay1), badge_bg, -1)
         cv2.putText(out, badge_txt, (ax1 + 6, ay1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
 
-        # 2. คัดกรองกล่อง AI ตรวจจับอื่นที่อยู่นอก Corridor (เช่น ราวสะพานมุมบน) และติดป้าย Filtered
-        for d in raw_detections:
-            if d.get("name") == "Staff Gauge":
-                g_box = d.get("bbox")
-                if g_box and g_box != raw_box and not d.get("is_manual"):
-                    gx1, gy1, gx2, gy2 = g_box
-                    cv2.rectangle(out, (gx1, gy1), (gx2, gy2), (100, 100, 200), 1, cv2.LINE_AA)
-                    cv2.putText(out, "[Filtered: Outside Corridor]", (gx1 + 2, max(14, gy1 - 5)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 220), 1, cv2.LINE_AA)
-
         return out
+
 
     # Fallback กรณีไม่มี hybrid_info (คงพฤติกรรมเดิม)
     gauges = [d for d in raw_detections if d.get("name") == "Staff Gauge"]

@@ -757,7 +757,74 @@ class ReviewService:
                 if should_close and db is not None:
                     db.close()
 
-        # 2. อ่านจาก dataset/manual_annotations/*.json (ข้ามรายการที่มีอยู่ใน DB แล้วเพื่อไม่ให้นับซ้ำ)
+        # 2. อ่านจาก MinIO datasets/curated_ground_truth/ และ datasets/labels/ เป็นหลัก (Single Source of Truth)
+        try:
+            from services.minio_service import minio_service
+            from core.config import settings
+            bucket = getattr(settings, "bucket_processed_images", "processed-camera-images")
+            client = minio_service.client
+            if client and client.bucket_exists(bucket):
+                for obj in client.list_objects(bucket, prefix="datasets/curated_ground_truth/", recursive=True):
+                    if obj.object_name.endswith(".json"):
+                        try:
+                            response = client.get_object(bucket, obj.object_name)
+                            mdata = json.loads(response.read().decode("utf-8"))
+                            response.close()
+                            response.release_conn()
+                            tid = str(mdata.get("task_id", ""))
+                            if tid and tid in seen_task_ids:
+                                continue
+                            if tid:
+                                seen_task_ids.add(tid)
+                            stn_code = mdata.get("station_code") or mdata.get("station") or ""
+                            stn_key = "bangsala" if "bangsala" in stn_code.lower() or "90" in stn_code else ("hatyainai" if "hatyainai" in stn_code.lower() or "44" in stn_code else "muangkong")
+                            bbox = mdata.get("bbox_xyxy", [])
+                            res = mdata.get("frame_resolution", [3200, 1800])
+                            box_dict = None
+                            if len(bbox) == 4:
+                                box_dict = {
+                                    "x": (bbox[0] / res[0]) * 100.0,
+                                    "y": (bbox[1] / res[1]) * 100.0,
+                                    "width": ((bbox[2] - bbox[0]) / res[0]) * 100.0,
+                                    "height": ((bbox[3] - bbox[1]) / res[1]) * 100.0
+                                }
+                            elif mdata.get("yolo_normalized"):
+                                yn = mdata["yolo_normalized"]
+                                box_dict = {
+                                    "x": (yn["x_center"] - yn["width"] / 2.0) * 100.0,
+                                    "y": (yn["y_center"] - yn["height"] / 2.0) * 100.0,
+                                    "width": yn["width"] * 100.0,
+                                    "height": yn["height"] * 100.0
+                                }
+
+                            lvl_m = mdata.get("verified_water_level_m")
+                            center_y_px = mdata.get("pixel_y")
+                            if center_y_px is None:
+                                center_y_px = (bbox[1] + bbox[3]) / 2.0 if len(bbox) == 4 else 800.0
+                            if lvl_m is None:
+                                calibrator, _, _ = cls.get_station_calibrator_and_res(stn_code)
+                                lvl_m = round(calibrator.pixel_to_level(center_y_px), 3) if calibrator else 7.5
+
+                            rec = {
+                                "source": "MinIO_Ground_Truth",
+                                "task_id": mdata.get("task_id", os.path.basename(obj.object_name)),
+                                "station": stn_code,
+                                "station_key": stn_key,
+                                "box": box_dict,
+                                "pixel_y": round(float(center_y_px), 1),
+                                "water_level_m": round(float(lvl_m), 3),
+                                "quality": mdata.get("quality", "Verified"),
+                                "img_w": res[0],
+                                "img_h": res[1]
+                            }
+                            dataset_records.append(rec)
+                            station_groups[stn_key].append(rec)
+                        except Exception as m_parse_err:
+                            pass
+        except Exception as minio_ext_err:
+            print(f"[ReviewService] MinIO ground truth fetch note: {minio_ext_err}")
+
+        # 3. อ่านเสริมจาก Local Directory dataset/manual_annotations/*.json
         manual_dir = os.path.join(base_dir, "dataset", "manual_annotations")
         if os.path.exists(manual_dir):
             for jf in glob.glob(os.path.join(manual_dir, "*.json")):

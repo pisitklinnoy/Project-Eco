@@ -773,6 +773,26 @@ class VisionService:
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
+        # 1.1 บันทึกชุดข้อมูลภาพและ Label ขึ้น MinIO Storage ทันที เพื่อให้ MinIO เป็น Single Source of Truth
+        try:
+            from services.minio_service import minio_service
+            from core.config import settings
+            bucket = getattr(settings, "bucket_processed_images", "processed-camera-images")
+
+            _, img_buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            yolo_content = f"0 {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n"
+            meta_bytes = json.dumps(meta, indent=2, ensure_ascii=False).encode("utf-8")
+
+            minio_service.upload_bytes(bucket, f"datasets/images/{file_prefix}.jpg", img_buf.tobytes(), "image/jpeg")
+            minio_service.upload_bytes(bucket, f"datasets/labels/{file_prefix}.txt", yolo_content.encode("utf-8"), "text/plain")
+            minio_service.upload_bytes(bucket, f"datasets/labels/{file_prefix}.json", meta_bytes, "application/json")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.jpg", img_buf.tobytes(), "image/jpeg")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.txt", yolo_content.encode("utf-8"), "text/plain")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.json", meta_bytes, "application/json")
+            print(f"[VisionService] ☁️ Uploaded manual BBox dataset to MinIO: s3://{bucket}/datasets/labels/{file_prefix}.txt")
+        except Exception as minio_err:
+            print(f"[VisionService] ⚠️ MinIO upload note for manual BBox: {minio_err}")
+
         # 2. ปรับปรุง Memory สำหรับ Session ปัจจุบัน (ไม่แก้ไขไฟล์ถาวร station config)
         self.manual_bboxes[stn_key] = clamped_bbox
         mgr = self.station_components.get(stn_key)

@@ -117,18 +117,35 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
     except Exception as e:
         print(f"[TrainingWorker] Warning pulling from MinIO: {e}")
 
-    # ดึงข้อมูลจาก Local dataset/manual_annotations เสริม
+    # ซิงค์ข้อมูลจาก Local dataset/manual_annotations ขึ้น MinIO อัตโนมัติ (หากมีไฟล์ใหม่ที่ยังไม่ได้ขึ้น MinIO)
     local_manual_dir = ROOT_DIR / "backend" / "dataset" / "manual_annotations"
     if not local_manual_dir.exists():
         local_manual_dir = Path("/app/dataset/manual_annotations")
     if local_manual_dir.exists():
         for f in local_manual_dir.glob("*.txt"):
-            shutil.copy(f, labels_dir / f.name)
-            count += 1
-        for f in local_manual_dir.glob("*.jpg"):
-            shutil.copy(f, images_dir / f.name)
-        for f in local_manual_dir.glob("*.json"):
-            shutil.copy(f, output_dir / f.name)
+            stem = f.stem
+            if not (labels_dir / f.name).exists():
+                shutil.copy(f, labels_dir / f.name)
+                # ซิงค์ขึ้น MinIO เพื่อคงความเป็น Single Source of Truth
+                try:
+                    client.fput_object(BUCKET_IMAGES, f"datasets/labels/{f.name}", str(f), content_type="text/plain")
+                    client.fput_object(BUCKET_IMAGES, f"datasets/curated_ground_truth/{f.name}", str(f), content_type="text/plain")
+                    jpg_local = local_manual_dir / f"{stem}.jpg"
+                    if jpg_local.exists():
+                        shutil.copy(jpg_local, images_dir / jpg_local.name)
+                        client.fput_object(BUCKET_IMAGES, f"datasets/images/{jpg_local.name}", str(jpg_local), content_type="image/jpeg")
+                        client.fput_object(BUCKET_IMAGES, f"datasets/curated_ground_truth/{jpg_local.name}", str(jpg_local), content_type="image/jpeg")
+                    json_local = local_manual_dir / f"{stem}.json"
+                    if json_local.exists():
+                        shutil.copy(json_local, output_dir / json_local.name)
+                        client.fput_object(BUCKET_IMAGES, f"datasets/labels/{json_local.name}", str(json_local), content_type="application/json")
+                        client.fput_object(BUCKET_IMAGES, f"datasets/curated_ground_truth/{json_local.name}", str(json_local), content_type="application/json")
+                except Exception as sync_err:
+                    print(f"[TrainingWorker] MinIO background sync note: {sync_err}")
+            else:
+                jpg_local = local_manual_dir / f"{stem}.jpg"
+                if jpg_local.exists() and not (images_dir / jpg_local.name).exists():
+                    shutil.copy(jpg_local, images_dir / jpg_local.name)
 
     # Format labels for YOLO segmentation (convert 5-token bboxes to 4-point polygon masks)
     for lbl_file in labels_dir.glob("*.txt"):

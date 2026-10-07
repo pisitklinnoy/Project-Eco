@@ -1,10 +1,23 @@
 {
   "is_retraining": false,
-  "current_model_version": "v1.1",
-  "last_mae_meters": 1.557,
-  "last_retrained_at": "2026-10-07T14:36:23.781511+00:00",
-  "training_samples": 1515,
+  "current_model_version": "v1.2",
+  "last_mae_meters": 1.3392,
+  "last_retrained_at": "2026-10-07T16:57:39.746531+00:00",
+  "training_samples": 1533,
   "history": [
+    {
+      "id": "ts-retrain-1791392259",
+      "model_version": "v1.2",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "challenger_mae": 1.3392,
+      "champion_mae": 1.557,
+      "improvement_pct": 13.99,
+      "promoted": true,
+      "train_samples": 1533,
+      "timestamp": "2026-10-07T16:57:39.746531+00:00",
+      "status": "PROMOTED_CHAMPION",
+      "mlflow_run_id": "0e6b846453544f7c98ecc86e4091349c"
+    },
     {
       "id": "ts-retrain-1791383783",
       "model_version": "v1.1",

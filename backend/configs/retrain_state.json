@@ -1,11 +1,11 @@
 {
-  "pending_count": 0,
+  "pending_count": 3,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
   "current_model_version": "v2.1",
   "last_mae_meters": 1.8767,
   "last_retrained_at": "2026-10-07T15:56:31.217999",
-  "is_retraining": false,
+  "is_retraining": true,
   "history": [
     {
       "id": "retrain-1791388591",

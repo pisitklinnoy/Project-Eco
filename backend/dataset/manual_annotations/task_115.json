@@ -1,0 +1,15 @@
+{
+  "task_id": 115,
+  "station": "STN-MUANGKONG",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-07T17:28:06.913405",
+  "verified_water_level_m": 14.681,
+  "pixel_y": 900.0,
+  "yolo_normalized": null,
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 0.0,
+    "mae_meters": 0.0,
+    "iou": 0.0
+  }
+}

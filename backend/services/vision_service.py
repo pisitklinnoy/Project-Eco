@@ -53,15 +53,15 @@ class VisionService:
         self._cached_frames: Dict[str, Tuple[float, np.ndarray]] = {}
         self.cache_ttl_seconds = 15.0
 
-        # โหลดโมเดล model_best_v2.pt โดยตรงตามคำขอ
-        v2_candidates = [
-            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.pt"),
-            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.pt",
-            os.path.join(BASE_DIR, "..", "non_time_series", "models", "model_best_v2.onnx"),
-            r"C:\Project\Project-Eco\non_time_series\models\model_best_v2.onnx"
+        # โหลดโมเดล YOLOv8m (model_best_v2.pt) เป็นโมเดลหลักประจำระบบ
+        model_candidates = [
+            os.path.join(BASE_DIR, "models", "model_best_v2.pt"),
+            os.path.join(BASE_DIR, "models", "best.pt"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "model_best_v2.pt"),
+            os.path.join(BASE_DIR, "..", "workers", "vision", "models", "best.pt"),
         ]
         target_model = None
-        for p in v2_candidates:
+        for p in model_candidates:
             if os.path.exists(p):
                 target_model = p
                 break
@@ -132,6 +132,18 @@ class VisionService:
             if k in stn_key or stn_key in k:
                 return k
         return None
+
+    def invalidate_dashboard_cache(self, station_code: str):
+        """ล้างแคชภาพแดชบอร์ดและเฟรมกล้อง เพื่อให้ทำนายและเรนเดอร์ใหม่ทันทีแบบ On-Demand"""
+        stn_key = self._resolve_station_key(station_code)
+        if not stn_key:
+            return
+        keys_to_del = [k for k in self._cached_dashboards if k.startswith(stn_key)]
+        for k in keys_to_del:
+            self._cached_dashboards.pop(k, None)
+        frame_keys = [k for k in self._cached_frames if k.startswith(stn_key)]
+        for k in frame_keys:
+            self._cached_frames.pop(k, None)
 
     def _fetch_axis_frame(self, stream_url: str) -> Optional[np.ndarray]:
         """ดึงภาพสดจากกล้อง Axis Camera (ta200304.dyndns.info) ด้วย Basic Auth"""
@@ -266,7 +278,7 @@ class VisionService:
         mode: 'live' (ประมวลผลจากกล้องสด), 'daytime' (ผลลัพธ์ Benchmark กลางวัน),
               'nighttime' (ผลลัพธ์ Benchmark กลางคืน), 'flood' (จำลองสภาวะน้ำท่วม)
         overlay: 'bbox' (กรอบสี่เหลี่ยมสีเขียว ROI/YOLO Bounding Box),
-                 'polygon' (แสดงเส้นรอบรูป Polygon จาก YOLOv8-Seg)
+                 'polygon' (แสดงเส้นรอบรูป Polygon)
         view: 'cctv' (เฉพาะมุมมองกล้อง CCTV 16:9 พร้อม Bounding Box),
               'gauge' (เฉพาะภาพสเกลเสาวัดน้ำดิจิทัล),
               'composite' (รวมแดชบอร์ด 2 ด้านดั้งเดิม)
@@ -365,6 +377,7 @@ class VisionService:
             is_valid_gauge = (
                 alignment.get("is_manual", False) or
                 alignment.get("method") in [
+                    "YOLO_DIRECT_DETECTION",
                     "HYBRID_CONFIG_TOP_ANCHOR",
                     "NIGHT_FIXED_ANCHOR",
                     "CONFIG_GEOMETRY_BASELINE",
@@ -480,10 +493,13 @@ class VisionService:
             "baseline_water_level_m": cfg.get("baseline_water_level_m") or cfg.get("warning_thresholds", {}).get("normal_m")
         }
 
-    def check_detection_status(self, station_code: str, mode: str = "live") -> Dict[str, Any]:
+    def check_detection_status(self, station_code: str, mode: str = "live", force_refresh: bool = False) -> Dict[str, Any]:
         """
         ตรวจสอบสถานะว่าโมเดล YOLO (model_best_v2.pt) สามารถตรวจพบเสาวัดระดับน้ำ (Staff Gauge) หรือไม่
         """
+        if force_refresh:
+            self.invalidate_dashboard_cache(station_code)
+
         stn_key = self._resolve_station_key(station_code)
         if not stn_key:
             return {"detected": False, "can_analyze_gauge": False, "error": "Invalid station code"}
@@ -593,23 +609,43 @@ class VisionService:
                 from core.database import SessionLocal
                 from models.measurement import WaterMeasurement
                 with SessionLocal() as db_session:
+                    conf_val = round(float(alignment.get("confidence", 0.0)), 3)
                     latest = db_session.query(WaterMeasurement).filter(
                         WaterMeasurement.station_code == station_code
                     ).order_by(WaterMeasurement.timestamp.desc()).first()
-                    # ถ้ายังไม่มีข้อมูล หรือระดับน้ำที่วัดได้จริงต่างจากข้อมูลล่าสุดเกิน 1 ซม. ให้บันทึกการวัดใหม่
                     if not latest or abs(latest.water_level - detected_water_level) > 0.01:
                         new_meas = WaterMeasurement(
                             station_code=station_code,
                             timestamp=datetime.utcnow(),
                             water_level=detected_water_level,
                             source_type="CAMERA_VISION",
-                            vision_confidence=round(float(alignment.get("confidence", 0.9)), 3),
+                            vision_confidence=conf_val,
                             is_reviewed_by_human=False
                         )
                         db_session.add(new_meas)
                         db_session.commit()
+
+                    # Active Learning: หากความเชื่อมั่นตรวจจับเสาต่ำกว่า 0.80 (80%) ส่งภาพเข้า Label Studio อัตโนมัติทุกสถานี
+                    if conf_val < 0.80 and frame is not None and not alignment.get("is_manual"):
+                        try:
+                            from services.review_service import review_service
+                            _, buf = cv2.imencode(".jpg", frame)
+                            review_service.ingest_low_confidence_frame_to_label_studio(
+                                db=db_session,
+                                station_code=station_code,
+                                image_bytes=buf.tobytes(),
+                                confidence=conf_val,
+                                water_level=detected_water_level,
+                                bbox=alignment.get("aligned_bbox"),
+                                reason=f"LOW_CONFIDENCE_{conf_val:.2f}"
+                            )
+                        except Exception as al_err:
+                            print(f"[check_detection_status] Active learning auto-ingest note: {al_err}")
             except Exception as e:
                 print(f"[check_detection_status] could not record measurement: {e}")
+
+        fw = int(frame.shape[1]) if frame is not None else None
+        fh = int(frame.shape[0]) if frame is not None else None
 
         if alignment.get("is_manual"):
             return {
@@ -618,6 +654,9 @@ class VisionService:
                 "confidence": 1.0,
                 "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
+                "raw_bbox": alignment["aligned_bbox"],
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
@@ -628,17 +667,17 @@ class VisionService:
                 "recommendation": "manual_active",
                 "message": "ใช้งานพิกัดเสาวัดระดับน้ำที่กำหนดด้วยตนเอง (Manual BBox) พร้อมสำหรับวิเคราะห์สเกลเสาและเตรียม Re-train โมเดล"
             }
-        elif alignment.get("method") == "HYBRID_CONFIG_TOP_ANCHOR":
+        elif alignment.get("method") in ("YOLO_DIRECT_DETECTION", "HYBRID_CONFIG_TOP_ANCHOR"):
             conf = alignment.get("confidence", 0.90)
             is_sub = alignment.get("is_submerged_occluded", False)
             is_shift = alignment.get("is_camera_shifted", False)
             shift_dx = alignment.get("camera_shift", {}).get("dx", 0.0)
 
-            status_msg = f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {conf*100:.1f}%) แบบ Hybrid Aligned"
+            status_msg = f"ตรวจพบเสาวัดระดับน้ำ (ความเชื่อมั่น {conf*100:.1f}%) โดยโมเดล AI (YOLO)"
             if is_sub:
-                status_msg += " [ตรวจพบคราบน้ำท่วมบังเสา: ดึงสเกลเต็มความยาวอัตโนมัติ]"
+                status_msg += " [ตรวจพบคราบน้ำท่วมบังเสา]"
             elif is_shift:
-                status_msg += f" [ตรวจพบการสั่น/ขยับของกล้อง {shift_dx:+.1f}px: ชดเชยมุมกล้องแล้ว]"
+                status_msg += f" [ตรวจพบการสั่น/ขยับของกล้อง {shift_dx:+.1f}px]"
 
             return {
                 "detected": True,
@@ -647,6 +686,8 @@ class VisionService:
                 "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
                 "raw_bbox": alignment.get("raw_yolo_bbox"),
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
@@ -680,11 +721,32 @@ class VisionService:
                 "message": status_msg
             }
         else:
+            if frame is not None and mode == "live":
+                try:
+                    from core.database import SessionLocal
+                    from services.review_service import review_service
+                    with SessionLocal() as db_session:
+                        _, buf = cv2.imencode(".jpg", frame)
+                        review_service.ingest_low_confidence_frame_to_label_studio(
+                            db=db_session,
+                            station_code=station_code,
+                            image_bytes=buf.tobytes(),
+                            confidence=0.0,
+                            water_level=detected_water_level,
+                            bbox=None,
+                            reason="GAUGE_POLE_NOT_DETECTED"
+                        )
+                except Exception as al_err:
+                    print(f"[check_detection_status] Active learning unaligned frame note: {al_err}")
+
             return {
                 "detected": False,
                 "is_manual": False,
                 "confidence": 0.0,
                 "bbox": None,
+                "raw_bbox": None,
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
@@ -816,6 +878,26 @@ class VisionService:
         }
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
+
+        # 1.1 บันทึกชุดข้อมูลภาพและ Label ขึ้น MinIO Storage ทันที เพื่อให้ MinIO เป็น Single Source of Truth
+        try:
+            from services.minio_service import minio_service
+            from core.config import settings
+            bucket = getattr(settings, "bucket_processed_images", "processed-camera-images")
+
+            _, img_buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            yolo_content = f"0 {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n"
+            meta_bytes = json.dumps(meta, indent=2, ensure_ascii=False).encode("utf-8")
+
+            minio_service.upload_bytes(bucket, f"datasets/images/{file_prefix}.jpg", img_buf.tobytes(), "image/jpeg")
+            minio_service.upload_bytes(bucket, f"datasets/labels/{file_prefix}.txt", yolo_content.encode("utf-8"), "text/plain")
+            minio_service.upload_bytes(bucket, f"datasets/labels/{file_prefix}.json", meta_bytes, "application/json")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.jpg", img_buf.tobytes(), "image/jpeg")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.txt", yolo_content.encode("utf-8"), "text/plain")
+            minio_service.upload_bytes(bucket, f"datasets/curated_ground_truth/{file_prefix}.json", meta_bytes, "application/json")
+            print(f"[VisionService] ☁️ Uploaded manual BBox dataset to MinIO: s3://{bucket}/datasets/labels/{file_prefix}.txt")
+        except Exception as minio_err:
+            print(f"[VisionService] ⚠️ MinIO upload note for manual BBox: {minio_err}")
 
         # 2. ปรับปรุง Memory สำหรับ Session ปัจจุบัน (ไม่แก้ไขไฟล์ถาวร station config)
         self.manual_bboxes[stn_key] = clamped_bbox

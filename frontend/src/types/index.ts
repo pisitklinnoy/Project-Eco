@@ -115,6 +115,8 @@ export interface RetrainHistoryItem {
   model_version: string;
   trigger_type: string;
   images_count: number;
+  train_samples?: number;
+  val_samples?: number;
   mae_meters: number;
   pixel_error_px: number;
   timestamp: string;
@@ -164,6 +166,9 @@ export interface DetectionStatus {
   confidence: number;
   water_level?: number | null;
   bbox: [number, number, number, number] | null;
+  raw_bbox?: [number, number, number, number] | null;
+  frame_width?: number | null;
+  frame_height?: number | null;
   station_code?: string;
   station_name?: string;
   mode?: string;

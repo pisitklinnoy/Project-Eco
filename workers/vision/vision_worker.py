@@ -60,6 +60,35 @@ async def process_vision_task(ctx, payload: dict):
             False,
             datetime.utcnow()
         ))
+        if q_eval["status"] == "FLAGGED_FOR_REVIEW":
+            try:
+                import json
+                now_iso = datetime.utcnow().isoformat()
+                task_data = json.dumps({
+                    "image": f"http://localhost:9000/{image_bucket}/{object_name}",
+                    "station_name": station_code,
+                    "source": "VISION_WORKER_QUALITY_GATE",
+                    "confidence": detect_res["confidence"],
+                    "flag_reason": q_eval["reason"],
+                    "captured_at": now_iso
+                })
+                cur.execute("""
+                    INSERT INTO task (
+                        data, project_id, created_at, updated_at,
+                        overlap, inner_id, total_predictions, total_annotations,
+                        cancelled_annotations, comment_count, unresolved_comment_count, is_labeled
+                    )
+                    VALUES (
+                        %s, 2, NOW(), NOW(),
+                        1, COALESCE((SELECT MAX(inner_id) FROM task WHERE project_id = 2), 0) + 1,
+                        0, 0, 0, 0, 0, FALSE
+                    );
+                """, (task_data,))
+                conn.commit()
+                print(f"[Vision Worker] 📥 Auto-dispatched FLAGGED task to Label Studio (Reason: {q_eval['reason']})")
+            except Exception as ls_err:
+                print(f"[Vision Worker] Label Studio task insert warning: {ls_err}")
+
         conn.commit()
         cur.close()
         conn.close()

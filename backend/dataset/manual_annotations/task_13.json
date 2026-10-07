@@ -1,0 +1,15 @@
+{
+  "task_id": 13,
+  "station": "On-Demand Hatyai Test",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-07T15:52:52.890136",
+  "verified_water_level_m": 6.464,
+  "pixel_y": 540.0,
+  "yolo_normalized": null,
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 448.96,
+    "mae_meters": 1.991,
+    "iou": 0.0
+  }
+}

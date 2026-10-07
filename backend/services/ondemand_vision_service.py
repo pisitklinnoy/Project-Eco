@@ -149,7 +149,7 @@ class OnDemandVisionService:
                 water_level=calculated_level_m,
                 source_type="ON_DEMAND_VISION",
                 vision_confidence=confidence_score,
-                is_reviewed_by_human=True
+                is_reviewed_by_human=False
             )
             db.add(meas)
             db.commit()
@@ -257,7 +257,7 @@ class OnDemandVisionService:
             if task_row:
                 task_id = task_row[0]
 
-                # สร้าง Pre-annotation Prediction
+                # สร้าง Pre-annotation Prediction สำหรับให้ผู้ตรวจทานมนุษย์เปิดตรวจทานใน Label Studio
                 insert_pred_sql = text("""
                     INSERT INTO prediction (
                         task_id, project_id, result, score, model_version, mislabeling, created_at, updated_at
@@ -265,35 +265,12 @@ class OnDemandVisionService:
                     VALUES (:tid, 2, :result, 0.91, 'OnDemand-v1', 0.0, NOW(), NOW())
                     RETURNING id;
                 """)
-                pred_res = db.execute(insert_pred_sql, {
+                db.execute(insert_pred_sql, {
                     "tid": task_id,
                     "result": json.dumps(prediction_result)
                 })
-                pred_row = pred_res.fetchone()
-                pred_id = pred_row[0] if pred_row else None
-
-                # สร้าง Initial Annotation เพื่อให้ผู้ใช้คลิกเลือกและขยับ Bounding Box ได้ทันที
-                insert_annot_sql = text("""
-                    INSERT INTO task_completion (
-                        task_id, project_id, result, was_cancelled, ground_truth,
-                        result_count, completed_by_id, parent_prediction_id, unique_id,
-                        created_at, updated_at
-                    )
-                    VALUES (
-                        :tid, 2, :result, FALSE, FALSE,
-                        :rc, 1, :pred_id, gen_random_uuid(),
-                        NOW(), NOW()
-                    );
-                    UPDATE task SET total_annotations = 1, is_labeled = TRUE WHERE id = :tid;
-                """)
-                db.execute(insert_annot_sql, {
-                    "tid": task_id,
-                    "result": json.dumps(prediction_result),
-                    "rc": len(prediction_result),
-                    "pred_id": pred_id
-                })
                 db.commit()
-                print(f"[OnDemandVisionService] 🎯 Created Label Studio Task #{task_id} with Editable Annotation & Pre-annotations!")
+                print(f"[OnDemandVisionService] 🎯 Created Pending Label Studio Task #{task_id} with Pre-annotations (Awaiting Human Review)")
         except Exception as e:
             db.rollback()
             print(f"[OnDemandVisionService] Label Studio direct DB integration note: {e}")

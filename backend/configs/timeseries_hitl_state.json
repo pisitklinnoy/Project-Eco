@@ -1,220 +1,263 @@
 {
-  "ingestion_queue": [
-    {
-      "id": "ING-BANGSALA-1791295052",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา",
-      "timestamp": "2026-10-06T13:57:32.847012+00:00",
-      "vision_water_level": 14.8,
-      "sensor_water_level": 2.45,
-      "discrepancy_m": 12.35,
-      "status": "RELEASED",
-      "flag_reason": "ค่าระดับน้ำจากกล้อง (14.80 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.45 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 12.35 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": "2026-10-06T13:57:32.972525+00:00",
-      "resolved_by": "API Tester",
-      "resolution_type": "MANUAL",
-      "verified_water_level": 3.15,
-      "resolution_notes": "Override via test suite"
-    },
-    {
-      "id": "ING-BANGSALA-1791295052",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา",
-      "timestamp": "2026-10-06T13:57:32.818303+00:00",
-      "vision_water_level": 20.0,
-      "sensor_water_level": 2.0,
-      "discrepancy_m": 18.0,
-      "status": "QUARANTINED",
-      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolution_type": null,
-      "verified_water_level": null,
-      "resolution_notes": null
-    },
-    {
-      "id": "ING-BANGSALA-1791294509",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา",
-      "timestamp": "2026-10-06T13:48:29.193317+00:00",
-      "vision_water_level": 14.8,
-      "sensor_water_level": 2.45,
-      "discrepancy_m": 12.35,
-      "status": "RELEASED",
-      "flag_reason": "ค่าระดับน้ำจากกล้อง (14.80 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.45 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 12.35 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": "2026-10-06T13:48:29.383536+00:00",
-      "resolved_by": "API Tester",
-      "resolution_type": "MANUAL",
-      "verified_water_level": 3.15,
-      "resolution_notes": "Override via test suite"
-    },
-    {
-      "id": "ING-BANGSALA-1791294509",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา",
-      "timestamp": "2026-10-06T13:48:29.160851+00:00",
-      "vision_water_level": 20.0,
-      "sensor_water_level": 2.0,
-      "discrepancy_m": 18.0,
-      "status": "QUARANTINED",
-      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolution_type": null,
-      "verified_water_level": null,
-      "resolution_notes": null
-    },
-    {
-      "id": "ING-BANGSALA-1791294465",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา",
-      "timestamp": "2026-10-06T13:47:45.485825+00:00",
-      "vision_water_level": 20.0,
-      "sensor_water_level": 2.0,
-      "discrepancy_m": 18.0,
-      "status": "RELEASED",
-      "flag_reason": "ค่าระดับน้ำจากกล้อง (20.00 ม.) ต่างจากเซ็นเซอร์ชลประทาน (2.00 ม.) เกินเกณฑ์ความปลอดภัย 0.8 ม. (ส่วนต่าง 18.00 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพและเซ็นเซอร์หน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": "2026-10-06T13:47:45.609241+00:00",
-      "resolved_by": "API Tester",
-      "resolution_type": "MANUAL",
-      "verified_water_level": 3.15,
-      "resolution_notes": "Override via test suite"
-    },
-    {
-      "id": "ING-BANGSALA-01",
-      "station_code": "STN-BANGSALA",
-      "station_name": "บ้านบางศาลา (กลางน้ำ - คลองอู่ตะเภา)",
-      "timestamp": "2026-10-06T12:00:00Z",
-      "vision_water_level": 14.8,
-      "sensor_water_level": 2.45,
-      "discrepancy_m": 12.35,
-      "status": "QUARANTINED",
-      "flag_reason": "ค่าที่อ่านได้จากภาพกล้อง (14.80 ม.) แตกต่างจากเซ็นเซอร์ชลประทาน RID (2.45 ม.) ผิดปกติเกินเกณฑ์ (ส่วนต่าง 12.35 ม.)",
-      "image_url": "/api/v1/stations/STN-BANGSALA/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบภาพเสาวัดน้ำหน้ากล้องว่ามีคราบตะไคร่หรือแสงสะท้อนผิวน้ำรบกวนหรือไม่ หรือเซ็นเซอร์ทุ่นชลประทานติดขัด",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolution_type": null,
-      "verified_water_level": null,
-      "resolution_notes": null
-    },
-    {
-      "id": "ING-HATYAINAI-02",
-      "station_code": "STN-HATYAINAI",
-      "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง)",
-      "timestamp": "2026-10-06T13:30:00Z",
-      "vision_water_level": 5.2,
-      "sensor_water_level": 4.1,
-      "discrepancy_m": 1.1,
-      "status": "QUARANTINED",
-      "flag_reason": "ความต่างระหว่างกล้อง (5.20 ม.) กับเซ็นเซอร์ (4.10 ม.) เกินเกณฑ์ความปลอดภัย 0.80 ม.",
-      "image_url": "/api/v1/stations/STN-HATYAINAI/raw-frame.jpg",
-      "suggested_action": "ตรวจสอบระดับน้ำหน้างานจริงเพื่อทำ Manual Override",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolution_type": null,
-      "verified_water_level": null,
-      "resolution_notes": null
+  "resolved_overrides": {
+    "ING-DB-611": {
+      "resolved_at": "2026-10-07T12:56:51.685900+00:00",
+      "resolved_by": "Dr. Somchai (Hydrologist)",
+      "resolution_type": "SENSOR",
+      "verified_water_level": 0.63,
+      "resolution_notes": "Confirmed sensor reading is accurate, camera was obscured by rain storm.",
+      "new_measurement_id": 650
     }
-  ],
+  },
   "drift_monitor": {
     "safety_threshold_m": 0.4,
-    "last_evaluated_at": "2026-10-06T13:57:33.015024+00:00",
+    "last_evaluated_at": "2026-10-07T16:15:13.293372+00:00",
     "drift_detected": false,
-    "max_residual_m": 0.75,
-    "mean_residual_m": 0.56,
+    "max_residual_m": 0.586,
+    "mean_residual_m": 0.052,
     "alert_status": "ACKNOWLEDGED",
-    "alert_message": "รับทราบการแจ้งเตือนแล้วโดย API Operator: API test acknowledge",
-    "current_model": {
-      "name": "Unified-LightGBM-Forecaster",
-      "version": "v1.0",
-      "champion_mae": 0.0699
-    },
+    "alert_message": "รับทราบการแจ้งเตือนแล้วโดย Test Operator: Acknowledged",
     "matched_evaluations": [
       {
-        "station_code": "STN-BANGSALA",
-        "station_name": "บ้านบางศาลา (X.90)",
-        "target_time": "2026-10-06T13:00:00Z",
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T16:00:00",
         "horizon": "+1h",
-        "predicted_level": 6.8,
-        "actual_level": 7.42,
-        "residual_error": 0.62,
-        "is_exceeded": true
+        "predicted_level": 0.62,
+        "actual_level": 0.6,
+        "residual_error": 0.02,
+        "is_exceeded": false
       },
       {
-        "station_code": "STN-HATYAINAI",
-        "station_name": "สะพานหาดใหญ่ใน (X.44)",
-        "target_time": "2026-10-06T13:00:00Z",
-        "horizon": "+2h",
-        "predicted_level": 4.5,
-        "actual_level": 4.95,
-        "residual_error": 0.45,
-        "is_exceeded": true
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T16:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.5,
+        "actual_level": 2.75,
+        "residual_error": 0.248,
+        "is_exceeded": false
       },
       {
         "station_code": "STN-MUANGKONG",
         "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
-        "target_time": "2026-10-06T13:00:00Z",
+        "target_time": "2026-10-07T16:00:00",
         "horizon": "+1h",
-        "predicted_level": 11.2,
-        "actual_level": 11.32,
-        "residual_error": 0.12,
+        "predicted_level": 10.5,
+        "actual_level": 9.91,
+        "residual_error": 0.586,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T15:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.6,
+        "actual_level": 0.64,
+        "residual_error": 0.04,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T15:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.52,
+        "actual_level": 2.51,
+        "residual_error": 0.015,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T15:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.52,
+        "actual_level": 10.51,
+        "residual_error": 0.005,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.59,
+        "actual_level": 0.62,
+        "residual_error": 0.028,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.54,
+        "actual_level": 2.53,
+        "residual_error": 0.007,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.53,
+        "actual_level": 10.53,
+        "residual_error": 0.003,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T13:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.58,
+        "actual_level": 0.61,
+        "residual_error": 0.032,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T13:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.55,
+        "actual_level": 2.54,
+        "residual_error": 0.008,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T13:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.54,
+        "actual_level": 10.55,
+        "residual_error": 0.007,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T12:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.6,
+        "actual_level": 0.61,
+        "residual_error": 0.006,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T12:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.57,
+        "actual_level": 2.56,
+        "residual_error": 0.005,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T12:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.56,
+        "actual_level": 10.56,
+        "residual_error": 0.003,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T11:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.63,
+        "actual_level": 0.63,
+        "residual_error": 0.001,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T11:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.58,
+        "actual_level": 2.58,
+        "residual_error": 0.003,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T11:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.58,
+        "actual_level": 10.58,
+        "residual_error": 0.002,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T10:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.68,
+        "actual_level": 0.66,
+        "residual_error": 0.017,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T10:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.59,
+        "actual_level": 2.59,
+        "residual_error": 0.002,
         "is_exceeded": false
       }
     ],
     "history": [
       {
-        "id": "drift-ack-1791295053",
+        "id": "drift-ack-1791378117",
         "action": "ACKNOWLEDGED",
-        "triggered_by": "API Operator",
-        "notes": "API test acknowledge",
-        "timestamp": "2026-10-06T13:57:33.015024+00:00"
+        "triggered_by": "Test Operator",
+        "notes": "Acknowledged",
+        "timestamp": "2026-10-07T13:01:57.837522+00:00"
       },
       {
-        "id": "drift-ack-1791295052",
-        "action": "ACKNOWLEDGED",
-        "triggered_by": "Operator Somchai",
-        "notes": "Under observation during high rain",
-        "timestamp": "2026-10-06T13:57:32.926206+00:00"
+        "id": "drift-action-1791377910",
+        "action": "RETRAIN_TRIGGERED",
+        "triggered_by": "Hydrologist Lead Engineer",
+        "notes": "Retrain initiated to absorb upstream wave surge.",
+        "timestamp": "2026-10-07T12:58:30.390908+00:00",
+        "retrain_result": {
+          "status": "success",
+          "promoted": true,
+          "model_version": "v1.7",
+          "challenger_mae": 1.5636,
+          "champion_mae": 0.4768,
+          "improvement_pct": -227.94,
+          "mlflow_run_id": "20bdc6a633aa4992b90727e7bdbb100d",
+          "timestamp": "2026-10-07T12:58:30.377740+00:00",
+          "trigger_type": "DRIFT_DETECTED_HITL"
+        }
       },
       {
-        "id": "drift-ack-1791294509",
+        "id": "drift-ack-1791377873",
         "action": "ACKNOWLEDGED",
-        "triggered_by": "API Operator",
-        "notes": "API test acknowledge",
-        "timestamp": "2026-10-06T13:48:29.420320+00:00"
-      },
-      {
-        "id": "drift-ack-1791294509",
-        "action": "ACKNOWLEDGED",
-        "triggered_by": "Operator Somchai",
-        "notes": "Under observation during high rain",
-        "timestamp": "2026-10-06T13:48:29.278953+00:00"
-      },
-      {
-        "id": "drift-ack-1791294465",
-        "action": "ACKNOWLEDGED",
-        "triggered_by": "API Operator",
-        "notes": "API test acknowledge",
-        "timestamp": "2026-10-06T13:47:45.645530+00:00"
-      },
-      {
-        "id": "drift-ack-1791294465",
-        "action": "ACKNOWLEDGED",
-        "triggered_by": "Operator Somchai",
-        "notes": "Under observation during high rain",
-        "timestamp": "2026-10-06T13:47:45.537318+00:00"
+        "triggered_by": "Eng. Nuttapong",
+        "notes": "Acknowledged high surge at Bangsala; under close surveillance.",
+        "timestamp": "2026-10-07T12:57:53.318675+00:00"
       }
-    ]
+    ],
+    "current_model": {
+      "name": "Unified-LightGBM-Forecaster",
+      "version": "v1.1",
+      "champion_mae": 1.557,
+      "is_retraining": false
+    }
   }
 }

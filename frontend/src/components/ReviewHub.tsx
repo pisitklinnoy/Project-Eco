@@ -23,9 +23,9 @@ import {
   Eye,
   Radio,
   TrendingUp,
-  Zap,
   X
 } from 'lucide-react';
+
 import type {
   RetrainStatus,
   TimeSeriesRetrainStatus,
@@ -203,32 +203,38 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
     }
   };
 
-  // Simulate Drift for Testing
-  const handleSimulateDrift = async () => {
+  // Evaluate Drift directly from DB
+  const handleEvaluateDrift = async () => {
     try {
-      await floodlensApi.simulateForecastDrift(0.72);
-      setTsMessage('จำลองเหตุการณ์ Forecast Drift สำเร็จ (Residual Error 0.72 ม. เกินเกณฑ์ความปลอดภัย 0.40 ม.)');
-      await loadHITLData();
+      setDriftLoading(true);
+      const res = await floodlensApi.evaluateForecastDrift();
+      setDriftReport(res);
+      setTsMessage(
+        `ประเมินผล Forecast Drift จากฐานข้อมูลจริงสำเร็จ! (Max Residual: ${res.max_residual_m.toFixed(2)} ม., Mean Residual: ${res.mean_residual_m.toFixed(2)} ม.)`
+      );
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด');
+      alert(err.message || 'เกิดข้อผิดพลาดในการประเมิน Drift');
+    } finally {
+      setDriftLoading(false);
     }
   };
 
-  // Simulate Ingestion Anomaly for Testing
-  const handleSimulateIngestion = async () => {
+  // Run Ingestion Cross-Validation directly from DB
+  const handleRunCrossValidation = async () => {
     try {
-      await floodlensApi.simulateIngestionAnomaly({
-        station_code: 'STN-BANGSALA',
-        station_name: 'บ้านบางศาลา (กลางน้ำ)',
-        vision_water_level: 18.50,
-        sensor_water_level: 2.30,
-      });
-      setTsMessage('จำลองข้อมูลนำเข้าผิดปกติสำเร็จ: กล้องอ่านได้ 18.50 ม. vs เซ็นเซอร์อ่านได้ 2.30 ม. (ระงับข้อมูลชั่วคราวแล้ว)');
+      setIngestionLoading(true);
+      const res = await floodlensApi.runIngestionCrossValidation();
       await loadHITLData();
+      setTsMessage(
+        `ตรวจประเมิน Cross-Validation จาก DB สำเร็จ! พบรายการระงับชั่วคราว ${res.quarantined_count} รายการ จากข้อมูลจริง ${res.total_candidates} รายการ`
+      );
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด');
+      alert(err.message || 'เกิดข้อผิดพลาดในการตรวจประเมิน Cross-Validation');
+    } finally {
+      setIngestionLoading(false);
     }
   };
+
 
   // Trigger Vision Manual Retrain
   const handleVisionRetrain = async () => {
@@ -613,7 +619,12 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           </span>
                         </td>
                         <td className="py-3.5 px-3 font-semibold text-slate-700">
-                          {item.images_count} ภาพ
+                          <div>{item.images_count} ภาพ</div>
+                          {item.train_samples ? (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              Train {item.train_samples} / Val {item.val_samples || 0}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-3.5 px-3 font-black text-emerald-600">
                           {item.mae_meters} ม. <span className="text-slate-400 text-[10px] font-normal">(~{Math.round(item.mae_meters * 100)} ซม.)</span>
@@ -622,15 +633,19 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           {new Date(item.timestamp).toLocaleString('th-TH')}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <a
-                            href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
-                          >
-                            <span className="font-mono text-[11px]">{item.mlflow_run_id.slice(0, 8)}...</span>
-                            <ExternalLink className="w-3 h-3 ml-0.5" />
-                          </a>
+                          {item.mlflow_run_id ? (
+                            <a
+                              href={`http://localhost:5000/#/experiments/2/runs/${item.mlflow_run_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
+                            >
+                              <span className="font-mono text-[11px]">{String(item.mlflow_run_id).slice(0, 8)}...</span>
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px]">-</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -813,13 +828,15 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
 
               <div className="flex items-center space-x-2 shrink-0">
                 <button
-                  onClick={handleSimulateIngestion}
-                  className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200/80 transition-all flex items-center space-x-1.5 cursor-pointer"
-                  title="จำลองสถานการณ์ค่ากล้องเพี้ยน"
+                  onClick={handleRunCrossValidation}
+                  disabled={ingestionLoading}
+                  className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200/80 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  title="ตรวจสอบความสอดคล้องระหว่าง Vision AI และ RID Sensor จากฐานข้อมูลจริง PostgreSQL"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>จำลองข้อมูลผิดปกติ (Test)</span>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>ตรวจสอบความสอดคล้องจาก DB</span>
                 </button>
+
 
                 <button
                   onClick={loadHITLData}
@@ -988,13 +1005,15 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
 
               <div className="flex items-center space-x-2 shrink-0">
                 <button
-                  onClick={handleSimulateDrift}
-                  className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200/80 transition-all flex items-center space-x-1.5 cursor-pointer"
-                  title="จำลองกรณี Forecast Drift"
+                  onClick={handleEvaluateDrift}
+                  disabled={driftLoading}
+                  className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200/80 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  title="คำนวณและประเมินค่า Residual Error ล่าสุดเทียบระหว่าง Forecast กับค่าจริงในฐานข้อมูล PostgreSQL"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>จำลอง Forecast Drift (Test)</span>
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>ประเมิน Drift สดจาก DB</span>
                 </button>
+
 
                 <button
                   onClick={loadHITLData}
@@ -1434,15 +1453,19 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           {new Date(item.timestamp).toLocaleString('th-TH')}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <a
-                            href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
-                          >
-                            <span className="font-mono text-[11px]">{item.mlflow_run_id.slice(0, 8)}...</span>
-                            <ExternalLink className="w-3 h-3 ml-0.5" />
-                          </a>
+                          {item.mlflow_run_id ? (
+                            <a
+                              href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
+                            >
+                              <span className="font-mono text-[11px]">{String(item.mlflow_run_id).slice(0, 8)}...</span>
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px]">-</span>
+                          )}
                         </td>
                       </tr>
                     );

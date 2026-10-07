@@ -47,3 +47,8 @@ backend/dataset/manual_annotations/*.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Weights & Temporary Artifacts
+backend/weights/
+model_best_v2.pt
+

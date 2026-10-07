@@ -1,0 +1,22 @@
+{
+  "task_id": 3,
+  "station": "Hatyai Nai Bridge (X.44 - Hatyai City)",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-06T18:47:46.358576",
+  "verified_water_level_m": 5.314,
+  "pixel_y": 799.2,
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.682,
+    "y_center": 0.495,
+    "width": 0.028,
+    "height": 0.75
+  },
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 0.0,
+    "mae_meters": 0.0,
+    "iou": 1.0
+  }
+}

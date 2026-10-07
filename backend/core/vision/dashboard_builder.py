@@ -1,7 +1,7 @@
 """
 Standard CCTV Water Level Monitoring Dashboard Builder
 สร้างภาพแดชบอร์ดตามมาตรฐานการตรวจสอบระดับน้ำ (Dark Theme + Golden Ticks + High-Resolution CCTV)
-รองรับทั้งโหมด Polygon (YOLOv8-Seg) และโหมด กรอบ ROI (Bounding Box)
+รองรับทั้งโหมด Polygon และโหมด กรอบ ROI (Bounding Box)
 """
 
 import cv2
@@ -23,7 +23,7 @@ def build_dashboard(
     เรนเดอร์ภาพ Dashboard แบบ 100% ตามมาตรฐาน
     - ซ้าย: เสา Enhanced พร้อมสเกลไม้บรรทัด Dark Theme (พื้นหลังดำ 26, 26, 26 ขีดระดับเมตรสีเหลืองทอง)
     - ขวา: ภาพ CCTV ความละเอียดเต็ม คมชัด ไม่แตก
-      - overlay_mode == "polygon": วาด Polygon สีเขียวล้อมรอบเสาจาก YOLOv8-Seg พร้อม Badge
+      - overlay_mode == "polygon": วาด Polygon สีเขียวล้อมรอบเสาพร้อม Badge
       - overlay_mode == "roi": วาดกรอบสี่เหลี่ยมสีเขียว (ROI Box) พร้อม Badge
       - เส้นระดับน้ำสีส้มบนผิวน้ำที่จุดตัดจริง
     - บน: Header Banner ดำเข้ม (24, 24, 24) ตัวหนังสือคมชัด
@@ -86,18 +86,14 @@ def build_dashboard(
         water_x_frame = int(round((fx1 + fx2) / 2.0))
 
     if is_manual:
-        label_text = f"Manual BBox: Staff Gauge {station_code}"
-    elif is_submerged:
-        label_text = f"Hybrid: Extrapolated {station_code} ({conf_display})"
-    elif is_shifted:
-        label_text = f"Hybrid: Shift Aligned {station_code} ({conf_display})"
+        label_text = f"Staff Gauge: Manual ({station_code})"
     elif has_yolo:
-        label_text = f"Hybrid Aligned: Staff Gauge {station_code} ({conf_display})"
+        label_text = f"Staff Gauge: {conf_display}"
     else:
-        label_text = f"ROI: Staff Gauge {station_code}"
+        label_text = f"Staff Gauge: {station_code}"
 
     if overlay_mode == "polygon":
-        # 3.1 โหมด Polygon (YOLOv8-Seg / 4-Point Homography Source)
+        # 3.1 โหมด Polygon (4-Point Homography Source)
         if gauge_poly is not None and len(gauge_poly) >= 3:
             g_scaled = (gauge_poly * np.array([scale_x, scale_y])).astype(np.int32)
         elif pts_src is not None and len(pts_src) == 4:
@@ -163,7 +159,7 @@ def build_dashboard(
         status_color = (0, 255, 120)
         status_text = "NORMAL LEVEL"
 
-    ai_tag = " | YOLOv8-Seg AI" if overlay_mode == "polygon" else " | ROI Analysis"
+    ai_tag = " | YOLOv8m AI" if overlay_mode in ("polygon", "bbox") else " | ROI Analysis"
 
     if station_code == "X.44":
         # Station 3: Hatyainai Benchmark Format
@@ -251,15 +247,11 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
         return out
 
     if is_manual:
-        badge_title = "Manual BBox: Staff Gauge"
-    elif is_submerged:
-        badge_title = f"Hybrid: Extrapolated ({conf_display})"
-    elif is_shifted:
-        badge_title = f"Hybrid: Shift Aligned ({conf_display})"
+        badge_title = "Staff Gauge: Manual"
     elif has_yolo:
-        badge_title = f"Hybrid Aligned: Staff Gauge ({conf_display})"
+        badge_title = f"Staff Gauge: {conf_display}"
     else:
-        badge_title = f"ROI: Staff Gauge"
+        badge_title = "Staff Gauge"
 
     if overlay_mode == "polygon" and pole_mgr.last_pts_src is not None and len(pole_mgr.last_pts_src) == 4:
         g_poly = pole_mgr.last_pts_src.astype(np.int32)

@@ -1,55 +1,495 @@
 {
-  "pending_count": 2,
+  "pending_count": 0,
   "target_count": 20,
-  "current_model_name": "Flood-Forecaster",
-  "current_model_version": "v1.4",
-  "last_mae_meters": 0.034,
-  "last_retrained_at": "2026-10-05T14:56:04.422415",
-  "is_retraining": true,
+  "current_model_name": "StaffGauge-Vision-Detector",
+  "current_model_version": "v2.1",
+  "last_mae_meters": 1.8767,
+  "last_retrained_at": "2026-10-07T15:56:31.217999",
+  "is_retraining": false,
   "history": [
     {
-      "id": "retrain-1791212164",
-      "model_version": "v1.4",
+      "id": "retrain-1791388591",
+      "model_version": "v2.1",
       "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 20,
-      "mae_meters": 0.034,
-      "pixel_error_px": 2.9,
-      "timestamp": "2026-10-05T14:56:04.422397",
+      "images_count": 46,
+      "mae_meters": 1.8767,
+      "pixel_error_px": 428.6,
+      "mean_iou": 0.5171,
+      "timestamp": "2026-10-07T15:56:31.207928",
       "status": "SUCCESS",
-      "mlflow_run_id": "ff3af9ea13814195b62f2de34f4f00e2"
+      "mlflow_run_id": "b3181a33a48a41479e1a5915b841416c",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_155328",
+        "weights_file": "best.pt",
+        "training_samples": 46,
+        "mlflow_run_id": "b3181a33a48a41479e1a5915b841416c",
+        "metrics": {
+          "mAP50": 0.0438,
+          "mAP50-95": 0.0169,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T15:56:31.207864+00:00"
+      }
     },
     {
-      "id": "retrain-1791199984",
-      "model_version": "v1.3",
+      "id": "deploy-model_best_v2-1791374000",
+      "model_version": "v2.0",
+      "trigger_type": "DEPLOY_MODEL_BEST_V2",
+      "images_count": 44,
+      "mae_meters": 0.035,
+      "pixel_error_px": 2.8,
+      "mean_iou": 0.942,
+      "timestamp": "2026-10-07T12:41:25.000000",
+      "status": "SUCCESS",
+      "mlflow_run_id": "639b05a3d6254251af837b24ea8235ee",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v2.0-model_best_v2",
+        "weights_file": "model_best_v2.pt",
+        "training_samples": 44,
+        "mlflow_run_id": "639b05a3d6254251af837b24ea8235ee",
+        "metrics": {
+          "mAP50": 0.965,
+          "mean_iou": 0.942,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "UPGRADED_MODEL_BEST_V2",
+          "classes": [
+            "Staff Gauge",
+            "Water-Area"
+          ],
+          "parameters": 25857478
+        },
+        "deployed_at": "2026-10-07T12:41:25.000000+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791376071",
+      "model_version": "v1.23",
       "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 20,
-      "mae_meters": 0.038,
-      "pixel_error_px": 3.2,
-      "timestamp": "2026-10-05T11:33:04.290614",
+      "images_count": 45,
+      "mae_meters": 1.7366,
+      "pixel_error_px": 396.6,
+      "mean_iou": 0.3886,
+      "timestamp": "2026-10-07T12:27:51.681741",
       "status": "SUCCESS",
-      "mlflow_run_id": "4a2e6085ba0346ada038d5f83099d36d"
+      "mlflow_run_id": "df74ff15734e4eb9bcf0c406fa51bcd1",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_122641",
+        "weights_file": "best.pt",
+        "training_samples": 45,
+        "mlflow_run_id": "df74ff15734e4eb9bcf0c406fa51bcd1",
+        "metrics": {
+          "mAP50": 0.0646,
+          "mAP50-95": 0.0215,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T12:27:51.681641+00:00"
+      }
     },
     {
-      "id": "retrain-001",
-      "model_version": "v1.1",
-      "trigger_type": "INITIAL_BENCHMARK",
-      "images_count": 20,
-      "mae_meters": 0.048,
-      "pixel_error_px": 4.5,
-      "timestamp": "2026-10-01T10:15:00Z",
+      "id": "retrain-1791373920",
+      "model_version": "v1.22",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 44,
+      "mae_meters": 1.5196,
+      "pixel_error_px": 347.0,
+      "mean_iou": 0.9321,
+      "timestamp": "2026-10-07T11:52:00.940958",
       "status": "SUCCESS",
-      "mlflow_run_id": "8169b3509dbd4ec192fc18aea799e7c8"
+      "mlflow_run_id": "b6b2687caff448afbcb7fe6214fd6372",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_115129",
+        "weights_file": "best.pt",
+        "training_samples": 44,
+        "mlflow_run_id": "b6b2687caff448afbcb7fe6214fd6372",
+        "metrics": {
+          "mAP50": 0.0593,
+          "mAP50-95": 0.0205,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T11:52:00.940919+00:00"
+      }
     },
     {
-      "id": "retrain-002",
-      "model_version": "v1.2",
+      "id": "retrain-1791373795",
+      "model_version": "v1.21",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 62,
+      "mae_meters": 1.5686,
+      "pixel_error_px": 358.2,
+      "mean_iou": 0.8679,
+      "timestamp": "2026-10-07T11:49:55.546722",
+      "status": "SUCCESS",
+      "mlflow_run_id": "9775ad932c4d48f9931ab3b42754c321",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_114920",
+        "weights_file": "best.pt",
+        "training_samples": 82,
+        "mlflow_run_id": "9775ad932c4d48f9931ab3b42754c321",
+        "metrics": {
+          "mAP50": 0.0612,
+          "mAP50-95": 0.0191,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T11:49:55.546659+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791372848",
+      "model_version": "v1.20",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 60,
+      "mae_meters": 1.6209,
+      "pixel_error_px": 370.2,
+      "mean_iou": 0.756,
+      "timestamp": "2026-10-07T11:34:08.713149",
+      "status": "SUCCESS",
+      "mlflow_run_id": "824df8a40cad4a86a50b7ac4c3422953",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_113301",
+        "weights_file": "best.pt",
+        "training_samples": 80,
+        "mlflow_run_id": "824df8a40cad4a86a50b7ac4c3422953",
+        "metrics": {
+          "mAP50": 0.0605,
+          "mAP50-95": 0.0233,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T11:34:08.713043+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791372277",
+      "model_version": "v1.19",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 60,
+      "mae_meters": 1.6209,
+      "pixel_error_px": 370.2,
+      "mean_iou": 0.5924,
+      "timestamp": "2026-10-07T11:24:37.340516",
+      "status": "SUCCESS",
+      "mlflow_run_id": null,
+      "neural_network_training": null
+    },
+    {
+      "id": "retrain-1791371885",
+      "model_version": "v1.18",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 60,
+      "mae_meters": 1.6209,
+      "pixel_error_px": 370.2,
+      "mean_iou": 0.3859,
+      "timestamp": "2026-10-07T11:18:05.954486",
+      "status": "SUCCESS",
+      "mlflow_run_id": "2851dc43781b43998bd12c275830b011",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_111705",
+        "weights_file": "best.pt",
+        "training_samples": 80,
+        "mlflow_run_id": "2851dc43781b43998bd12c275830b011",
+        "metrics": {
+          "mAP50": 0.0427,
+          "mAP50-95": 0.0166,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T11:18:05.954404+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791370596",
+      "model_version": "v1.17",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 55,
+      "mae_meters": 1.7682,
+      "pixel_error_px": 403.8,
+      "mean_iou": 0.5016,
+      "timestamp": "2026-10-07T10:56:36.797823",
+      "status": "SUCCESS",
+      "mlflow_run_id": "9019b12517a946b3b185d04def037a93",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_105525",
+        "weights_file": "best.pt",
+        "training_samples": 76,
+        "mlflow_run_id": "a05c1c42a3ec46b49874ade785872210",
+        "metrics": {
+          "mAP50": 0.0662,
+          "mAP50-95": 0.0281,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T10:56:36.797781+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791369383",
+      "model_version": "v1.16",
       "trigger_type": "AUTO_BATCH_20",
-      "images_count": 20,
-      "mae_meters": 0.042,
-      "pixel_error_px": 3.8,
-      "timestamp": "2026-10-02T14:30:00Z",
+      "images_count": 99,
+      "mae_meters": 2.0628,
+      "pixel_error_px": 471.1,
+      "mean_iou": 0.7349,
+      "timestamp": "2026-10-07T10:36:23.966938",
       "status": "SUCCESS",
-      "mlflow_run_id": "b90b2fc5bad34b41a1207f057e3e2c08"
+      "mlflow_run_id": "18ea2ecc6aed45d08f6979ea4653ba00",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_103553",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "cc3f15c2786c428c893bad695a031f52",
+        "metrics": {
+          "mAP50": 0.038,
+          "mAP50-95": 0.0149,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T10:36:23.966908+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791368495",
+      "model_version": "v1.15",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.9959,
+      "timestamp": "2026-10-07T10:21:35.068952",
+      "status": "SUCCESS",
+      "mlflow_run_id": "7a64a2f603434d45ac8ec0de968006a5",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_102016",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "19dd1134276e47e58468c20b2ed145a1",
+        "metrics": {
+          "mAP50": 0.0467,
+          "mAP50-95": 0.019,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T10:21:35.068894+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791319124",
+      "model_version": "v1.14",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.9897,
+      "timestamp": "2026-10-06T20:38:44.722765",
+      "status": "SUCCESS",
+      "mlflow_run_id": "65b523fbcf274e8d9aa589defcd07730",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261006_203616",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "0ea52c77e74a4db9adb26011ea8d2b3a",
+        "metrics": {
+          "mAP50": 0.0406,
+          "mAP50-95": 0.0147,
+          "box_loss": 0.024,
+          "device": "cpu",
+          "gpu_name": "CPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-06T20:38:44.722695+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791318455",
+      "model_version": "v1.13",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.9831,
+      "timestamp": "2026-10-06T20:27:35.582354",
+      "status": "SUCCESS",
+      "mlflow_run_id": "77c950a8d55c444f85279990985190cc",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261006_202636",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "f6f875f4fc264465996a01d1fc577d4d",
+        "metrics": {
+          "mAP50": 0.0241,
+          "mAP50-95": 0.0044,
+          "box_loss": 0.024,
+          "device": "cpu",
+          "gpu_name": "CPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-06T20:27:35.582290+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791318153",
+      "model_version": "v1.12",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.9704,
+      "timestamp": "2026-10-06T20:22:33.916798",
+      "status": "SUCCESS",
+      "mlflow_run_id": "2b4386bcfeb14293bb957bea986ceb56",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261006_202128",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "487e4a7f0d9c4f2ca680348043aaedde",
+        "metrics": {
+          "mAP50": 0.0486,
+          "mAP50-95": 0.0259,
+          "box_loss": 0.024,
+          "device": "cpu",
+          "gpu_name": "CPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-06T20:22:33.916731+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791316993",
+      "model_version": "v1.11",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.9463,
+      "timestamp": "2026-10-06T20:03:13.723753",
+      "status": "SUCCESS",
+      "mlflow_run_id": "e13d555085b9439cb40ed6208cc907c6",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261006_200004",
+        "weights_file": "best.pt",
+        "training_samples": 72,
+        "mlflow_run_id": "2366989258e74c909c75d13c6d271c7e",
+        "metrics": {
+          "mAP50": 0.0642,
+          "mAP50-95": 0.0197,
+          "box_loss": 0.024,
+          "device": "cpu",
+          "gpu_name": "CPU",
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-06T20:03:13.723681+00:00"
+      }
+    },
+    {
+      "id": "retrain-1791315163",
+      "model_version": "v1.10",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.899,
+      "timestamp": "2026-10-06T19:32:43.878564",
+      "status": "SUCCESS",
+      "mlflow_run_id": "5b99c425d82f44ec82aa330e4c5113ed"
+    },
+    {
+      "id": "retrain-1791313407",
+      "model_version": "v1.9",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.8152,
+      "timestamp": "2026-10-06T19:03:27.204478",
+      "status": "SUCCESS",
+      "mlflow_run_id": "b087a360146b4b0c9d3079e60be165d5"
+    },
+    {
+      "id": "retrain-1791312691",
+      "model_version": "v1.8",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 83,
+      "mae_meters": 2.4604,
+      "pixel_error_px": 561.9,
+      "mean_iou": 0.7057,
+      "timestamp": "2026-10-06T18:51:31.628290",
+      "status": "SUCCESS",
+      "mlflow_run_id": "a9ab95930eaf48b9a03e38a9d46b6656"
+    },
+    {
+      "id": "retrain-1791308511",
+      "model_version": "v1.7",
+      "trigger_type": "REAL_VISION_TEST",
+      "images_count": 47,
+      "mae_meters": 2.276,
+      "pixel_error_px": 519.8,
+      "mean_iou": 0.2619,
+      "timestamp": "2026-10-06T17:41:51.965058",
+      "status": "SUCCESS",
+      "mlflow_run_id": "593fd2e5ca714b43b88ff36d60eb5c03"
+    },
+    {
+      "id": "retrain-1791306218",
+      "model_version": "v1.6",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 20,
+      "mae_meters": 0.026,
+      "pixel_error_px": 2.2,
+      "timestamp": "2026-10-06T17:03:38.737393",
+      "status": "SUCCESS",
+      "mlflow_run_id": "4518b89319d74030b914b482e377728a"
     }
-  ]
+  ],
+  "last_retrained_count": 28
 }

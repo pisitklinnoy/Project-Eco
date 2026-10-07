@@ -131,10 +131,10 @@ def get_timeseries_retrain_status():
 
 
 @router.post("/trigger-retrain")
-def trigger_timeseries_retrain(force_promote: bool = Query(False)):
+def trigger_timeseries_retrain(force_promote: bool = Query(False), db: Session = Depends(get_db)):
     """สั่งฝึกฝนโมเดล Time-Series LightGBM ใหม่ พร้อมประเมิน Champion vs Challenger"""
     from services.timeseries_retrain_service import timeseries_retrain_service
-    result = timeseries_retrain_service.execute_retrain_job(trigger_type="MANUAL_OVERRIDE", force_promote=force_promote)
+    result = timeseries_retrain_service.execute_retrain_job(trigger_type="MANUAL_OVERRIDE", force_promote=force_promote, db=db)
     return {
         "status": "success",
         "message": "Time-Series Model Retraining completed successfully!",

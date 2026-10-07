@@ -1,0 +1,15 @@
+{
+  "task_id": 14,
+  "station": "Verification Test E2E",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-07T15:52:56.372711",
+  "verified_water_level_m": 6.464,
+  "pixel_y": 540.0,
+  "yolo_normalized": null,
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 520.02,
+    "mae_meters": 2.308,
+    "iou": 0.0
+  }
+}

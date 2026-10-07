@@ -94,12 +94,21 @@ def get_station_detection_status(station_code: str, mode: str = "live"):
     return vision_service.check_detection_status(station_code, mode=mode)
 
 
+@router.post("/{station_code}/predict-bbox")
+def predict_staff_gauge_bbox(station_code: str, mode: str = "live"):
+    """
+    สั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาวัดระดับน้ำ (Staff Gauge Bounding Box) ทันทีแบบ On-Demand ตามคำสั่งปุ่มกด
+    """
+    from services.vision_service import vision_service
+    return vision_service.check_detection_status(station_code, mode=mode, force_refresh=True)
+
+
 @router.get("/{station_code}/cctv-analysis.jpg")
 def get_cctv_analysis_image(station_code: str, mode: str = "live", overlay: str = "bbox", view: str = "cctv", db: Session = Depends(get_db)):
     """
     สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime หรือ Benchmark
     mode: 'live', 'daytime', 'nighttime', 'flood'
-    overlay: 'bbox' (กรอบเขียว Bounding Box), 'polygon' (YOLOv8-Seg polygon mask)
+    overlay: 'bbox' (กรอบเขียว Bounding Box), 'polygon' (Polygon Mask)
     view: 'cctv' (เฉพาะภาพกล้อง CCTV 16:9), 'gauge' (เฉพาะสเกลเสาวัดน้ำดิจิทัล), 'composite' (รวมแดชบอร์ด)
     """
     from fastapi.responses import Response

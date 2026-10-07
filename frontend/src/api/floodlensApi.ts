@@ -130,6 +130,14 @@ export const floodlensApi = {
     return res.json();
   },
 
+  predictStaffGaugeBBox: async (stationCode: string, mode = 'live'): Promise<DetectionStatus> => {
+    const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/predict-bbox?mode=${encodeURIComponent(mode)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to predict bbox');
+    return res.json();
+  },
+
   saveCalibration: async (stationCode: string, calibrationData: any) => {
     const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/calibrate`, {
       method: 'POST',
@@ -242,18 +250,22 @@ export const floodlensApi = {
     return res.json();
   },
 
-  simulateIngestionAnomaly: async (payload: {
-    station_code: string;
-    station_name: string;
-    vision_water_level: number;
-    sensor_water_level: number;
-  }): Promise<any> => {
-    const res = await fetch(`${API_BASE}/review/timeseries/ingestion-simulate`, {
+  runIngestionCrossValidation: async (): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/run-cross-validation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to simulate ingestion anomaly');
+    if (!res.ok) throw new Error('Failed to run ingestion cross-validation');
+    return res.json();
+  },
+
+  simulateIngestionAnomaly: async (_payload?: any): Promise<any> => {
+    // Backwards-compatible alias: triggers live DB cross-validation
+    const res = await fetch(`${API_BASE}/review/timeseries/run-cross-validation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error('Failed to run ingestion cross-validation');
     return res.json();
   },
 
@@ -289,14 +301,24 @@ export const floodlensApi = {
     return res.json();
   },
 
-  simulateForecastDrift: async (residual_error: number = 0.65): Promise<any> => {
-    const res = await fetch(`${API_BASE}/review/timeseries/simulate-drift`, {
+  evaluateForecastDrift: async (): Promise<any> => {
+    const res = await fetch(`${API_BASE}/review/timeseries/evaluate-drift`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ residual_error }),
     });
-    if (!res.ok) throw new Error('Failed to simulate forecast drift');
+    if (!res.ok) throw new Error('Failed to evaluate forecast drift');
+    return res.json();
+  },
+
+  simulateForecastDrift: async (_residual_error: number = 0.65): Promise<any> => {
+    // Backwards-compatible alias: triggers live DB drift evaluation
+    const res = await fetch(`${API_BASE}/review/timeseries/evaluate-drift`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error('Failed to evaluate forecast drift');
     return res.json();
   },
 };
+
 

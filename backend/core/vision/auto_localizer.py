@@ -1,11 +1,10 @@
 """
 Staff Gauge & Water Surface Auto-Localizer Module
-ระบบตรวจจับหาตำแหน่งเสาวัดระดับน้ำและผิวน้ำอัตโนมัติด้วย YOLO Segmentation
+ระบบตรวจจับหาตำแหน่งเสาวัดระดับน้ำและผิวน้ำอัตโนมัติด้วย YOLOv8m Object Detection
 รองรับ:
-1. YOLOv8-Seg via OpenCV DNN (model_muangkong_seg.onnx) - รวดเร็ว ไม่ต้องพึ่งพา PyTorch
-2. YOLOv8-Seg via Ultralytics PyTorch (model_muangkong_seg.pt)
-3. Color Saliency & Structural Aspect Ratio Fallback (Pure Computer Vision)
-4. Dynamic Camera Shift Compensation เมื่อกล้อง CCTV ขยับ/ส่าย/เปลี่ยนมุมมอง
+1. YOLOv8m Detection via Ultralytics PyTorch (model_best_v2.pt)
+2. Color Saliency & Structural Aspect Ratio Fallback (Pure Computer Vision)
+3. Dynamic Camera Shift Compensation เมื่อกล้อง CCTV ขยับ/ส่าย/เปลี่ยนมุมมอง
 """
 
 import os
@@ -72,7 +71,7 @@ class StaffGaugeAutoLocalizer:
             project_roots.append(p)
             p = os.path.dirname(p)
 
-        search_names = ["model_best_v2.pt", "model_best_v2.onnx", "model_muangkong_seg.pt", "model_muangkong_seg.onnx"]
+        search_names = ["model_best_v2.pt", "best.pt", "model_best_v2.onnx", "model_muangkong_seg.pt", "model_muangkong_seg.onnx"]
         search_dirs = []
         for root in project_roots:
             search_dirs.extend([
@@ -512,8 +511,11 @@ class StaffGaugeAutoLocalizer:
             dx_clamped = float(np.clip(dx, -250.0, 250.0))
             dy_clamped = float(np.clip(dy_top, -150.0, 150.0))
 
-            # 2. ยึดหัวเสา (Top-Cap Anchor)
-            aligned_y1 = ref_y1 + dy_clamped
+            # ใช้พิกัดจริงที่ตรวจจับได้จากโมเดล YOLO โดยตรง (Exact YOLO Predicted Bounding Box - ปราศจาก Offset)
+            aligned_x1 = int(round(bx1))
+            aligned_y1 = int(round(gy1))
+            aligned_x2 = int(round(bx2))
+            aligned_y2 = int(round(gy2))
 
             # 3. ตรวจจับการถูกน้ำท่วมบังเสา (Water Submergence Occlusion Check)
             # ถ้าน้ำท่วมบังเสาท่อนล่าง det_h จะหดสั้นกว่าความสูงจริง base_h
@@ -565,12 +567,12 @@ class StaffGaugeAutoLocalizer:
                 "source_points": aligned_pts,
                 "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
                 "is_camera_shifted": abs(dx_clamped) > 3.0 or abs(dy_clamped) > 3.0,
-                "is_submerged_occluded": is_submerged,
+                "is_submerged_occluded": False,
                 "is_manual": False,
                 "detected_height_px": int(det_h),
                 "structural_height_px": int(base_h),
                 "confidence": float(best_g["confidence"]),
-                "method": "HYBRID_CONFIG_TOP_ANCHOR",
+                "method": "YOLO_DIRECT_DETECTION",
                 "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)]
             }
 

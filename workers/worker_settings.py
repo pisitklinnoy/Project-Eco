@@ -5,6 +5,8 @@ from ingestion.ingestion_worker import run_ingestion_cycle
 from vision.vision_worker import process_vision_task
 from forecast.forecast_worker import run_periodic_forecast
 from notification.line_worker import send_async_line_notification
+from vision.train_worker import run_vision_training_task
+from forecast.train_worker import run_timeseries_training_task
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
@@ -16,6 +18,8 @@ async def startup(ctx):
     print("   - Computer Vision & Quality Gate")
     print("   - Time-Series Flood Forecasting Engine")
     print("   - LINE Messaging Notification Outbox")
+    print("   - Continuous Training Worker (YOLO / Vision)")
+    print("   - Continuous Training Worker (Time-Series / LGBM)")
     print("=======================================================\n")
 
 async def shutdown(ctx):
@@ -26,7 +30,9 @@ class WorkerSettings:
         run_ingestion_cycle,
         process_vision_task,
         run_periodic_forecast,
-        send_async_line_notification
+        send_async_line_notification,
+        run_vision_training_task,
+        run_timeseries_training_task
     ]
     redis_settings = RedisSettings(host=REDIS_HOST, port=REDIS_PORT)
     on_startup = startup

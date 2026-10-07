@@ -1,11 +1,10 @@
 """
 Staff Gauge & Water Surface Auto-Localizer Module
-ระบบตรวจจับหาตำแหน่งเสาวัดระดับน้ำและผิวน้ำอัตโนมัติด้วย YOLO Segmentation
+ระบบตรวจจับหาตำแหน่งเสาวัดระดับน้ำและผิวน้ำอัตโนมัติด้วย YOLOv8m Object Detection
 รองรับ:
-1. YOLOv8-Seg via OpenCV DNN (model_muangkong_seg.onnx) - รวดเร็ว ไม่ต้องพึ่งพา PyTorch
-2. YOLOv8-Seg via Ultralytics PyTorch (model_muangkong_seg.pt)
-3. Color Saliency & Structural Aspect Ratio Fallback (Pure Computer Vision)
-4. Dynamic Camera Shift Compensation เมื่อกล้อง CCTV ขยับ/ส่าย/เปลี่ยนมุมมอง
+1. YOLOv8m Detection via Ultralytics PyTorch (model_best_v2.pt)
+2. Color Saliency & Structural Aspect Ratio Fallback (Pure Computer Vision)
+3. Dynamic Camera Shift Compensation เมื่อกล้อง CCTV ขยับ/ส่าย/เปลี่ยนมุมมอง
 """
 
 import os

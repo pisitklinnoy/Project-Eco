@@ -107,7 +107,7 @@ def get_cctv_analysis_image(station_code: str, mode: str = "live", overlay: str 
     """
     สร้างและส่งคืนภาพ Dashboard วิเคราะห์ AI Staff Gauge แบบ Realtime หรือ Benchmark
     mode: 'live', 'daytime', 'nighttime', 'flood'
-    overlay: 'bbox' (กรอบเขียว Bounding Box), 'polygon' (YOLOv8-Seg polygon mask)
+    overlay: 'bbox' (กรอบเขียว Bounding Box), 'polygon' (Polygon Mask)
     view: 'cctv' (เฉพาะภาพกล้อง CCTV 16:9), 'gauge' (เฉพาะสเกลเสาวัดน้ำดิจิทัล), 'composite' (รวมแดชบอร์ด)
     """
     from fastapi.responses import Response

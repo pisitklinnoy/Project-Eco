@@ -201,7 +201,7 @@ class VisionService:
         mode: 'live' (ประมวลผลจากกล้องสด), 'daytime' (ผลลัพธ์ Benchmark กลางวัน),
               'nighttime' (ผลลัพธ์ Benchmark กลางคืน), 'flood' (จำลองสภาวะน้ำท่วม)
         overlay: 'bbox' (กรอบสี่เหลี่ยมสีเขียว ROI/YOLO Bounding Box),
-                 'polygon' (แสดงเส้นรอบรูป Polygon จาก YOLOv8-Seg)
+                 'polygon' (แสดงเส้นรอบรูป Polygon)
         view: 'cctv' (เฉพาะมุมมองกล้อง CCTV 16:9 พร้อม Bounding Box),
               'gauge' (เฉพาะภาพสเกลเสาวัดน้ำดิจิทัล),
               'composite' (รวมแดชบอร์ด 2 ด้านดั้งเดิม)

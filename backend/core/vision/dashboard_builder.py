@@ -1,7 +1,7 @@
 """
 Standard CCTV Water Level Monitoring Dashboard Builder
 สร้างภาพแดชบอร์ดตามมาตรฐานการตรวจสอบระดับน้ำ (Dark Theme + Golden Ticks + High-Resolution CCTV)
-รองรับทั้งโหมด Polygon (YOLOv8-Seg) และโหมด กรอบ ROI (Bounding Box)
+รองรับทั้งโหมด Polygon และโหมด กรอบ ROI (Bounding Box)
 """
 
 import cv2
@@ -23,7 +23,7 @@ def build_dashboard(
     เรนเดอร์ภาพ Dashboard แบบ 100% ตามมาตรฐาน
     - ซ้าย: เสา Enhanced พร้อมสเกลไม้บรรทัด Dark Theme (พื้นหลังดำ 26, 26, 26 ขีดระดับเมตรสีเหลืองทอง)
     - ขวา: ภาพ CCTV ความละเอียดเต็ม คมชัด ไม่แตก
-      - overlay_mode == "polygon": วาด Polygon สีเขียวล้อมรอบเสาจาก YOLOv8-Seg พร้อม Badge
+      - overlay_mode == "polygon": วาด Polygon สีเขียวล้อมรอบเสาพร้อม Badge
       - overlay_mode == "roi": วาดกรอบสี่เหลี่ยมสีเขียว (ROI Box) พร้อม Badge
       - เส้นระดับน้ำสีส้มบนผิวน้ำที่จุดตัดจริง
     - บน: Header Banner ดำเข้ม (24, 24, 24) ตัวหนังสือคมชัด
@@ -93,7 +93,7 @@ def build_dashboard(
         label_text = f"Staff Gauge: {station_code}"
 
     if overlay_mode == "polygon":
-        # 3.1 โหมด Polygon (YOLOv8-Seg / 4-Point Homography Source)
+        # 3.1 โหมด Polygon (4-Point Homography Source)
         if gauge_poly is not None and len(gauge_poly) >= 3:
             g_scaled = (gauge_poly * np.array([scale_x, scale_y])).astype(np.int32)
         elif pts_src is not None and len(pts_src) == 4:
@@ -159,7 +159,7 @@ def build_dashboard(
         status_color = (0, 255, 120)
         status_text = "NORMAL LEVEL"
 
-    ai_tag = " | YOLOv8-Seg AI" if overlay_mode == "polygon" else " | ROI Analysis"
+    ai_tag = " | YOLOv8m AI" if overlay_mode in ("polygon", "bbox") else " | ROI Analysis"
 
     if station_code == "X.44":
         # Station 3: Hatyainai Benchmark Format

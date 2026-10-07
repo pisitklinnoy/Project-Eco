@@ -326,6 +326,23 @@ class TimeSeriesRetrainService:
                                 artifact_path="model",
                                 registered_model_name=reg_name
                             )
+                            if is_promoted:
+                                try:
+                                    from mlflow.tracking import MlflowClient
+                                    client = MlflowClient(tracking_uri)
+                                    latest = client.get_latest_versions("Unified-LightGBM-Forecaster")
+                                    if latest:
+                                        latest_v = latest[-1].version
+                                        client.transition_model_version_stage(
+                                            name="Unified-LightGBM-Forecaster",
+                                            version=latest_v,
+                                            stage="Production",
+                                            archive_existing_versions=True
+                                        )
+                                        client.set_model_version_tag("Unified-LightGBM-Forecaster", latest_v, "status", "PRODUCTION_ACTIVE")
+                                        client.set_registered_model_alias("Unified-LightGBM-Forecaster", "production", latest_v)
+                                except Exception as stg_err:
+                                    print(f"[TimeSeriesRetrain] Stage transition note: {stg_err}")
                             print(f"[TimeSeriesRetrain] 🏆 Model logged & registered in MLflow: {reg_name or 'unregistered'} (Run ID: {run_id})")
                         except Exception as mdl_err:
                             print(f"[TimeSeriesRetrain] Log model warning: {mdl_err}")

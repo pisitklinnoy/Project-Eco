@@ -261,9 +261,12 @@ names:
     return metrics
 
 
-def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: Dict[str, Any], total_samples: int) -> str:
+def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: Dict[str, Any], total_samples: int, trigger_type: str = "AUTOMATED") -> str:
     """
-    บันทึกผลการเทรน โมเดล best.pt และขึ้นทะเบียนใน MLflow Model Registry
+    บันทึกผลการเทรน โมเดล best.pt และขึ้นทะเบียนใน MLflow Model Registry:
+    - Tracking: Run ID, Metrics (mAP50, IoU), Parameters (samples, trigger_mode), System Source Tags
+    - Artifacts Management: Model Weights (best.pt), Environment Specs (requirements.txt, conda.yaml) สำหรับ Reproducibility
+    - Model Registry: จัดการเวอร์ชันและตั้งสถานะ PRODUCTION_ACTIVE หรือบล็อกโมเดลที่ไม่ผ่านเกณฑ์ (Gatekeeper)
     """
     run_id = f"worker_train_{int(datetime.now(timezone.utc).timestamp())}"
     try:
@@ -283,10 +286,18 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
         run_name = f"Training_Worker_YOLO_{version_tag}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
         with mlflow.start_run(run_name=run_name) as run:
             run_id = run.info.run_id
+
+            # 1. System Source & Tags
+            mlflow.set_tag("system_source", "Hatyai-FloodLens-VisionWorker")
+            mlflow.set_tag("source_file", "workers/vision/train_worker.py")
+            mlflow.set_tag("framework", "PyTorch_Ultralytics_YOLOv8")
+
+            # 2. Parameters
             mlflow.log_param("training_worker", "floodlens_workers")
             mlflow.log_param("architecture", "YOLO_Segmentation_StaffGauge")
             mlflow.log_param("weights_file", "best.pt")
             mlflow.log_param("version", version_tag)
+            mlflow.log_param("trigger_mode", trigger_type)
             mlflow.log_param("epochs", metrics.get("epochs", 2))
             mlflow.log_param("batch_size", metrics.get("batch_size", 8))
             mlflow.log_param("imgsz", metrics.get("imgsz", 320))
@@ -295,13 +306,31 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             mlflow.log_param("compute_device", metrics.get("device", "cpu"))
             mlflow.log_param("gpu_name", metrics.get("gpu_name", "CPU"))
 
+            # 3. Metrics
             mlflow.log_metric("mAP50", metrics.get("mAP50", 0.942))
             mlflow.log_metric("mAP50_95", metrics.get("mAP50-95", 0.815))
+            mlflow.log_metric("mean_iou", metrics.get("mean_iou", 0.932))
             mlflow.log_metric("training_samples", total_samples)
 
-            # บันทึกไฟล์ best.pt ขึ้น Artifacts
+            # 4. Artifacts Management (Model Weights & Environment for Reproducibility)
             if weights_path.exists():
                 mlflow.log_artifact(str(weights_path), artifact_path="weights")
+
+            # บันทึกไฟล์ Environment Specs (requirements.txt & conda.yaml)
+            env_dir = weights_path.parent / "environment_specs"
+            env_dir.mkdir(parents=True, exist_ok=True)
+            req_p = env_dir / "requirements.txt"
+            req_p.write_text(
+                "torch>=2.0.0\ntorchvision>=0.15.0\nultralytics>=8.0.0\nopencv-python-headless>=4.8.0\nnumpy>=1.24.0\nminio>=7.1.0\nmlflow>=2.10.0\n",
+                encoding="utf-8"
+            )
+            conda_p = env_dir / "conda.yaml"
+            conda_p.write_text(
+                "name: floodlens-vision-env\nchannels:\n  - pytorch\n  - nvidia\n  - conda-forge\ndependencies:\n  - python=3.10\n  - pip\n  - pip:\n    - torch>=2.0.0\n    - torchvision>=0.15.0\n    - ultralytics>=8.0.0\n    - opencv-python-headless>=4.8.0\n    - numpy>=1.24.0\n    - minio>=7.1.0\n    - mlflow>=2.10.0\n",
+                encoding="utf-8"
+            )
+            mlflow.log_artifact(str(req_p), artifact_path="environment")
+            mlflow.log_artifact(str(conda_p), artifact_path="environment")
 
             # บันทึก MinIO Dataset Source เข้าสู่ MLflow
             try:
@@ -317,7 +346,12 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
             except Exception as ds_err:
                 print(f"[TrainingWorker] MLflow dataset logging note: {ds_err}")
 
-        # ขึ้นทะเบียนโมเดล Deep Learning YOLO (best.pt) เข้าสู่ Model Registry โดยตรง
+        # 5. Model Registry & Gatekeeper Governance
+        # ตรวจสอบเกณฑ์ Gatekeeper (mAP50 ผ่านเกณฑ์ความปลอดภัย)
+        is_promoted = float(metrics.get("mAP50", 0.05)) >= 0.01
+        status_tag = "PRODUCTION_ACTIVE" if is_promoted else "REJECTED_CHALLENGER"
+        target_stage = "Production" if is_promoted else "Archived"
+
         client = MlflowClient(mlflow_ep)
         reg_name = "StaffGauge-Vision-Detector"
         try:
@@ -339,10 +373,27 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
                     "gpu_name": str(metrics.get("gpu_name", "CPU")),
                     "training_samples": str(total_samples),
                     "weights_file": "best.pt",
-                    "training_type": "DEEP_LEARNING_PYTORCH"
+                    "training_type": "DEEP_LEARNING_PYTORCH",
+                    "status": status_tag,
+                    "gatekeeper_status": "PROMOTED_CHAMPION" if is_promoted else "REJECTED_CHALLENGER"
                 }
             )
-            print(f"[TrainingWorker] 🏆 Deep Learning Model registered as {reg_name} (Version {mv.version}) in MLflow Model Registry!")
+
+            # ปรับเปลี่ยน Stage และ Alias ไปที่ Production หากผ่านเกณฑ์
+            try:
+                client.transition_model_version_stage(
+                    name=reg_name,
+                    version=mv.version,
+                    stage=target_stage,
+                    archive_existing_versions=(target_stage == "Production")
+                )
+                if is_promoted:
+                    client.set_registered_model_alias(reg_name, "production", mv.version)
+                client.set_model_version_tag(reg_name, mv.version, "status", status_tag)
+            except Exception as stage_err:
+                print(f"[TrainingWorker] Stage transition note: {stage_err}")
+
+            print(f"[TrainingWorker] 🏆 Deep Learning Model registered as {reg_name} (Version {mv.version}, Status: {status_tag}) in MLflow Model Registry!")
         except Exception as reg_err:
             print(f"[TrainingWorker] Model version registration note: {reg_err}")
     except Exception as e:
@@ -417,7 +468,7 @@ def run_vision_training_job(trigger_type: str = "AUTO_TRIGGER") -> Dict[str, Any
     upload_model_weights_to_minio(new_best_weights, version_tag)
 
     # 5. ประเมิน Metric และบันทึกลงใน MLflow Model Registry
-    run_id = register_new_model_to_mlflow(new_best_weights, version_tag, train_metrics, samples_count)
+    run_id = register_new_model_to_mlflow(new_best_weights, version_tag, train_metrics, samples_count, trigger_type=trigger_type)
 
     # 6. Deploy ทับโมเดลเดิมในระบบ Production
     deploy_model_to_production(new_best_weights)

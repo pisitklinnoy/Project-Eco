@@ -385,6 +385,9 @@ export const App: React.FC = () => {
                       <CameraViewer
                         station={selectedStation}
                         measurement={measurement}
+                        onOpenManualBBox={() => setIsManualBBoxOpen(true)}
+                        onOpenReview={() => setIsReviewOpen(true)}
+                        onOpenCalibrate={() => setIsCalibrateOpen(true)}
                       />
                     </div>
                   </div>

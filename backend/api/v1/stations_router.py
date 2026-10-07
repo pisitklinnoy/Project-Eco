@@ -93,6 +93,15 @@ def get_station_detection_status(station_code: str, mode: str = "live"):
     return vision_service.check_detection_status(station_code, mode=mode)
 
 
+@router.post("/{station_code}/predict-bbox")
+def predict_staff_gauge_bbox(station_code: str, mode: str = "live"):
+    """
+    สั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาวัดระดับน้ำ (Staff Gauge Bounding Box) ทันทีแบบ On-Demand ตามคำสั่งปุ่มกด
+    """
+    from services.vision_service import vision_service
+    return vision_service.check_detection_status(station_code, mode=mode, force_refresh=True)
+
+
 @router.get("/{station_code}/cctv-analysis.jpg")
 def get_cctv_analysis_image(station_code: str, mode: str = "live", overlay: str = "bbox", view: str = "cctv", db: Session = Depends(get_db)):
     """

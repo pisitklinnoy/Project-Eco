@@ -103,6 +103,18 @@ class VisionService:
                 return k
         return None
 
+    def invalidate_dashboard_cache(self, station_code: str):
+        """ล้างแคชภาพแดชบอร์ดและเฟรมกล้อง เพื่อให้ทำนายและเรนเดอร์ใหม่ทันทีแบบ On-Demand"""
+        stn_key = self._resolve_station_key(station_code)
+        if not stn_key:
+            return
+        keys_to_del = [k for k in self._cached_dashboards if k.startswith(stn_key)]
+        for k in keys_to_del:
+            self._cached_dashboards.pop(k, None)
+        frame_keys = [k for k in self._cached_frames if k.startswith(stn_key)]
+        for k in frame_keys:
+            self._cached_frames.pop(k, None)
+
     def _fetch_axis_frame(self, stream_url: str) -> Optional[np.ndarray]:
         """ดึงภาพสดจากกล้อง Axis Camera (ta200304.dyndns.info) ด้วย Basic Auth"""
         import base64
@@ -400,10 +412,13 @@ class VisionService:
             "baseline_water_level_m": cfg.get("baseline_water_level_m") or cfg.get("warning_thresholds", {}).get("normal_m")
         }
 
-    def check_detection_status(self, station_code: str, mode: str = "live") -> Dict[str, Any]:
+    def check_detection_status(self, station_code: str, mode: str = "live", force_refresh: bool = False) -> Dict[str, Any]:
         """
         ตรวจสอบสถานะว่าโมเดล YOLO (model_best_v2.pt) สามารถตรวจพบเสาวัดระดับน้ำ (Staff Gauge) หรือไม่
         """
+        if force_refresh:
+            self.invalidate_dashboard_cache(station_code)
+
         stn_key = self._resolve_station_key(station_code)
         if not stn_key:
             return {"detected": False, "can_analyze_gauge": False, "error": "Invalid station code"}
@@ -548,6 +563,9 @@ class VisionService:
             except Exception as e:
                 print(f"[check_detection_status] could not record measurement: {e}")
 
+        fw = int(frame.shape[1]) if frame is not None else None
+        fh = int(frame.shape[0]) if frame is not None else None
+
         if alignment.get("is_manual"):
             return {
                 "detected": True,
@@ -555,6 +573,9 @@ class VisionService:
                 "confidence": 1.0,
                 "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
+                "raw_bbox": alignment["aligned_bbox"],
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
@@ -584,6 +605,8 @@ class VisionService:
                 "water_level": detected_water_level,
                 "bbox": alignment["aligned_bbox"],
                 "raw_bbox": alignment.get("raw_yolo_bbox"),
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,
@@ -618,6 +641,9 @@ class VisionService:
                 "is_manual": False,
                 "confidence": 0.0,
                 "bbox": None,
+                "raw_bbox": None,
+                "frame_width": fw,
+                "frame_height": fh,
                 "station_code": station_code,
                 "station_name": stn_name,
                 "mode": mode,

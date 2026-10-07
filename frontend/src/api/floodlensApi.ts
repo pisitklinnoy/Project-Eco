@@ -130,6 +130,14 @@ export const floodlensApi = {
     return res.json();
   },
 
+  predictStaffGaugeBBox: async (stationCode: string, mode = 'live'): Promise<DetectionStatus> => {
+    const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/predict-bbox?mode=${encodeURIComponent(mode)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to predict bbox');
+    return res.json();
+  },
+
   saveCalibration: async (stationCode: string, calibrationData: any) => {
     const res = await fetch(`${API_BASE}/stations/${encodeURIComponent(stationCode)}/calibrate`, {
       method: 'POST',

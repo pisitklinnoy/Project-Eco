@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Station, WaterMeasurement } from '../types';
+import type { Station, WaterMeasurement, DetectionStatus } from '../types';
+import { floodlensApi } from '../api/floodlensApi';
 import {
   Camera,
   Eye,
@@ -15,6 +16,10 @@ import {
   Move,
   Sliders,
   CheckCircle,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  X,
   Sun,
   Moon,
   Columns,
@@ -284,21 +289,15 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   // Aspect Ratio Fit Mode: 'contain' = สัดส่วนจริง ไม่ตัดขอบ (Default) | 'cover' = เต็มพื้นที่กรอบ
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
 
-  // AI Staff Gauge Detection Status
-  interface DetectionStatus {
-    detected: boolean;
-    is_manual?: boolean;
-    confidence: number;
-    water_level?: number | null;
-    bbox?: number[];
-    station_code: string;
-    station_name: string;
-    mode: string;
-    can_analyze_gauge: boolean;
-    recommendation?: string;
-    message?: string;
-  }
   const [detectionStatus, setDetectionStatus] = useState<DetectionStatus | null>(null);
+  const [isPredicting, setIsPredicting] = useState<boolean>(false);
+  const [showBBox, setShowBBox] = useState<boolean>(true);
+  const [predictionToast, setPredictionToast] = useState<{
+    type: 'success' | 'warn' | 'error';
+    message: string;
+    conf?: number;
+    bbox?: number[] | null;
+  } | null>(null);
 
   const isHatyai = Boolean(
     station?.station_code.toUpperCase().includes('HATYAI') ||
@@ -382,10 +381,54 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     };
 
     fetchDetectionStatus();
-    return () => {
-      isMounted = false;
-    };
   }, [station?.station_code, aiScenario, viewMode, refreshKey]);
+
+  // สั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาวัดระดับน้ำทันทีตามคำสั่งปุ่มกด (On-Demand Predict)
+  const handlePredictBBox = async () => {
+    if (!station?.station_code) return;
+    setIsPredicting(true);
+    setPredictionToast(null);
+    try {
+      const modeParam = viewMode === 'ai_dashboard' ? aiScenario : 'live';
+      const data = await floodlensApi.predictStaffGaugeBBox(station.station_code, modeParam);
+      setDetectionStatus(data);
+      setShowBBox(true);
+      setRefreshKey(Date.now());
+
+      if (data.detected) {
+        const confPct = Math.round((data.confidence || 0) * 100);
+        const bboxStr = data.bbox ? `พิกัด: [${data.bbox.join(', ')}]` : '';
+        setPredictionToast({
+          type: 'success',
+          message: `🎯 AI (YOLO) ทำนายเสาวัดระดับน้ำสำเร็จ! (ความเชื่อมั่น ${confPct}%) ${bboxStr}`,
+          conf: confPct,
+          bbox: data.bbox,
+        });
+      } else {
+        setPredictionToast({
+          type: 'warn',
+          message: '⚠️ AI ยังตรวจไม่พบเสาวัดน้ำในภาพนี้ (แนะนำให้ใช้ปุ่ม "วาด BBox เอง" เพื่อระบุตำแหน่ง)',
+        });
+      }
+    } catch (err: any) {
+      console.error('[CameraViewer] Predict error:', err);
+      setPredictionToast({
+        type: 'error',
+        message: `❌ เกิดข้อผิดพลาดในการสั่ง AI ทำนาย: ${err?.message || 'Server error'}`,
+      });
+    } finally {
+      setIsPredicting(false);
+    }
+  };
+
+  // ปิดการแจ้งเตือนผลการทำนายอัตโนมัติหลัง 7 วินาที
+  useEffect(() => {
+    if (!predictionToast) return;
+    const t = setTimeout(() => {
+      setPredictionToast(null);
+    }, 7000);
+    return () => clearTimeout(t);
+  }, [predictionToast]);
 
   if (!station) return null;
 
@@ -763,11 +806,52 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           </div>
 
           {/* Action buttons right */}
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1.5 shrink-0 flex-wrap gap-y-1">
+            {/* 1. ปุ่มกดสั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาทันที */}
+            <button
+              onClick={handlePredictBBox}
+              disabled={isPredicting}
+              className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-1.5 rounded-xl font-black transition flex items-center space-x-1.5 text-[11px] shadow-md shadow-emerald-950/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="กดสั่งให้โมเดล AI (YOLO) ทำนายตำแหน่งเสาวัดระดับน้ำบนภาพกล้องสด ณ ขณะนี้ทันที"
+            >
+              {isPredicting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-white" />
+              ) : (
+                <Target className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+              )}
+              <span>{isPredicting ? 'กำลังทำนาย...' : 'สั่ง AI ทำนาย BBox'}</span>
+            </button>
+
+            {/* 2. สลับเปิด/ปิดกรอบ BBox บนภาพกล้องสด */}
+            <button
+              onClick={() => setShowBBox((prev) => !prev)}
+              className={`px-2.5 py-1.5 rounded-xl font-bold transition flex items-center space-x-1 text-[11px] border cursor-pointer ${
+                showBBox
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+              title={showBBox ? 'คลิกเพื่อซ่อนกรอบ BBox (แสดงภาพกล้องสดแบบ Clean ไม่ตีกรอบ)' : 'คลิกเพื่อแสดงกรอบ BBox ที่ AI ตรวจจับได้'}
+            >
+              {showBBox ? <Eye className="w-3.5 h-3.5 text-emerald-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+              <span>{showBBox ? 'ซ่อน BBox' : 'แสดง BBox'}</span>
+            </button>
+
+            {/* 3. ปุ่มวาด BBox ด้วยตนเอง */}
+            {onOpenManualBBox && (
+              <button
+                onClick={onOpenManualBBox}
+                className="bg-amber-50 hover:bg-amber-100 text-amber-900 px-2.5 py-1.5 rounded-xl border border-amber-300 font-bold transition flex items-center space-x-1 text-[11px] shadow-xs cursor-pointer"
+                title="วาดกรอบเสาวัดระดับน้ำด้วยตนเองจากภาพสดกล้อง CCTV เพื่อระบุพิกัดหรือบันทึกเข้า Retrain Dataset"
+              >
+                <Sliders className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>วาด BBox เอง</span>
+              </button>
+            )}
+
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}
-                className="bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-700 px-2.5 py-1 rounded-lg border border-slate-200 font-bold transition flex items-center space-x-1 text-[11px] cursor-pointer"
+                className="bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-700 px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold transition flex items-center space-x-1 text-[11px] cursor-pointer"
                 title="ปรับเทียบพิกัดสเกลเสาวัดน้ำ"
               >
                 <Target className="w-3 h-3 text-blue-600 shrink-0" />
@@ -775,21 +859,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </button>
             )}
 
-            {onOpenManualBBox && (
-              <button
-                onClick={onOpenManualBBox}
-                className="bg-amber-50 hover:bg-amber-100 text-amber-800 hover:text-amber-900 px-2.5 py-1 rounded-lg border border-amber-300 font-bold transition flex items-center space-x-1 text-[11px] shadow-xs cursor-pointer"
-                title="วาดกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV ณ ขณะนี้เพื่อจัดเก็บเข้า Retrain Dataset"
-              >
-                <Sliders className="w-3 h-3 text-amber-600 shrink-0" />
-                <span>วาดกรอบเสาภาพสด</span>
-              </button>
-            )}
-
             {onOpenReview && (
               <button
                 onClick={onOpenReview}
-                className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer"
+                className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-xl font-bold transition flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer"
                 title="ตรวจทานภาพและยืนยันระดับน้ำ"
               >
                 <Eye className="w-3 h-3 shrink-0" />
@@ -873,11 +946,12 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 </div>
               )
             ) : (
-              /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Video Feed) */
-              streamUrl && !imgError ? (
+              /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Feed หรือ แสดง BBox ตามคำสั่ง) */
+              (showBBox ? aiDashboardUrl : streamUrl) && !imgError ? (
                 <div className="relative w-full h-full flex items-center justify-center p-1">
                   <img
-                    src={streamUrl}
+                    key={`${station.station_code}-${showBBox ? 'bbox' : 'clean'}-${refreshKey}`}
+                    src={showBBox ? aiDashboardUrl : streamUrl!}
                     alt={station.name}
                     onError={handleImageError}
                     className={`max-w-full max-h-full ${
@@ -908,6 +982,36 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               )
             )}
           </div>
+
+          {/* Floating Prediction Result Toast Banner */}
+          {predictionToast && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-auto max-w-lg w-[92%] sm:w-auto">
+              <div className={`px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border text-xs font-bold flex items-center justify-between gap-3 ${
+                predictionToast.type === 'success'
+                  ? 'bg-slate-900/95 border-emerald-500/60 text-emerald-200 shadow-emerald-950/40'
+                  : predictionToast.type === 'warn'
+                  ? 'bg-slate-900/95 border-amber-500/60 text-amber-200 shadow-amber-950/40'
+                  : 'bg-slate-900/95 border-rose-500/60 text-rose-200 shadow-rose-950/40'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  {predictionToast.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : predictionToast.type === 'warn' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span className="leading-tight">{predictionToast.message}</span>
+                </div>
+                <button
+                  onClick={() => setPredictionToast(null)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Top-Left Station Status Badge */}
           {showOverlays && (
@@ -1126,6 +1230,30 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             )}
 
             <div className="flex items-center space-x-2 shrink-0">
+              {/* สั่ง AI ทำนาย BBox ใน Fullscreen */}
+              <button
+                onClick={handlePredictBBox}
+                disabled={isPredicting}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-bold transition flex items-center space-x-1.5 text-xs shadow-md disabled:opacity-50 cursor-pointer"
+                title="สั่งให้โมเดล AI (YOLO) ทำนายตำแหน่งเสาวัดระดับน้ำทันที"
+              >
+                {isPredicting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
+                <span>{isPredicting ? 'กำลังทำนาย...' : 'สั่ง AI ทำนาย BBox'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowBBox((prev) => !prev)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer ${
+                  showBBox
+                    ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400/50'
+                    : 'bg-white/10 text-slate-300 border-white/20 hover:text-white'
+                }`}
+                title={showBBox ? 'ซ่อนกรอบ BBox' : 'แสดงกรอบ BBox'}
+              >
+                {showBBox ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+                <span>{showBBox ? 'ซ่อน BBox' : 'แสดง BBox'}</span>
+              </button>
+
               <button
                 onClick={() => setShowOverlays(!showOverlays)}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition text-xs font-bold flex items-center space-x-1"

@@ -164,6 +164,9 @@ export interface DetectionStatus {
   confidence: number;
   water_level?: number | null;
   bbox: [number, number, number, number] | null;
+  raw_bbox?: [number, number, number, number] | null;
+  frame_width?: number | null;
+  frame_height?: number | null;
   station_code?: string;
   station_name?: string;
   mode?: string;

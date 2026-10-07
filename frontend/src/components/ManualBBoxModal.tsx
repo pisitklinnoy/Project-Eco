@@ -15,6 +15,8 @@ import {
   Sparkles,
   RefreshCw,
   Radio,
+  Target,
+  Loader2,
 } from 'lucide-react';
 
 interface ManualBBoxModalProps {
@@ -45,6 +47,8 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isAiPredicting, setIsAiPredicting] = useState<boolean>(false);
+  const [aiPredictMsg, setAiPredictMsg] = useState<{ type: 'success' | 'warn' | 'error'; text: string } | null>(null);
 
   // Live snapshot state
   const [capturedTimestamp, setCapturedTimestamp] = useState<number>(Date.now());
@@ -98,6 +102,49 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
         .padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')} น.`
     );
   }, []);
+
+  // สั่งให้โมเดล AI (YOLO) ช่วยทำนายตำแหน่งเสาวัดน้ำบนภาพนี้โดยอัตโนมัติ
+  const handleAiAutoPredict = useCallback(async () => {
+    if (!station || !imgRef.current) return;
+    setIsAiPredicting(true);
+    setAiPredictMsg(null);
+    try {
+      const res = await floodlensApi.predictStaffGaugeBBox(station.station_code, 'live');
+      if (res.detected && res.bbox) {
+        const clientW = imgRef.current.clientWidth || 1;
+        const clientH = imgRef.current.clientHeight || 1;
+        const naturalW = imgRef.current.naturalWidth || clientW;
+        const naturalH = imgRef.current.naturalHeight || clientH;
+
+        const scaleX = clientW / naturalW;
+        const scaleY = clientH / naturalH;
+
+        const x1 = Math.round(res.bbox[0] * scaleX);
+        const y1 = Math.round(res.bbox[1] * scaleY);
+        const x2 = Math.round(res.bbox[2] * scaleX);
+        const y2 = Math.round(res.bbox[3] * scaleY);
+
+        setBBox({ x1, y1, x2, y2 });
+        const confPct = Math.round((res.confidence || 0) * 100);
+        setAiPredictMsg({
+          type: 'success',
+          text: `🎯 AI (YOLO) ทำนายพิกัดเสาสำเร็จ! ความเชื่อมั่น ${confPct}% (ท่านสามารถปรับขนาดหรือกดบันทึกได้ทันที)`,
+        });
+      } else {
+        setAiPredictMsg({
+          type: 'warn',
+          text: '⚠️ AI ยังตรวจไม่พบเสาวัดน้ำในภาพนี้ กรุณาคลิกลากเพื่อวาดกรอบด้วยตนเอง',
+        });
+      }
+    } catch (err: any) {
+      setAiPredictMsg({
+        type: 'error',
+        text: `❌ เกิดข้อผิดพลาดในการทำนาย: ${err?.message || 'Server error'}`,
+      });
+    } finally {
+      setIsAiPredicting(false);
+    }
+  }, [station]);
 
   // Initialize snapshot when opened
   useEffect(() => {
@@ -388,6 +435,22 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                   <RefreshCw className="w-3 h-3" />
                   <span>ดึงภาพสดใหม่</span>
                 </button>
+
+                {/* สั่ง AI ทำนายพิกัดเสาอัตโนมัติ */}
+                <button
+                  type="button"
+                  onClick={handleAiAutoPredict}
+                  disabled={isAiPredicting}
+                  className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black transition flex items-center space-x-1.5 cursor-pointer text-xs shadow-md shadow-emerald-950/30 active:scale-95 disabled:opacity-50"
+                  title="สั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาวัดน้ำบนภาพนี้โดยอัตโนมัติ"
+                >
+                  {isAiPredicting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Target className="w-3.5 h-3.5 text-emerald-200" />
+                  )}
+                  <span>{isAiPredicting ? 'กำลังทำนาย...' : 'สั่ง AI ทำนายพิกัด'}</span>
+                </button>
               </div>
 
               {/* Zoom Controls */}
@@ -433,6 +496,26 @@ export const ManualBBoxModal: React.FC<ManualBBoxModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* AI Auto-Predict Status Message Banner */}
+            {aiPredictMsg && (
+              <div className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 border ${
+                aiPredictMsg.type === 'success'
+                  ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-300'
+                  : aiPredictMsg.type === 'warn'
+                  ? 'bg-amber-950/70 border-amber-500/50 text-amber-300'
+                  : 'bg-rose-950/70 border-rose-500/50 text-rose-300'
+              }`}>
+                <span>{aiPredictMsg.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setAiPredictMsg(null)}
+                  className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Drawing Viewport */}
             <div

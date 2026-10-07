@@ -27,6 +27,24 @@ import {
   Flag,
 } from 'lucide-react';
 
+// Bounding Box coordinates (% of frame) extracted directly from station vision calibrations
+const STATION_BBOX: Record<string, { left: number; top: number; width: number; height: number; focusPan: { x: number; y: number } }> = {
+  'STN-MUANGKONG': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
+  'X.173A': { left: 56.56, top: 18.61, width: 2.2, height: 37.56, focusPan: { x: -80, y: 15 } },
+  'STN-BANGSALA': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
+  'X.90': { left: 57.97, top: 26.67, width: 2.4, height: 34.44, focusPan: { x: -90, y: 15 } },
+  'STN-HATYAINAI': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
+  'X.44': { left: 65.73, top: 7.41, width: 5.5, height: 92.13, focusPan: { x: -140, y: 0 } },
+};
+
+function getStationBBox(code: string) {
+  const upper = (code || '').toUpperCase();
+  for (const [key, val] of Object.entries(STATION_BBOX)) {
+    if (upper.includes(key)) return val;
+  }
+  return { left: 56.5, top: 20.0, width: 2.5, height: 40.0, focusPan: { x: -80, y: 15 } };
+}
+
 // เกณฑ์ระดับน้ำและสีธงเตือนภัยตามเงื่อนไขของแต่ละสถานี
 export interface StationFlagInfo {
   flagColor: 'green' | 'yellow' | 'red';
@@ -331,6 +349,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isFocusedGauge, setIsFocusedGauge] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   
   // Toggle overlay badges to ensure NOTHING blocks the camera stream / timestamp when zooming
@@ -347,6 +366,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     // Reset zoom when switching station
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
+    setIsFocusedGauge(false);
     if (isHatyai) {
       setHatyaiSource('backend_proxy');
     }
@@ -495,13 +515,16 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // Zoom Handlers
   const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(Number((prev + 0.3).toFixed(1)), 3.5));
+    setZoomLevel((prev) => Math.min(Number((prev + 0.3).toFixed(1)), 4.0));
   };
 
   const handleZoomOut = () => {
     setZoomLevel((prev) => {
       const next = Math.max(Number((prev - 0.3).toFixed(1)), 1.0);
-      if (next === 1.0) setPan({ x: 0, y: 0 });
+      if (next === 1.0) {
+        setPan({ x: 0, y: 0 });
+        setIsFocusedGauge(false);
+      }
       return next;
     });
   };
@@ -509,6 +532,31 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const handleResetZoom = () => {
     setZoomLevel(1.0);
     setPan({ x: 0, y: 0 });
+    setIsFocusedGauge(false);
+  };
+
+  // Preset Focus & Auto-Crop Gauge: Smoothly crops and centers directly on the staff gauge
+  const handleFocusGauge = () => {
+    if (isFocusedGauge) {
+      handleResetZoom();
+    } else {
+      let targetPan = { x: -80, y: 15 };
+      if (detectionStatus?.bbox && detectionStatus.bbox.length === 4) {
+        const [x1, y1, x2, y2] = detectionStatus.bbox;
+        const centerX = (x1 + x2) / 2;
+        const centerY = (y1 + y2) / 2;
+        targetPan = {
+          x: Math.round((640 - centerX) * 0.45),
+          y: Math.round((360 - centerY) * 0.35),
+        };
+      } else {
+        const bbox = getStationBBox(station.station_code);
+        targetPan = bbox.focusPan;
+      }
+      setZoomLevel(2.8);
+      setPan(targetPan);
+      setIsFocusedGauge(true);
+    }
   };
 
   // Mouse Drag Panning
@@ -521,7 +569,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || zoomLevel <= 1.0) return;
     e.preventDefault();
-    const maxPan = (zoomLevel - 1) * 220;
+    const maxPan = (zoomLevel - 1) * 260;
     const newX = Math.max(Math.min(e.clientX - dragStart.x, maxPan), -maxPan);
     const newY = Math.max(Math.min(e.clientY - dragStart.y, maxPan), -maxPan);
     setPan({ x: newX, y: newY });
@@ -531,16 +579,42 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
     setIsDragging(false);
   };
 
+  // React Synthetic Wheel Event
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const maxZoom = isFullscreen ? 4.5 : 4.0;
+    setZoomLevel((prev) => {
+      const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), maxZoom);
+      if (next === 1.0) {
+        setPan({ x: 0, y: 0 });
+        setIsFocusedGauge(false);
+      }
+      return next;
+    });
+  };
+
+  // Double Click to Quick Zoom / Reset
+  const handleDoubleClick = () => {
+    if (zoomLevel > 1.0) {
+      handleResetZoom();
+    } else {
+      setZoomLevel(2.2);
+    }
+  };
+
   // Native non-passive Wheel Event Listeners to prevent browser window scrolling while zooming
   useEffect(() => {
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
       const delta = e.deltaY > 0 ? -0.2 : 0.2;
-      const maxZoom = isFullscreen ? 4.0 : 3.5;
+      const maxZoom = isFullscreen ? 4.5 : 4.0;
       setZoomLevel((prev) => {
         const next = Math.min(Math.max(Number((prev + delta).toFixed(1)), 1.0), maxZoom);
-        if (next === 1.0) setPan({ x: 0, y: 0 });
+        if (next === 1.0) {
+          setPan({ x: 0, y: 0 });
+          setIsFocusedGauge(false);
+        }
         return next;
       });
     };
@@ -563,7 +637,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
         modalEl.removeEventListener('wheel', handleNativeWheel);
       }
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, viewMode, station?.station_code]);
 
   const zoomPercent = Math.round(zoomLevel * 100);
 
@@ -759,20 +833,24 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             <button
               onClick={handleZoomOut}
               disabled={zoomLevel <= 1.0}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 disabled:opacity-40 transition"
+              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 disabled:opacity-40 transition cursor-pointer"
               title="ซูมออก (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
 
-            <span className="font-mono font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md min-w-[46px] text-center text-[11px]">
+            <button
+              onClick={handleResetZoom}
+              className="font-mono font-extrabold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md min-w-[46px] text-center text-[11px] transition cursor-pointer"
+              title="คลิกเพื่อรีเซ็ตขนาดซูม (1x)"
+            >
               {zoomPercent}%
-            </span>
+            </button>
 
             <button
               onClick={handleZoomIn}
-              disabled={zoomLevel >= 3.5}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 disabled:opacity-40 transition"
+              disabled={zoomLevel >= 4.0}
+              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 disabled:opacity-40 transition cursor-pointer"
               title="ซูมเข้า (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -780,16 +858,30 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
 
             <button
               onClick={handleResetZoom}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 transition"
+              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 transition cursor-pointer"
               title="รีเซ็ตขนาดซูม (1x)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
+            {/* Quick Focus Gauge Preset Button */}
+            <button
+              onClick={handleFocusGauge}
+              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] cursor-pointer ${
+                isFocusedGauge
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
+              }`}
+              title="คลิกเพื่อซูมและจัดกึ่งกลางเสาวัดระดับน้ำอัตโนมัติ (2.8x)"
+            >
+              <Target className="w-3.5 h-3.5 text-blue-600" />
+              <span>{isFocusedGauge ? 'คืนมุมมองเดิม' : 'ซูมเจาะจงเสา (2.8x)'}</span>
+            </button>
+
             {/* Toggle Overlay Visibility (ไม่บังเวลาซูมกล้องสด) */}
             <button
               onClick={() => setShowOverlays(!showOverlays)}
-              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] ${
+              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center space-x-1 text-[11px] cursor-pointer ${
                 !showOverlays
                   ? 'bg-amber-100 text-amber-900 border-amber-300'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -907,6 +999,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+          onDoubleClick={handleDoubleClick}
           className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] touch-none overscroll-contain ${
             zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
           }`}
@@ -1055,11 +1149,63 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             </div>
           </div>
 
-          {/* Zoom & Pan Guide Hint */}
+          {/* Floating High-Visibility Camera Zoom Controller directly on CCTV Viewport */}
+          <div className="absolute bottom-3.5 right-3.5 z-20 flex items-center space-x-1 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/20 shadow-2xl text-white select-none">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+              disabled={zoomLevel <= 1.0}
+              className="p-1.5 rounded-xl hover:bg-white/20 disabled:opacity-30 transition cursor-pointer text-white"
+              title="ซูมออก (-)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+              className="px-2 py-0.5 rounded-lg font-mono font-bold text-xs bg-white/10 hover:bg-white/25 text-sky-300 transition cursor-pointer"
+              title="คลิกเพื่อรีเซ็ตขนาดซูม (1x)"
+            >
+              {zoomPercent}%
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+              disabled={zoomLevel >= 4.0}
+              className="p-1.5 rounded-xl hover:bg-white/20 disabled:opacity-30 transition cursor-pointer text-white"
+              title="ซูมเข้า (+)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+
+            <div className="w-[1px] h-4 bg-white/20 mx-0.5" />
+
+            <button
+              onClick={(e) => { e.stopPropagation(); handleFocusGauge(); }}
+              className={`px-2 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                isFocusedGauge
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'hover:bg-white/20 text-amber-300'
+              }`}
+              title="ซูมเจาะจงเฉพาะตำแหน่งเสาวัดระดับน้ำ (2.8x)"
+            >
+              <Target className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">{isFocusedGauge ? 'เสา 2.8x' : 'โฟกัสเสา'}</span>
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsFullscreen(true); }}
+              className="p-1.5 rounded-xl hover:bg-white/20 transition cursor-pointer text-white"
+              title="เปิดดูแบบเต็มจอเพื่อตรวจสเกลชัดเจน (HD Inspection)"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Zoom & Pan Guide Hint when zoomed */}
           {showOverlays && zoomLevel > 1.0 && (
-            <div className="absolute bottom-3 right-3 z-10 bg-black/75 backdrop-blur-md text-sky-200 text-[10px] px-2.5 py-1 rounded-lg border border-white/20 shadow flex items-center space-x-1 font-medium">
+            <div className="absolute bottom-16 right-3.5 z-10 bg-black/80 backdrop-blur-md text-sky-200 text-[10px] px-2.5 py-1 rounded-lg border border-white/20 shadow flex items-center space-x-1 font-medium pointer-events-none">
               <Move className="w-3 h-3 text-sky-300 animate-bounce shrink-0" />
-              <span>คลิกลากเพื่อเลื่อนดูตำแหน่ง ({zoomPercent}%)</span>
+              <span>คลิกลากเพื่อเลื่อนดูตำแหน่ง ({zoomPercent}%) &bull; ดับเบิลคลิกเพื่อรีเซ็ต</span>
             </div>
           )}
         </div>
@@ -1264,29 +1410,48 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               <button
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= 1.0}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 disabled:opacity-40 transition"
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 disabled:opacity-40 transition cursor-pointer"
+                title="ซูมออก (-)"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="font-mono font-bold text-sky-300 px-3 py-1 bg-white/10 rounded-xl text-sm">
+              <button
+                onClick={handleResetZoom}
+                className="font-mono font-bold text-sky-300 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-xl text-sm border border-white/20 transition cursor-pointer"
+                title="คลิกเพื่อรีเซ็ตขนาดซูม (1x)"
+              >
                 {zoomPercent}%
-              </span>
+              </button>
               <button
                 onClick={handleZoomIn}
                 disabled={zoomLevel >= 4.0}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 disabled:opacity-40 transition"
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 disabled:opacity-40 transition cursor-pointer"
+                title="ซูมเข้า (+)"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
               <button
+                onClick={handleFocusGauge}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer ${
+                  isFocusedGauge
+                    ? 'bg-blue-600 text-white border-blue-400 shadow-md'
+                    : 'bg-white/10 text-amber-300 border-white/20 hover:bg-white/20'
+                }`}
+                title="ซูมเจาะจงเฉพาะตำแหน่งเสาวัดระดับน้ำ (2.8x)"
+              >
+                <Target className="w-4 h-4 text-amber-300" />
+                <span>โฟกัสเสา (2.8x)</span>
+              </button>
+              <button
                 onClick={handleResetZoom}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition"
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition cursor-pointer"
+                title="รีเซ็ตตำแหน่งซูม"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setIsFullscreen(false)}
-                className="p-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition ml-2 shadow-lg"
+                className="p-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition ml-2 shadow-lg cursor-pointer"
                 title="ปิดหน้าต่างเต็มจอ"
               >
                 <Minimize2 className="w-4 h-4" />
@@ -1326,6 +1491,8 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+            onDoubleClick={handleDoubleClick}
             className={`flex-1 relative bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-white/15 touch-none overscroll-contain ${
               zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
             }`}
@@ -1450,6 +1617,66 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Floating High-Visibility Camera Zoom Controller in Fullscreen Viewport */}
+            <div className="absolute bottom-6 right-6 z-20 flex items-center space-x-1.5 bg-slate-950/85 backdrop-blur-md p-2 rounded-2xl border border-white/20 shadow-2xl text-white select-none">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+                disabled={zoomLevel <= 1.0}
+                className="p-2 rounded-xl hover:bg-white/20 disabled:opacity-30 transition cursor-pointer text-white"
+                title="ซูมออก (-)"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+                className="px-2.5 py-1 rounded-lg font-mono font-bold text-xs bg-white/10 hover:bg-white/25 text-sky-300 transition cursor-pointer"
+                title="คลิกเพื่อรีเซ็ตขนาดซูม (1x)"
+              >
+                {zoomPercent}%
+              </button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+                disabled={zoomLevel >= 4.0}
+                className="p-2 rounded-xl hover:bg-white/20 disabled:opacity-30 transition cursor-pointer text-white"
+                title="ซูมเข้า (+)"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+
+              <div className="w-[1px] h-4 bg-white/20 mx-0.5" />
+
+              <button
+                onClick={(e) => { e.stopPropagation(); handleFocusGauge(); }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  isFocusedGauge
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'hover:bg-white/20 text-amber-300'
+                }`}
+                title="ซูมเจาะจงเฉพาะตำแหน่งเสาวัดระดับน้ำ (2.8x)"
+              >
+                <Target className="w-4 h-4 text-amber-300" />
+                <span>{isFocusedGauge ? 'เสา 2.8x' : 'โฟกัสเสา'}</span>
+              </button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+                className="p-2 rounded-xl hover:bg-white/20 transition cursor-pointer text-white"
+                title="รีเซ็ตตำแหน่งซูม"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Zoom & Pan Guide Hint when zoomed in fullscreen */}
+            {zoomLevel > 1.0 && (
+              <div className="absolute bottom-20 right-6 z-10 bg-black/80 backdrop-blur-md text-sky-200 text-xs px-3 py-1.5 rounded-xl border border-white/20 shadow flex items-center space-x-1.5 font-medium pointer-events-none">
+                <Move className="w-3.5 h-3.5 text-sky-300 animate-bounce shrink-0" />
+                <span>คลิกลากเพื่อเลื่อนดูตำแหน่ง ({zoomPercent}%) &bull; ดับเบิลคลิกเพื่อรีเซ็ต</span>
+              </div>
+            )}
           </div>
         </div>
       )}

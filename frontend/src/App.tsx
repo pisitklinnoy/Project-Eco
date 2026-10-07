@@ -371,7 +371,7 @@ export const App: React.FC = () => {
 
                   {/* Bento Row: GIS Map (50%) & CCTV Stream (50%) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                    <div className="h-[540px]">
+                    <div className="min-h-[580px] lg:h-[640px]">
                       <StationMap
                         stations={stations}
                         selectedStation={selectedStation}
@@ -381,7 +381,7 @@ export const App: React.FC = () => {
                       />
                     </div>
 
-                    <div className="h-[540px]">
+                    <div className="min-h-[580px] lg:h-[640px]">
                       <CameraViewer
                         station={selectedStation}
                         measurement={measurement}

@@ -99,6 +99,12 @@ function CameraSnapshot({ station, stamp, currentLevel, onSelect }: CameraSnapsh
           onClick={(e) => {
             e.stopPropagation();
             onSelect();
+            setTimeout(() => {
+              const elem = document.getElementById('gis-map-section');
+              if (elem) {
+                elem.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 50);
           }}
           className="px-2.5 py-1.5 rounded-xl bg-sky-500/90 hover:bg-sky-500 text-white text-[11px] font-bold flex items-center space-x-1 shadow-lg backdrop-blur-md transition-all hover:scale-105 cursor-pointer"
           title="สลับไปยังหน้าตรวจวัด AI และดูกราฟสถานีนี้"

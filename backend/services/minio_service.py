@@ -75,6 +75,19 @@ class MinIOService:
             print(f"[MinIO] Upload error: {e}")
             return None
 
+    def upload_file(self, bucket_name: str, object_name: str, file_path: str, content_type: str = "application/octet-stream"):
+        try:
+            self.client.fput_object(
+                bucket_name=bucket_name,
+                object_name=object_name,
+                file_path=str(file_path),
+                content_type=content_type
+            )
+            return f"{bucket_name}/{object_name}"
+        except S3Error as e:
+            print(f"[MinIO] Upload file error: {e}")
+            return None
+
     def get_presigned_url(self, bucket_name: str, object_name: str, expires_hours: int = 1) -> str:
         try:
             from datetime import timedelta

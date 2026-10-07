@@ -86,15 +86,11 @@ def build_dashboard(
         water_x_frame = int(round((fx1 + fx2) / 2.0))
 
     if is_manual:
-        label_text = f"Manual BBox: Staff Gauge {station_code}"
-    elif is_submerged:
-        label_text = f"Hybrid: Extrapolated {station_code} ({conf_display})"
-    elif is_shifted:
-        label_text = f"Hybrid: Shift Aligned {station_code} ({conf_display})"
+        label_text = f"Staff Gauge: Manual ({station_code})"
     elif has_yolo:
-        label_text = f"Hybrid Aligned: Staff Gauge {station_code} ({conf_display})"
+        label_text = f"Staff Gauge: {conf_display}"
     else:
-        label_text = f"ROI: Staff Gauge {station_code}"
+        label_text = f"Staff Gauge: {station_code}"
 
     if overlay_mode == "polygon":
         # 3.1 โหมด Polygon (YOLOv8-Seg / 4-Point Homography Source)
@@ -252,15 +248,11 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
         return out
 
     if is_manual:
-        badge_title = "Manual BBox: Staff Gauge"
-    elif is_submerged:
-        badge_title = f"Hybrid: Extrapolated ({conf_display})"
-    elif is_shifted:
-        badge_title = f"Hybrid: Shift Aligned ({conf_display})"
+        badge_title = "Staff Gauge: Manual"
     elif has_yolo:
-        badge_title = f"Hybrid Aligned: Staff Gauge ({conf_display})"
+        badge_title = f"Staff Gauge: {conf_display}"
     else:
-        badge_title = f"ROI: Staff Gauge"
+        badge_title = "Staff Gauge"
 
     if overlay_mode == "polygon" and pole_mgr.last_pts_src is not None and len(pole_mgr.last_pts_src) == 4:
         g_poly = pole_mgr.last_pts_src.astype(np.int32)

@@ -100,12 +100,17 @@ class ReviewService:
                 if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
                     bx1, by1, bx2, by2 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
                     try:
+                        import cv2
                         import numpy as np
                         nparr = np.frombuffer(image_bytes, np.uint8)
                         img_tmp = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                        ih, iw = img_tmp.shape[:2]
-                    except Exception:
-                        iw, ih = 3200, 1800
+                        if img_tmp is not None:
+                            ih, iw = img_tmp.shape[:2]
+                        else:
+                            iw, ih = 1920, 1080
+                    except Exception as dec_err:
+                        print(f"[ReviewService] Image dimension decode note: {dec_err}")
+                        iw, ih = 1920, 1080
                     box_x = round((bx1 / float(iw)) * 100.0, 2)
                     box_y = round((by1 / float(ih)) * 100.0, 2)
                     box_w = round(((bx2 - bx1) / float(iw)) * 100.0, 2)

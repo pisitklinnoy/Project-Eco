@@ -1371,7 +1371,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                       : 'bg-rose-500 animate-ping'
                   }`} />
                   <span className="font-extrabold text-xs text-sky-200">
-                    AI Vision: <code className="text-amber-300 font-mono">model_best_v2.pt</code> (YOLOv8-Seg) &bull; {station.name}
+                    AI Vision: <code className="text-amber-300 font-mono">model_best_v2.pt</code> (YOLOv8m BBox) &bull; {station.name}
                   </span>
                 </div>
 

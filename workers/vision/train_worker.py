@@ -147,7 +147,7 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
                 if jpg_local.exists() and not (images_dir / jpg_local.name).exists():
                     shutil.copy(jpg_local, images_dir / jpg_local.name)
 
-    # Format labels for YOLO segmentation (convert 5-token bboxes to 4-point polygon masks)
+    # Format labels for YOLO Object Detection (Bounding Box: class_id xc yc w h)
     for lbl_file in labels_dir.glob("*.txt"):
         try:
             with open(lbl_file, "r", encoding="utf-8") as f:
@@ -156,19 +156,23 @@ def pull_ground_truth_dataset_from_minio(output_dir: Path) -> int:
             for line in lines:
                 parts = line.strip().split()
                 if len(parts) == 5:
-                    cls_id = parts[0]
+                    # มาตรฐาน YOLO Bounding Box 5 ค่า: class_id x_center y_center width height
+                    cls_id = int(parts[0])
                     xc, yc, w, h = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
-                    x1 = max(0.0, xc - w / 2.0)
-                    y1 = max(0.0, yc - h / 2.0)
-                    x2 = min(1.0, xc + w / 2.0)
-                    y2 = max(0.0, yc - h / 2.0)
-                    x3 = min(1.0, xc + w / 2.0)
-                    y3 = min(1.0, yc + h / 2.0)
-                    x4 = max(0.0, xc - w / 2.0)
-                    y4 = min(1.0, yc + h / 2.0)
-                    new_lines.append(f"{cls_id} {x1:.6f} {y1:.6f} {x2:.6f} {y2:.6f} {x3:.6f} {y3:.6f} {x4:.6f} {y4:.6f}\n")
+                    new_lines.append(f"{cls_id} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}\n")
                 elif len(parts) >= 8:
-                    new_lines.append(line)
+                    # หากเป็น Polygon หลายจุด ให้แปลงกลับเป็น Bounding Box (min/max bounding rect)
+                    cls_id = int(parts[0])
+                    coords = [float(p) for p in parts[1:]]
+                    xs = coords[0::2]
+                    ys = coords[1::2]
+                    x_min, x_max = max(0.0, min(xs)), min(1.0, max(xs))
+                    y_min, y_max = max(0.0, min(ys)), min(1.0, max(ys))
+                    xc = (x_min + x_max) / 2.0
+                    yc = (y_min + y_max) / 2.0
+                    bw = max(0.001, x_max - x_min)
+                    bh = max(0.001, y_max - y_min)
+                    new_lines.append(f"{cls_id} {xc:.6f} {yc:.6f} {bw:.6f} {bh:.6f}\n")
             if new_lines:
                 with open(lbl_file, "w", encoding="utf-8") as f:
                     f.writelines(new_lines)
@@ -420,7 +424,8 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
 
             # 2. Parameters
             mlflow.log_param("training_worker", "floodlens_workers")
-            mlflow.log_param("architecture", "YOLO_Segmentation_StaffGauge")
+            mlflow.log_param("architecture", "YOLOv8m_Object_Detection_BBox")
+            mlflow.log_param("task", "detect_bbox")
             mlflow.log_param("weights_file", "best.pt")
             mlflow.log_param("version", version_tag)
             mlflow.log_param("trigger_mode", trigger_type)
@@ -506,10 +511,12 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
                 name=reg_name,
                 source=weights_source,
                 run_id=run_id,
-                description=f"YOLOv8n-seg Deep Learning Model (Device: {metrics.get('gpu_name', 'CPU')}, mAP50: {metrics.get('mAP50', 0.942)})",
+                description=f"YOLOv8m Object Detection (BBox) Model (Device: {metrics.get('gpu_name', 'CPU')}, mAP50: {metrics.get('mAP50', 0.942)})",
                 tags={
                     "version": version_tag,
-                    "architecture": "YOLOv8n-seg",
+                    "architecture": "YOLOv8m-detect",
+                    "task": "detect_bbox",
+                    "detection_type": "BOUNDING_BOX",
                     "device": str(metrics.get("device", "cpu")),
                     "gpu_name": str(metrics.get("gpu_name", "CPU")),
                     "train_samples": str(train_s),

@@ -361,6 +361,32 @@ class TimeSeriesRetrainService:
         final_version = next_v if is_promoted else curr_v
         final_mae = challenger_mae if is_promoted else old_champion_mae
 
+        # บันทึก Canonical Human-Readable Archive ขึ้น MinIO Bucket flood-models (time-series/{version}-run-{run_id}/)
+        try:
+            from services.minio_service import minio_service
+            import io, json
+            bucket = "flood-models"
+            short_id = (run_id or "direct")[:8]
+            ts_prefix = f"time-series/{final_version}-run-{short_id}"
+            if model_save_path.exists():
+                minio_service.upload_file(bucket, f"{ts_prefix}/unified_flood_model.txt", str(model_save_path))
+            req_b = "lightgbm>=3.3.0\npandas>=1.5.0\nnumpy>=1.23.0\nscikit-learn>=1.1.0\n".encode("utf-8")
+            minio_service.client.put_object(bucket, f"{ts_prefix}/requirements.txt", io.BytesIO(req_b), len(req_b), "text/plain")
+            m_sum = {
+                "model_version": final_version,
+                "run_id": run_id,
+                "challenger_mae": round(challenger_mae, 4),
+                "champion_mae": round(old_champion_mae, 4),
+                "improvement_pct": improvement_pct,
+                "promoted": is_promoted,
+                "status": "PROMOTED_CHAMPION" if is_promoted else "REJECTED_CHALLENGER"
+            }
+            mb = json.dumps(m_sum, indent=2).encode("utf-8")
+            minio_service.client.put_object(bucket, f"{ts_prefix}/metrics_summary.json", io.BytesIO(mb), len(mb), "application/json")
+            print(f"[TimeSeriesRetrain] 📁 Created canonical MinIO archive: s3://{bucket}/{ts_prefix}/")
+        except Exception as can_err:
+            print(f"[TimeSeriesRetrain] Canonical archive save note: {can_err}")
+
         history_item = {
             "id": f"ts-retrain-{int(datetime.now(timezone.utc).timestamp())}",
             "model_version": final_version,

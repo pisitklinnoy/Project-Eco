@@ -402,9 +402,11 @@ def register_new_model_to_mlflow(weights_path: Path, version_tag: str, metrics: 
     return run_id
 
 
-def upload_model_weights_to_minio(weights_path: Path, version_tag: str):
+def upload_model_weights_to_minio(weights_path: Path, version_tag: str, run_id: Optional[str] = None, metrics: Optional[Dict[str, Any]] = None, total_samples: int = 0):
     """
-    บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO Bucket flood-models
+    บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO Bucket flood-models:
+    1. weights/best.pt และ weights/best_{version_tag}.pt สำหรับ Direct Inference Serving
+    2. vision/{version_tag}-run-{run_id}/ สำหรับ Canonical Model Archive (Human-readable structure)
     """
     client = get_minio_client()
     try:
@@ -418,6 +420,43 @@ def upload_model_weights_to_minio(weights_path: Path, version_tag: str):
         # 2. บันทึกเป็น latest best.pt สำหรับการ Deploy
         client.fput_object(BUCKET_MODELS, "weights/best.pt", str(weights_path))
         print(f"[TrainingWorker] ☁️ Uploaded new model weights to MinIO: s3://{BUCKET_MODELS}/{object_version}")
+
+        # 3. จัดเก็บบน Canonical Human-Readable Folder: vision/{version}-run-{run_id}/
+        if run_id:
+            short_id = run_id[:8]
+            vis_prefix = f"vision/{version_tag}-run-{short_id}"
+            client.fput_object(BUCKET_MODELS, f"{vis_prefix}/best.pt", str(weights_path))
+
+            # บันทึก calibration config
+            import io
+            configs_dir = ROOT_DIR / "backend" / "configs"
+            calib_summary = {}
+            for cf in ["station1_muangkong.json", "station2_bangsala.json", "station3_hatyainai.json"]:
+                cp = configs_dir / cf
+                if cp.exists():
+                    try:
+                        calib_summary[cf.replace(".json", "")] = json.loads(cp.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
+            if calib_summary:
+                calib_b = json.dumps(calib_summary, indent=2).encode("utf-8")
+                client.put_object(BUCKET_MODELS, f"{vis_prefix}/calibration_config.json", io.BytesIO(calib_b), len(calib_b), "application/json")
+
+            # requirements.txt
+            req_b = "torch>=2.0.0\ntorchvision>=0.15.0\nultralytics>=8.0.0\nopencv-python-headless>=4.8.0\n".encode("utf-8")
+            client.put_object(BUCKET_MODELS, f"{vis_prefix}/requirements.txt", io.BytesIO(req_b), len(req_b), "text/plain")
+
+            # metrics_summary.json
+            m_summary = {
+                "version": version_tag,
+                "run_id": run_id,
+                "status": "PRODUCTION_ACTIVE",
+                "training_samples": total_samples,
+                "metrics": metrics or {}
+            }
+            m_b = json.dumps(m_summary, indent=2).encode("utf-8")
+            client.put_object(BUCKET_MODELS, f"{vis_prefix}/metrics_summary.json", io.BytesIO(m_b), len(m_b), "application/json")
+            print(f"[TrainingWorker] 📁 Created canonical MinIO archive: s3://{BUCKET_MODELS}/{vis_prefix}/")
     except Exception as e:
         print(f"[TrainingWorker] MinIO weights upload note: {e}")
 
@@ -464,11 +503,11 @@ def run_vision_training_job(trigger_type: str = "AUTO_TRIGGER") -> Dict[str, Any
     new_best_weights = scratch_dir / "best.pt"
     train_metrics = execute_yolo_model_training(scratch_dir, new_best_weights)
 
-    # 4. บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO
-    upload_model_weights_to_minio(new_best_weights, version_tag)
-
-    # 5. ประเมิน Metric และบันทึกลงใน MLflow Model Registry
+    # 4. ประเมิน Metric และบันทึกลงใน MLflow Model Registry
     run_id = register_new_model_to_mlflow(new_best_weights, version_tag, train_metrics, samples_count, trigger_type=trigger_type)
+
+    # 5. บันทึก Model Weights ตัวใหม่ (best.pt) ขึ้น MinIO (ทั้ง Serving Mirror และ Canonical Archive)
+    upload_model_weights_to_minio(new_best_weights, version_tag, run_id=run_id, metrics=train_metrics, total_samples=samples_count)
 
     # 6. Deploy ทับโมเดลเดิมในระบบ Production
     deploy_model_to_production(new_best_weights)

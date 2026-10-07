@@ -261,4 +261,15 @@ def evaluate_live_drift(db: Session = Depends(get_db)):
     """รันการคำนวณและประเมิน Forecast Drift จากฐานข้อมูลจริง PostgreSQL สดๆ ทันที (ไม่มี Mock)"""
     return timeseries_hitl_service.get_forecast_drift_report(db=db)
 
+@router.get("/timeseries/archived-overrides")
+def get_archived_overrides():
+    """ดึงข้อมูลประวัติการ Archive รายการตรวจทานที่ถูกนำไป Retrain แล้ว"""
+    return timeseries_hitl_service.get_archived_overrides()
+
+@router.post("/timeseries/archive-released")
+def archive_released_overrides(db: Session = Depends(get_db)):
+    """สั่ง Archive รายการที่ตรวจทานแล้ว (RELEASED) และรีเซ็ตตัวนับคิวปัจจุบันให้เหลือ 0 ทันที"""
+    return timeseries_hitl_service.archive_released_overrides(model_version="manual_archive", db=db)
+
+
 

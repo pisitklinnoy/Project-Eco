@@ -261,9 +261,9 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
       const res = await floodlensApi.triggerTimeSeriesRetrain();
       const r = res.result;
       setTsMessage(
-        `ฝึกฝนโมเดล Time-Series สำเร็จ! [${r.status}] เวอร์ชัน ${r.model_version} (Challenger MAE: ${r.challenger_mae} ม., พัฒนาขึ้น ${r.improvement_pct}%)`
+        `ฝึกฝนโมเดล Time-Series สำเร็จ! [${r.status}] เวอร์ชัน ${r.model_version} (Challenger MAE: ${r.challenger_mae} ม., พัฒนาขึ้น ${r.improvement_pct}%) & ดูดข้อมูลที่ตรวจทานแล้วเข้าโมเดลเรียบร้อย`
       );
-      await loadTimeSeriesStatus();
+      await Promise.all([loadTimeSeriesStatus(), loadHITLData()]);
     } catch (err) {
       console.error('Time series retrain error', err);
     } finally {
@@ -868,6 +868,11 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                   <div className="text-[11px] font-bold text-slate-400 uppercase">ตรวจทานแล้ว (Verified & Released)</div>
                   <div className="text-xl font-black text-emerald-600 font-mono mt-0.5">
                     {ingestionQueue.filter(q => q.status === 'RELEASED').length} รายการ
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {ingestionQueue.filter(q => q.status === 'RELEASED').length > 0
+                      ? 'พร้อมดูดเข้าเทรนโมเดล (จะรีเซ็ตเป็น 0 เมื่อกด Retrain)'
+                      : 'รอบใหม่ (ข้อมูลรอบก่อนหน้าดูดเข้าโมเดลแล้ว)'}
                   </div>
                 </div>
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">

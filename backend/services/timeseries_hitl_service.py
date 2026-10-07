@@ -168,6 +168,7 @@ class TimeSeriesHITLService:
         """
         state = cls.load_state()
         resolved_overrides = state.get("resolved_overrides", {})
+        archived_ids = set(state.get("archived_ids", []))
 
         should_close = False
         if db is None:
@@ -183,6 +184,10 @@ class TimeSeriesHITLService:
 
             for r in rows:
                 item_id = f"ING-DB-{r.vision_id}"
+                # หากรายการนี้ถูกดูดเข้าสู่โมเดลและย้ายเข้าคลังประวัติ (Archived) แล้ว ให้ข้ามไป ไม่นับในคิวรอบปัจจุบัน
+                if item_id in archived_ids:
+                    continue
+
                 stn_meta = STATION_METADATA.get(r.station_code, {
                     "name": r.station_code,
                     "image_url": f"/api/v1/stations/{r.station_code}/raw-frame.jpg"
@@ -346,6 +351,77 @@ class TimeSeriesHITLService:
             "quarantined_count": quarantined_count,
             "released_count": released_count,
             "items": queue[:10]
+        }
+
+    @classmethod
+    def archive_released_overrides(cls, model_version: str = "latest", db: Optional[Session] = None) -> Dict[str, Any]:
+        """
+        Archive รายการที่ผ่านการตรวจทานแล้ว (RELEASED) เข้าสู่ประวัติการเทรน
+        และรีเซ็ตรายการในคิว Active Ingestion Queue ให้กลับเป็น 0
+        เมื่อโมเดล Time-Series ได้รับการ Retrain นำข้อมูลชุดนี้ไปฝึกฝนเรียบร้อยแล้ว
+        """
+        state = cls.load_state()
+        resolved_overrides = state.get("resolved_overrides", {})
+        archived_history = state.setdefault("archived_overrides_history", [])
+        archived_ids = set(state.get("archived_ids", []))
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # รวบรวมรายการทั้งหมดที่แสดงสถานะ RELEASED อยู่ในคิวขณะนี้
+        current_queue = cls.get_ingestion_queue(db=db)
+        released_items = [q for q in current_queue if q.get("status") == "RELEASED"]
+
+        for item in released_items:
+            item_id = item["id"]
+            archived_ids.add(item_id)
+            if item_id not in resolved_overrides:
+                resolved_overrides[item_id] = {
+                    "resolved_at": item.get("resolved_at") or now_iso,
+                    "resolved_by": item.get("resolved_by") or "Hydrologist Operator",
+                    "resolution_type": item.get("resolution_type") or "MANUAL_REVIEW",
+                    "verified_water_level": item.get("verified_water_level") or item.get("sensor_water_level"),
+                    "resolution_notes": item.get("resolution_notes") or "Verified in active queue"
+                }
+
+        count_archived = max(len(released_items), len(resolved_overrides))
+
+        if count_archived > 0:
+            archive_entry = {
+                "archived_at": now_iso,
+                "model_version": model_version,
+                "count": count_archived,
+                "items": dict(resolved_overrides)
+            }
+            archived_history.insert(0, archive_entry)
+            state["archived_overrides_history"] = archived_history[:50]
+
+            for item_id in resolved_overrides.keys():
+                archived_ids.add(item_id)
+
+            state["archived_ids"] = list(archived_ids)
+            state["resolved_overrides"] = {}
+            cls.save_state(state)
+            print(f"[TimeSeriesHITL] 📦 Successfully archived {count_archived} released items into model version {model_version}. Ingestion queue counter reset to 0.")
+
+        return {
+            "status": "success",
+            "archived_count": count_archived,
+            "model_version": model_version,
+            "archived_at": now_iso
+        }
+
+    @classmethod
+    def get_archived_overrides(cls) -> Dict[str, Any]:
+        """
+        ดึงข้อมูลประวัติการ Archive รายการตรวจทานที่ถูกนำไป Retrain แล้ว
+        """
+        state = cls.load_state()
+        history = state.get("archived_overrides_history", [])
+        archived_ids = state.get("archived_ids", [])
+        return {
+            "total_archived_items": len(archived_ids),
+            "archived_batches_count": len(history),
+            "history": history
         }
 
     # =========================================================================

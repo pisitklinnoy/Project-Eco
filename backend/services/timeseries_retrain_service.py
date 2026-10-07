@@ -413,6 +413,13 @@ class TimeSeriesRetrainService:
 
         cls.save_retrain_state(state)
 
+        # Archive รายการที่ตรวจทานแล้ว และรีเซ็ตตัวนับ Verified & Released ในคิวปัจจุบันให้เหลือ 0
+        try:
+            from services.timeseries_hitl_service import timeseries_hitl_service
+            timeseries_hitl_service.archive_released_overrides(model_version=final_version, db=db)
+        except Exception as arc_ex:
+            print(f"[TimeSeriesRetrain] Archive overrides note: {arc_ex}")
+
         print(f"[TimeSeriesRetrain] ✅ Finished! Model status: {history_item['status']} (Version {final_version})")
 
         return {

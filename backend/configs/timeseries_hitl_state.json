@@ -11,21 +11,51 @@
   },
   "drift_monitor": {
     "safety_threshold_m": 0.4,
-    "last_evaluated_at": "2026-10-07T13:01:57.837522+00:00",
+    "last_evaluated_at": "2026-10-07T13:33:59.969167+00:00",
     "drift_detected": false,
-    "max_residual_m": 0.353,
-    "mean_residual_m": 0.035,
+    "max_residual_m": 7.803,
+    "mean_residual_m": 0.415,
     "alert_status": "ACKNOWLEDGED",
     "alert_message": "รับทราบการแจ้งเตือนแล้วโดย Test Operator: Acknowledged",
     "matched_evaluations": [
       {
         "station_code": "STN-HATYAINAI",
         "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.59,
+        "actual_level": 0.6,
+        "residual_error": 0.008,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.54,
+        "actual_level": 10.34,
+        "residual_error": 7.803,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T14:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.53,
+        "actual_level": 10.19,
+        "residual_error": 0.343,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
         "target_time": "2026-10-07T13:00:00",
         "horizon": "+1h",
         "predicted_level": 0.58,
-        "actual_level": 0.6,
-        "residual_error": 0.022,
+        "actual_level": 0.61,
+        "residual_error": 0.032,
         "is_exceeded": false
       },
       {
@@ -34,8 +64,8 @@
         "target_time": "2026-10-07T13:00:00",
         "horizon": "+1h",
         "predicted_level": 2.55,
-        "actual_level": 2.75,
-        "residual_error": 0.202,
+        "actual_level": 2.54,
+        "residual_error": 0.008,
         "is_exceeded": false
       },
       {
@@ -44,8 +74,8 @@
         "target_time": "2026-10-07T13:00:00",
         "horizon": "+1h",
         "predicted_level": 10.54,
-        "actual_level": 10.19,
-        "residual_error": 0.353,
+        "actual_level": 10.55,
+        "residual_error": 0.007,
         "is_exceeded": false
       },
       {
@@ -186,36 +216,6 @@
         "predicted_level": 3.08,
         "actual_level": 3.08,
         "residual_error": 0.001,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-MUANGKONG",
-        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
-        "target_time": "2026-10-06T14:00:00",
-        "horizon": "+1h",
-        "predicted_level": 11.36,
-        "actual_level": 11.35,
-        "residual_error": 0.014,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-HATYAINAI",
-        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
-        "target_time": "2026-10-06T13:00:00",
-        "horizon": "+1h",
-        "predicted_level": 0.99,
-        "actual_level": 1.0,
-        "residual_error": 0.005,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-BANGSALA",
-        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
-        "target_time": "2026-10-06T13:00:00",
-        "horizon": "+1h",
-        "predicted_level": 3.09,
-        "actual_level": 3.08,
-        "residual_error": 0.009,
         "is_exceeded": false
       }
     ],

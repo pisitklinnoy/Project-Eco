@@ -137,11 +137,15 @@ def run_retrain_pipeline(csv_path: str, model_save_path: str, force_promote: boo
         archive_dir.mkdir(exist_ok=True, parents=True)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive_path = archive_dir / f"unified_flood_model_{timestamp_str}.txt"
-        challenger.booster_.save_model(str(archive_path))
+        
+        model_str = challenger.booster_.model_to_string()
+        with open(str(archive_path), "w", encoding="utf-8") as f:
+            f.write(model_str)
         print(f"📦 สำรองโมเดลเวอร์ชันใหม่ไว้ที่: {archive_path}")
 
         # โปรโมตไปแทนที่โมเดลใช้งานจริง (Production Model)
-        challenger.booster_.save_model(model_save_path)
+        with open(str(model_save_path), "w", encoding="utf-8") as f:
+            f.write(model_str)
         print(f"🚀 โปรโมตโมเดลเข้าสู่ระบบ Production สำเร็จที่: {model_save_path}")
 
     return {

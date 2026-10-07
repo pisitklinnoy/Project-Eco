@@ -1,12 +1,52 @@
 {
-  "pending_count": 4,
+  "pending_count": 0,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
-  "current_model_version": "v2.1",
-  "last_mae_meters": 1.8767,
-  "last_retrained_at": "2026-10-07T15:56:31.217999",
+  "current_model_version": "v2.2",
+  "last_mae_meters": 1.5967,
+  "last_retrained_at": "2026-10-07T18:23:56.028331",
   "is_retraining": false,
   "history": [
+    {
+      "id": "retrain-1791397435",
+      "model_version": "v2.2",
+      "trigger_type": "SCHEDULED_MONTHLY",
+      "images_count": 52,
+      "train_samples": 42,
+      "val_samples": 10,
+      "mae_meters": 1.5967,
+      "pixel_error_px": 364.6,
+      "mean_iou": 0.9973,
+      "timestamp": "2026-10-07T18:23:55.967551",
+      "status": "SUCCESS",
+      "mlflow_run_id": "5857d55199cc4453986179290360cc37",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261007_182129",
+        "weights_file": "best.pt",
+        "training_samples": 52,
+        "train_samples": 42,
+        "val_samples": 10,
+        "split_ratio": 0.8,
+        "mlflow_run_id": "5857d55199cc4453986179290360cc37",
+        "metrics": {
+          "mAP50": 0.065,
+          "mAP50-95": 0.0428,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "train_samples": 42,
+          "val_samples": 10,
+          "total_samples": 52,
+          "split_ratio": 0.8,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-07T18:23:55.966893+00:00"
+      }
+    },
     {
       "id": "retrain-1791388591",
       "model_version": "v2.1",
@@ -478,18 +518,7 @@
       "timestamp": "2026-10-06T17:41:51.965058",
       "status": "SUCCESS",
       "mlflow_run_id": "593fd2e5ca714b43b88ff36d60eb5c03"
-    },
-    {
-      "id": "retrain-1791306218",
-      "model_version": "v1.6",
-      "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 20,
-      "mae_meters": 0.026,
-      "pixel_error_px": 2.2,
-      "timestamp": "2026-10-06T17:03:38.737393",
-      "status": "SUCCESS",
-      "mlflow_run_id": "4518b89319d74030b914b482e377728a"
     }
   ],
-  "last_retrained_count": 28
+  "last_retrained_count": 34
 }

@@ -1005,7 +1005,8 @@ class ReviewService:
                     except Exception:
                         pass
 
-                med_bias = float(np.median(residuals))
+                # ป้องกันการบิดเบือนสเกลเสาด้วยการจำกัดขอบเขต Bias ให้อยู่ในช่วงความคลาดเคลื่อนจริง (ไม่เกิน ±0.50 เมตร)
+                med_bias = float(np.clip(np.median(residuals), -0.50, 0.50))
                 cfg["calibration_bias_m"] = round(float(cfg.get("calibration_bias_m", 0.0) * 0.3 + med_bias * 0.7), 4)
 
             station_configs[cfg_fname.replace(".json", "")] = cfg

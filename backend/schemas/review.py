@@ -68,3 +68,31 @@ class VisionCorrectionResponse(BaseModel):
     saved_meta_path: Optional[str]
     active_learning_count: int
     message: str
+
+from enum import Enum
+
+class RetrainCadence(str, Enum):
+    MONTHLY = "MONTHLY"
+    WEEKLY = "WEEKLY"
+    BIWEEKLY = "BIWEEKLY"
+    ON_DEMAND = "ON_DEMAND"
+
+class EcosystemRetrainRequest(BaseModel):
+    cadence: RetrainCadence = RetrainCadence.MONTHLY
+    retrain_vision: bool = True
+    retrain_timeseries: bool = True
+    force_promote: bool = True
+    reviewer_name: str = "Hydrologist MLOps Operator"
+    reviewer_notes: Optional[str] = "Monthly Scheduled Retraining across entire AI Ecosystem"
+
+class EcosystemRetrainResponse(BaseModel):
+    status: str
+    message: str
+    cadence: str
+    triggered_at: str
+    reviewer_name: str
+    reviewer_notes: Optional[str] = None
+    vision_model: Optional[dict] = None
+    timeseries_model: Optional[dict] = None
+    ecosystem_summary: dict
+

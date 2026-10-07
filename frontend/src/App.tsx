@@ -370,9 +370,9 @@ export const App: React.FC = () => {
                     onRefresh={loadStationData}
                   />
 
-                  {/* Bento Row: GIS Map (42%) & Expanded CCTV Stream (58%) */}
+                  {/* Bento Row: GIS Map & Expanded High-Impact CCTV Stream */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    <div className="lg:col-span-5 h-[580px] lg:h-[660px] xl:h-[700px]">
+                    <div className="lg:col-span-5 xl:col-span-4 h-[600px] lg:h-[700px] xl:h-[780px] 2xl:h-[840px]">
                       <StationMap
                         stations={stations}
                         selectedStation={selectedStation}
@@ -382,7 +382,7 @@ export const App: React.FC = () => {
                       />
                     </div>
 
-                    <div className="lg:col-span-7 h-[600px] lg:h-[660px] xl:h-[700px]">
+                    <div className="lg:col-span-7 xl:col-span-8 h-[640px] lg:h-[700px] xl:h-[780px] 2xl:h-[840px]">
                       <CameraViewer
                         station={selectedStation}
                         measurement={measurement}

@@ -810,27 +810,28 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
         )}
 
         {/* Toolbar: Streamlined Zoom Controls & Inspector Actions */}
-        <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-          {/* Zoom & Overlay controls (Left Pill Group) */}
-          <div className="flex items-center space-x-2">
+        <div className="px-3 sm:px-4 py-2 bg-slate-50/90 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          {/* Left: Viewport & Zoom Controls */}
+          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {/* Zoom Pill Group */}
             <div className="inline-flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
               <button
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= 1.0}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition cursor-pointer"
+                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition cursor-pointer"
                 title="ซูมออก (-)"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
 
-              <span className="font-mono font-bold text-blue-700 text-[11px] px-2 min-w-[44px] text-center select-none">
+              <span className="font-mono font-bold text-blue-700 text-[11px] px-1.5 min-w-[38px] text-center select-none">
                 {zoomPercent}%
               </span>
 
               <button
                 onClick={handleZoomIn}
-                disabled={zoomLevel >= 3.5}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition cursor-pointer"
+                disabled={zoomLevel >= 4.0}
+                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition cursor-pointer"
                 title="ซูมเข้า (+)"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
@@ -839,7 +840,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               {zoomLevel !== 1 && (
                 <button
                   onClick={handleResetZoom}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition cursor-pointer border-l border-slate-100"
+                  className="p-1 sm:p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition cursor-pointer border-l border-slate-100"
                   title="รีเซ็ตขนาดซูม (1x)"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -850,7 +851,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             {/* Toggle Overlay Visibility */}
             <button
               onClick={() => setShowOverlays(!showOverlays)}
-              className={`px-2.5 py-1.5 rounded-xl font-bold border transition inline-flex items-center space-x-1.5 text-[11px] cursor-pointer shadow-2xs ${
+              className={`px-2.5 py-1.5 rounded-xl font-bold border transition inline-flex items-center space-x-1 text-[11px] cursor-pointer shadow-2xs shrink-0 ${
                 !showOverlays
                   ? 'bg-amber-100 text-amber-900 border-amber-300'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -862,17 +863,35 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               }
             >
               {showOverlays ? <EyeOff className="w-3.5 h-3.5 text-slate-400" /> : <Eye className="w-3.5 h-3.5 text-amber-700" />}
-              <span>{showOverlays ? 'ซ่อนป้าย' : 'แสดงป้าย'}</span>
+              <span className="hidden xs:inline">{showOverlays ? 'ซ่อนป้าย' : 'แสดงป้าย'}</span>
+            </button>
+
+            {/* Aspect Ratio Fit Mode Toggle Button */}
+            <button
+              onClick={() => setFitMode((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+              className={`px-2.5 py-1.5 rounded-xl font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs border cursor-pointer active:scale-95 shrink-0 ${
+                fitMode === 'contain'
+                  ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
+              }`}
+              title={
+                fitMode === 'contain'
+                  ? 'แสดงผลสัดส่วนจริง (ไม่ตัดขอบภาพ) - คลิกเพื่อเปลี่ยนเป็นเต็มกรอบ'
+                  : 'แสดงผลเต็มกรอบ (Cover) - คลิกเพื่อเปลี่ยนเป็นสัดส่วนจริง'
+              }
+            >
+              <Move className="w-3.5 h-3.5 shrink-0" />
+              <span>{fitMode === 'contain' ? 'พอดีจอ' : 'เต็มกรอบ'}</span>
             </button>
           </div>
 
-          {/* Action buttons (Right Group) */}
-          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+          {/* Right: AI & Inspector Actions */}
+          <div className="flex items-center space-x-1 sm:space-x-1.5 flex-wrap gap-y-1.5 justify-end">
             {/* 1. ปุ่มกดสั่งให้โมเดล AI (YOLO) ทำนายพิกัดเสาทันที */}
             <button
               onClick={handlePredictBBox}
               disabled={isPredicting}
-              className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-1.5 rounded-xl font-black transition flex items-center space-x-1.5 text-[11px] shadow-md shadow-emerald-950/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition flex items-center space-x-1.5 text-[11px] shadow-xs shadow-emerald-950/20 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
               title="กดสั่งให้โมเดล AI (YOLO) ทำนายตำแหน่งเสาวัดระดับน้ำบนภาพกล้องสด ณ ขณะนี้ทันที"
             >
               {isPredicting ? (
@@ -880,49 +899,55 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               ) : (
                 <Target className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
               )}
-              <span>{isPredicting ? 'กำลังทำนาย...' : 'สั่ง AI ทำนาย BBox'}</span>
+              <span className="hidden sm:inline">สั่ง AI </span>
+              <span>ทำนาย BBox</span>
             </button>
 
             {/* 2. สลับเปิด/ปิดกรอบ BBox บนภาพกล้องสด */}
             <button
               onClick={() => setShowBBox((prev) => !prev)}
-              className={`px-2.5 py-1.5 rounded-xl font-bold transition flex items-center space-x-1 text-[11px] border cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-xl font-bold transition flex items-center space-x-1 text-[11px] border cursor-pointer shrink-0 ${
                 showBBox
-                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 shadow-xs'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 shadow-2xs'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
               }`}
               title={showBBox ? 'คลิกเพื่อซ่อนกรอบ BBox (แสดงภาพกล้องสดแบบ Clean ไม่ตีกรอบ)' : 'คลิกเพื่อแสดงกรอบ BBox ที่ AI ตรวจจับได้'}
             >
               {showBBox ? <Eye className="w-3.5 h-3.5 text-emerald-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
-              <span>{showBBox ? 'ซ่อน BBox' : 'แสดง BBox'}</span>
+              <span>{showBBox ? 'ซ่อนกรอบ' : 'กรอบ BBox'}</span>
             </button>
 
+            <div className="h-4 w-[1px] bg-slate-200 hidden md:block mx-0.5" />
+
+            {/* 3. ปุ่มครอปเสา */}
             {onOpenManualBBox && (
               <button
                 onClick={onOpenManualBBox}
-                className="bg-amber-50 hover:bg-amber-100 text-amber-900 px-2.5 py-1.5 rounded-xl border border-amber-300/80 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95"
+                className="bg-amber-50 hover:bg-amber-100 text-amber-900 px-2.5 py-1.5 rounded-xl border border-amber-300/80 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95 shrink-0"
                 title="วาดกรอบเสาวัดระดับน้ำจากภาพสดกล้อง CCTV เพื่อจัดเก็บเข้า Retrain Dataset (Manual Crop / BBox)"
               >
                 <Crop className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>ครอปเสา (Crop)</span>
+                <span>ครอปเสา</span>
               </button>
             )}
 
+            {/* 4. ปุ่มวัดภาพ AI */}
             {onOpenOnDemand && (
               <button
                 onClick={onOpenOnDemand}
-                className="bg-sky-50 hover:bg-sky-100 text-sky-800 px-2.5 py-1.5 rounded-xl border border-sky-200 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95"
+                className="bg-sky-50 hover:bg-sky-100 text-sky-800 px-2.5 py-1.5 rounded-xl border border-sky-200 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95 shrink-0"
                 title="ตรวจวัดระดับน้ำจากภาพถ่ายแบบอิสระ (On-Demand AI)"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>วัดภาพ AI</span>
+                <span>วัดภาพ</span>
               </button>
             )}
 
+            {/* 5. ปุ่มปรับเทียบ */}
             {onOpenCalibrate && (
               <button
                 onClick={onOpenCalibrate}
-                className="bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95"
+                className="bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs cursor-pointer active:scale-95 shrink-0"
                 title="ปรับเทียบพิกัดสเกลเสาวัดน้ำ"
               >
                 <Target className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -930,31 +955,14 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
               </button>
             )}
 
-            {/* Aspect Ratio Fit Mode Toggle Button */}
-            <button
-              onClick={() => setFitMode((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
-              className={`px-2.5 py-1.5 rounded-xl font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-2xs border cursor-pointer active:scale-95 ${
-                fitMode === 'contain'
-                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
-              }`}
-              title={
-                fitMode === 'contain'
-                  ? 'แสดงผลสัดส่วนจริง (16:9 / ไม้บรรทัดเต็มเสา ไม่ตัดขอบ) - คลิกเพื่อขยายเต็มกรอบ'
-                  : 'แสดงผลเต็มกรอบ (Cover) - คลิกเพื่อเปลี่ยนเป็นสัดส่วนจริง'
-              }
-            >
-              <Move className="w-3.5 h-3.5 shrink-0" />
-              <span>{fitMode === 'contain' ? 'สัดส่วนจริง' : 'เต็มกรอบ'}</span>
-            </button>
-
-            {/* Fullscreen Button */}
+            {/* 6. ปุ่มเต็มจอ Fullscreen */}
             <button
               onClick={() => setIsFullscreen(true)}
-              className="bg-slate-900 hover:bg-slate-800 text-white p-1.5 rounded-xl font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer active:scale-95"
+              className="bg-slate-900 hover:bg-slate-800 text-white px-2.5 py-1.5 rounded-xl font-bold transition inline-flex items-center space-x-1 text-[11px] shadow-sm cursor-pointer active:scale-95 shrink-0"
               title="เปิดดูแบบเต็มจอเพื่อตรวจสเกลชัดเจน"
             >
               <Maximize2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">เต็มจอ</span>
             </button>
           </div>
         </div>
@@ -969,7 +977,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
-          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[380px] overscroll-contain ${
+          className={`relative flex-1 w-full bg-slate-950 overflow-hidden select-none flex items-center justify-center min-h-[440px] sm:min-h-[480px] lg:min-h-[520px] xl:min-h-[580px] 2xl:min-h-[640px] overscroll-contain ${
             zoomLevel > 1.0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
           }`}
         >
@@ -987,7 +995,7 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                   {renderNotDetectedRecommendation(false)}
                 </div>
               ) : (
-                <div className="relative w-full h-full flex items-center justify-center p-1">
+                <div className="relative w-full h-full flex items-center justify-center p-0.5 sm:p-1">
                   <img
                     key={`${station.station_code}-${aiScenario}-${overlayMode}-${aiViewType}-${refreshKey}`}
                     src={aiDashboardUrl}
@@ -999,10 +1007,10 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
                         target.src = staticFallbackUrl;
                       }
                     }}
-                    className={`max-w-full max-h-full ${
+                    className={`w-full h-full ${
                       aiViewType === 'gauge' || fitMode === 'contain'
                         ? 'object-contain'
-                        : 'w-full h-full object-cover'
+                        : 'object-cover'
                     } object-center pointer-events-none drop-shadow-md transition-all`}
                   />
                 </div>
@@ -1010,14 +1018,14 @@ export const CameraViewer: React.FC<CameraViewerProps> = ({
             ) : (
               /* VIEW MODE 2: LIVE STREAM (กล้องสด Clean Feed หรือ แสดง BBox ตามคำสั่ง) */
               (showBBox ? aiDashboardUrl : streamUrl) && !imgError ? (
-                <div className="relative w-full h-full flex items-center justify-center p-1">
+                <div className="relative w-full h-full flex items-center justify-center p-0.5 sm:p-1">
                   <img
                     key={`${station.station_code}-${showBBox ? 'bbox' : 'clean'}-${refreshKey}`}
                     src={showBBox ? aiDashboardUrl : streamUrl!}
                     alt={station.name}
                     onError={handleImageError}
-                    className={`max-w-full max-h-full ${
-                      fitMode === 'contain' ? 'object-contain' : 'w-full h-full object-cover'
+                    className={`w-full h-full ${
+                      fitMode === 'contain' ? 'object-contain' : 'object-cover'
                     } object-center pointer-events-none drop-shadow-md transition-all`}
                   />
                 </div>

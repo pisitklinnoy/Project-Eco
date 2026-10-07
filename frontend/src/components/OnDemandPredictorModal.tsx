@@ -1559,20 +1559,20 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
 
                 {/* MLOps Active Learning badge & Label Studio Task Link */}
                 {predictionResult && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 text-xs text-emerald-900 space-y-2">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 text-xs text-amber-950 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="font-bold text-[11px]">บันทึกข้อมูลเข้า Active Learning แล้ว</span>
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="font-bold text-[11px]">ส่งเข้าคิวรอตรวจทานใน Label Studio แล้ว</span>
                       </div>
                       {predictionResult.label_studio_task_id && (
-                        <span className="font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px]">
-                          Task #{predictionResult.label_studio_task_id}
+                        <span className="font-black px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px]">
+                          Task #{predictionResult.label_studio_task_id} (รอมนุษย์ Review)
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-emerald-800 leading-relaxed">
-                      Bounding Box และสเกลที่ระบุถูกบันทึกเป็น Pre-annotation สำหรับ Retrain โมเดล
+                    <p className="text-[11px] text-amber-900 leading-relaxed">
+                      ระบบส่งภาพพร้อม Bounding Box เป็น Pre-annotation ให้แล้ว (ยังไม่ Complete อัตโนมัติ เพื่อให้ผู้เชี่ยวชาญเข้าตรวจทานและกดยืนยันเอง)
                     </p>
                     {predictionResult.label_studio_task_id && (
                       <div className="pt-0.5">
@@ -1580,9 +1580,9 @@ export const OnDemandPredictorModal: React.FC<OnDemandPredictorModalProps> = ({
                           href="http://localhost:8085"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center space-x-1.5 text-xs font-black text-emerald-700 hover:text-emerald-900 underline"
+                          className="inline-flex items-center space-x-1.5 text-xs font-black text-amber-800 hover:text-amber-950 underline"
                         >
-                          <span>เปิดตรวจทานใน Label Studio (Project 2)</span>
+                          <span>เปิดตรวจทานและกดยืนยันใน Label Studio (Project 2)</span>
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </div>

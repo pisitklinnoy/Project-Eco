@@ -38,10 +38,10 @@ def get_retrain_status(db: Session = Depends(get_db)):
     return review_service.get_retrain_status(db=db)
 
 @router.post("/trigger-retrain")
-def trigger_manual_retrain(background_tasks: BackgroundTasks):
+def trigger_manual_retrain(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """สั่ง Retrain โมเดลทันทีโดยไม่ต้องรอให้ครบ 20 ภาพ (Manual Override)"""
     # Execute immediately and return result
-    result = review_service.execute_retrain_job(trigger_type="MANUAL_OVERRIDE")
+    result = review_service.execute_retrain_job(trigger_type="MANUAL_OVERRIDE", db=db)
     return {
         "message": "Manual Retraining completed successfully!",
         "result": result
@@ -77,19 +77,21 @@ async def label_studio_webhook(payload: dict = Body(...), db: Session = Depends(
     task_data = row[0] if (row and row[0]) else task.get("data", {})
     ai_result = row[1] if (row and row[1]) else []
 
-    station_name = task_data.get("station_name") or task.get("data", {}).get("station_name") or "Ban Muangkong"
+    station_name = (task_data.get("station_name") if isinstance(task_data, dict) else "") or task.get("data", {}).get("station_name") or "Ban Muangkong"
+    image_url = (task_data.get("image") if isinstance(task_data, dict) else None) or task.get("data", {}).get("image")
 
-    # 1. Evaluate & Log to MLflow
+    # 1. Evaluate & Log to MLflow and upload image + YOLO label to MinIO Dataset
     evaluation = review_service.evaluate_and_log_to_mlflow(
         task_id=task_id,
         station_name=station_name,
         human_result=human_result,
         ai_result=ai_result,
-        reviewer=reviewer
+        reviewer=reviewer,
+        image_url=image_url
     )
 
     # 2. Register Review Count & Trigger Auto-Retrain when reaching 20
-    retrain_signal = review_service.register_review_submission(task_id=task_id)
+    retrain_signal = review_service.register_review_submission(task_id=task_id, db=db)
     evaluation["retrain_signal"] = retrain_signal
 
     return evaluation

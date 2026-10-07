@@ -1,0 +1,22 @@
+{
+  "task_id": 66,
+  "station": "สะพานหาดใหญ่นอก / ที่ว่าการ อ.หาดใหญ่ (X.44) (ตรวจทานโดยมนุษย์)",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-07T11:16:29.551557",
+  "verified_water_level_m": 6.464,
+  "pixel_y": 540.0,
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.67765,
+    "y_center": 0.5074,
+    "width": 0.1125,
+    "height": 0.8852
+  },
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 0.0,
+    "mae_meters": 0.0,
+    "iou": 1.0
+  }
+}

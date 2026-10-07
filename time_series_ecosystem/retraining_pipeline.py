@@ -147,8 +147,11 @@ def run_retrain_pipeline(csv_path: str, model_save_path: str, force_promote: boo
     return {
         "promoted": should_promote,
         "challenger_mae": challenger_mae,
+        "champion_mae": champion_mae if "champion_mae" in locals() else None,
         "train_samples": len(X_train),
-        "test_samples": len(X_test)
+        "test_samples": len(X_test),
+        "challenger_model": challenger,
+        "train_df": train_df
     }
 
 

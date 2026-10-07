@@ -514,18 +514,35 @@ class VisionService:
                     latest = db_session.query(WaterMeasurement).filter(
                         WaterMeasurement.station_code == station_code
                     ).order_by(WaterMeasurement.timestamp.desc()).first()
-                    # ถ้ายังไม่มีข้อมูล หรือระดับน้ำที่วัดได้จริงต่างจากข้อมูลล่าสุดเกิน 1 ซม. ให้บันทึกการวัดใหม่
                     if not latest or abs(latest.water_level - detected_water_level) > 0.01:
+                        conf_val = round(float(alignment.get("confidence", 0.9)), 3)
                         new_meas = WaterMeasurement(
                             station_code=station_code,
                             timestamp=datetime.utcnow(),
                             water_level=detected_water_level,
                             source_type="CAMERA_VISION",
-                            vision_confidence=round(float(alignment.get("confidence", 0.9)), 3),
+                            vision_confidence=conf_val,
                             is_reviewed_by_human=False
                         )
                         db_session.add(new_meas)
                         db_session.commit()
+
+                        # Active Learning: หากความเชื่อมั่นต่ำกว่า 0.80 ส่งภาพเข้า Label Studio อัตโนมัติ
+                        if conf_val < 0.80 and frame is not None:
+                            try:
+                                from services.review_service import review_service
+                                _, buf = cv2.imencode(".jpg", frame)
+                                review_service.ingest_low_confidence_frame_to_label_studio(
+                                    db=db_session,
+                                    station_code=station_code,
+                                    image_bytes=buf.tobytes(),
+                                    confidence=conf_val,
+                                    water_level=detected_water_level,
+                                    bbox=alignment.get("aligned_bbox"),
+                                    reason=f"LOW_CONFIDENCE_{conf_val:.2f}"
+                                )
+                            except Exception as al_err:
+                                print(f"[check_detection_status] Active learning auto-ingest note: {al_err}")
             except Exception as e:
                 print(f"[check_detection_status] could not record measurement: {e}")
 
@@ -576,6 +593,24 @@ class VisionService:
                 "message": status_msg
             }
         else:
+            if frame is not None and mode == "live":
+                try:
+                    from core.database import SessionLocal
+                    from services.review_service import review_service
+                    with SessionLocal() as db_session:
+                        _, buf = cv2.imencode(".jpg", frame)
+                        review_service.ingest_low_confidence_frame_to_label_studio(
+                            db=db_session,
+                            station_code=station_code,
+                            image_bytes=buf.tobytes(),
+                            confidence=0.0,
+                            water_level=detected_water_level,
+                            bbox=None,
+                            reason="GAUGE_POLE_NOT_DETECTED"
+                        )
+                except Exception as al_err:
+                    print(f"[check_detection_status] Active learning unaligned frame note: {al_err}")
+
             return {
                 "detected": False,
                 "is_manual": False,

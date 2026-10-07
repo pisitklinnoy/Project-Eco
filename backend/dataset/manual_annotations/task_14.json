@@ -1,0 +1,22 @@
+{
+  "task_id": 14,
+  "station": "Verification Test E2E",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-06T18:47:48.096967",
+  "verified_water_level_m": 6.464,
+  "pixel_y": 540.0,
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.404406,
+    "y_center": 0.67978,
+    "width": 0.228167,
+    "height": 0.299327
+  },
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 520.02,
+    "mae_meters": 2.308,
+    "iou": 0.0
+  }
+}

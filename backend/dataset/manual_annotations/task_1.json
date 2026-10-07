@@ -1,0 +1,22 @@
+{
+  "task_id": 1,
+  "station": "Ban Muangkong (X.173A - Sadao)",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-06T18:58:58.691222",
+  "verified_water_level_m": 14.681,
+  "pixel_y": 900.0,
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.572086,
+    "y_center": 0.342263,
+    "width": 0.018374,
+    "height": 0.343559
+  },
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 32.4,
+    "mae_meters": 0.138,
+    "iou": 0.5447
+  }
+}

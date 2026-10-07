@@ -1,0 +1,22 @@
+{
+  "task_id": 28,
+  "station": "หาดใหญ่ใน (ตรวจวัดแบบกำหนดเอง)",
+  "reviewer": "hydrologist_operator",
+  "timestamp": "2026-10-06T18:48:01.183504",
+  "verified_water_level_m": 6.464,
+  "pixel_y": 540.0,
+  "yolo_normalized": {
+    "class_id": 0,
+    "class_name": "Staff Gauge",
+    "x_center": 0.690398,
+    "y_center": 0.476717,
+    "width": 0.068753,
+    "height": 0.927866
+  },
+  "quality": "Normal",
+  "metrics": {
+    "pixel_difference_px": 0.0,
+    "mae_meters": 0.0,
+    "iou": 0.8658
+  }
+}

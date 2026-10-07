@@ -21,9 +21,14 @@ import { ManualBBoxModal } from './components/ManualBBoxModal';
 import { Waves, Cpu, Sparkles, Camera } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // Role & Navigation Page State
-  const [role, setRole] = useState<UserRole>('public');
-  const [activePage, setActivePage] = useState<string>('overview');
+  // Role & Navigation Page State (Auto-detect /admin, #admin, or ?role=admin)
+  const initialIsAdmin = typeof window !== 'undefined' && (
+    window.location.pathname.toLowerCase().includes('admin') ||
+    window.location.hash.toLowerCase().includes('admin') ||
+    window.location.search.toLowerCase().includes('admin')
+  );
+  const [role, setRole] = useState<UserRole>(initialIsAdmin ? 'admin' : 'public');
+  const [activePage, setActivePage] = useState<string>(initialIsAdmin ? 'admin-review' : 'overview');
 
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);

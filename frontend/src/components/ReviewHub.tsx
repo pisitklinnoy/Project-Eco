@@ -622,15 +622,19 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           {new Date(item.timestamp).toLocaleString('th-TH')}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <a
-                            href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
-                          >
-                            <span className="font-mono text-[11px]">{item.mlflow_run_id.slice(0, 8)}...</span>
-                            <ExternalLink className="w-3 h-3 ml-0.5" />
-                          </a>
+                          {item.mlflow_run_id ? (
+                            <a
+                              href={`http://localhost:5000/#/experiments/2/runs/${item.mlflow_run_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
+                            >
+                              <span className="font-mono text-[11px]">{String(item.mlflow_run_id).slice(0, 8)}...</span>
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px]">-</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1434,15 +1438,19 @@ export const ReviewHub: React.FC<ReviewHubProps> = ({ onRefreshTelemetry }) => {
                           {new Date(item.timestamp).toLocaleString('th-TH')}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <a
-                            href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
-                          >
-                            <span className="font-mono text-[11px]">{item.mlflow_run_id.slice(0, 8)}...</span>
-                            <ExternalLink className="w-3 h-3 ml-0.5" />
-                          </a>
+                          {item.mlflow_run_id ? (
+                            <a
+                              href={`http://localhost:5000/#/experiments/1/runs/${item.mlflow_run_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center space-x-1"
+                            >
+                              <span className="font-mono text-[11px]">{String(item.mlflow_run_id).slice(0, 8)}...</span>
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px]">-</span>
+                          )}
                         </td>
                       </tr>
                     );

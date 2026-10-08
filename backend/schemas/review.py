@@ -72,9 +72,11 @@ class VisionCorrectionResponse(BaseModel):
 from enum import Enum
 
 class RetrainCadence(str, Enum):
-    MONTHLY = "MONTHLY"
+    DAILY = "DAILY"
     WEEKLY = "WEEKLY"
     BIWEEKLY = "BIWEEKLY"
+    MONTHLY = "MONTHLY"
+    QUARTERLY = "QUARTERLY"
     ON_DEMAND = "ON_DEMAND"
 
 class EcosystemRetrainRequest(BaseModel):

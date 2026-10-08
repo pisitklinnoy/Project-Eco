@@ -1,31 +1,82 @@
 {
-  "resolved_overrides": {
-    "ING-DB-611": {
-      "resolved_at": "2026-10-07T12:56:51.685900+00:00",
-      "resolved_by": "Dr. Somchai (Hydrologist)",
-      "resolution_type": "SENSOR",
-      "verified_water_level": 0.63,
-      "resolution_notes": "Confirmed sensor reading is accurate, camera was obscured by rain storm.",
-      "new_measurement_id": 650
-    }
-  },
+  "resolved_overrides": {},
   "drift_monitor": {
     "safety_threshold_m": 0.4,
-    "last_evaluated_at": "2026-10-07T16:15:13.293372+00:00",
+    "last_evaluated_at": "2026-10-07T18:56:57.356889+00:00",
     "drift_detected": false,
-    "max_residual_m": 0.586,
-    "mean_residual_m": 0.052,
+    "max_residual_m": 6.315,
+    "mean_residual_m": 0.674,
     "alert_status": "ACKNOWLEDGED",
     "alert_message": "รับทราบการแจ้งเตือนแล้วโดย Test Operator: Acknowledged",
     "matched_evaluations": [
       {
         "station_code": "STN-HATYAINAI",
         "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.64,
+        "actual_level": 0.6,
+        "residual_error": 0.038,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.48,
+        "actual_level": 2.75,
+        "residual_error": 0.272,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.46,
+        "actual_level": 16.78,
+        "residual_error": 6.315,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 0.64,
+        "actual_level": 0.6,
+        "residual_error": 0.038,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-BANGSALA",
+        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 2.48,
+        "actual_level": 2.75,
+        "residual_error": 0.272,
+        "is_exceeded": false
+      },
+      {
+        "station_code": "STN-MUANGKONG",
+        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
+        "target_time": "2026-10-07T17:00:00",
+        "horizon": "+1h",
+        "predicted_level": 10.46,
+        "actual_level": 16.78,
+        "residual_error": 6.315,
+        "is_exceeded": true
+      },
+      {
+        "station_code": "STN-HATYAINAI",
+        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
         "target_time": "2026-10-07T16:00:00",
         "horizon": "+1h",
         "predicted_level": 0.62,
-        "actual_level": 0.6,
-        "residual_error": 0.02,
+        "actual_level": 0.66,
+        "residual_error": 0.04,
         "is_exceeded": false
       },
       {
@@ -34,8 +85,8 @@
         "target_time": "2026-10-07T16:00:00",
         "horizon": "+1h",
         "predicted_level": 2.5,
-        "actual_level": 2.75,
-        "residual_error": 0.248,
+        "actual_level": 2.49,
+        "residual_error": 0.012,
         "is_exceeded": false
       },
       {
@@ -44,9 +95,9 @@
         "target_time": "2026-10-07T16:00:00",
         "horizon": "+1h",
         "predicted_level": 10.5,
-        "actual_level": 9.91,
-        "residual_error": 0.586,
-        "is_exceeded": true
+        "actual_level": 10.48,
+        "residual_error": 0.016,
+        "is_exceeded": false
       },
       {
         "station_code": "STN-HATYAINAI",
@@ -157,66 +208,6 @@
         "actual_level": 2.56,
         "residual_error": 0.005,
         "is_exceeded": false
-      },
-      {
-        "station_code": "STN-MUANGKONG",
-        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
-        "target_time": "2026-10-07T12:00:00",
-        "horizon": "+1h",
-        "predicted_level": 10.56,
-        "actual_level": 10.56,
-        "residual_error": 0.003,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-HATYAINAI",
-        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
-        "target_time": "2026-10-07T11:00:00",
-        "horizon": "+1h",
-        "predicted_level": 0.63,
-        "actual_level": 0.63,
-        "residual_error": 0.001,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-BANGSALA",
-        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
-        "target_time": "2026-10-07T11:00:00",
-        "horizon": "+1h",
-        "predicted_level": 2.58,
-        "actual_level": 2.58,
-        "residual_error": 0.003,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-MUANGKONG",
-        "station_name": "ท้ายเขื่อนคลองจำไพบูลย์ (ม่วงก็อง - X.173A)",
-        "target_time": "2026-10-07T11:00:00",
-        "horizon": "+1h",
-        "predicted_level": 10.58,
-        "actual_level": 10.58,
-        "residual_error": 0.002,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-HATYAINAI",
-        "station_name": "สะพานหาดใหญ่ใน (ปลายน้ำในเมือง - X.44)",
-        "target_time": "2026-10-07T10:00:00",
-        "horizon": "+1h",
-        "predicted_level": 0.68,
-        "actual_level": 0.66,
-        "residual_error": 0.017,
-        "is_exceeded": false
-      },
-      {
-        "station_code": "STN-BANGSALA",
-        "station_name": "บ้านบางศาลา (กลางน้ำ - X.90)",
-        "target_time": "2026-10-07T10:00:00",
-        "horizon": "+1h",
-        "predicted_level": 2.59,
-        "actual_level": 2.59,
-        "residual_error": 0.002,
-        "is_exceeded": false
       }
     ],
     "history": [
@@ -255,9 +246,113 @@
     ],
     "current_model": {
       "name": "Unified-LightGBM-Forecaster",
-      "version": "v1.1",
-      "champion_mae": 1.557,
+      "version": "v1.7",
+      "champion_mae": 1.6072,
       "is_retraining": false
     }
-  }
+  },
+  "archived_overrides_history": [
+    {
+      "archived_at": "2026-10-07T18:51:45.529483+00:00",
+      "model_version": "v1.7",
+      "count": 1,
+      "items": {
+        "ING-DB-668": {
+          "resolved_at": "2026-10-07T18:51:19.038554+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.53,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 742
+        }
+      }
+    },
+    {
+      "archived_at": "2026-10-07T18:44:31.799376+00:00",
+      "model_version": "v1.6",
+      "count": 2,
+      "items": {
+        "ING-DB-663": {
+          "resolved_at": "2026-10-07T18:43:52.788516+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 10.53,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 738
+        },
+        "ING-DB-665": {
+          "resolved_at": "2026-10-07T18:43:55.947637+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.53,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 739
+        }
+      }
+    },
+    {
+      "archived_at": "2026-10-07T18:42:23.472741+00:00",
+      "model_version": "v1.5",
+      "count": 1,
+      "items": {
+        "ING-DB-660": {
+          "resolved_at": "2026-10-07T18:41:26.749766+00:00",
+          "resolved_by": "Hydrologist Operator",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.53,
+          "resolution_notes": "Verified",
+          "new_measurement_id": 737
+        }
+      }
+    },
+    {
+      "archived_at": "2026-10-07T18:40:58.348187+00:00",
+      "model_version": "manual_archive",
+      "count": 4,
+      "items": {
+        "ING-DB-611": {
+          "resolved_at": "2026-10-07T12:56:51.685900+00:00",
+          "resolved_by": "Dr. Somchai (Hydrologist)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 0.63,
+          "resolution_notes": "Confirmed sensor reading is accurate, camera was obscured by rain storm.",
+          "new_measurement_id": 650
+        },
+        "ING-DB-644": {
+          "resolved_at": "2026-10-07T18:04:19.902333+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.54,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 729
+        },
+        "ING-DB-647": {
+          "resolved_at": "2026-10-07T18:04:21.894470+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.54,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 730
+        },
+        "ING-DB-654": {
+          "resolved_at": "2026-10-07T18:05:15.664518+00:00",
+          "resolved_by": "ผู้เชี่ยวชาญชลประทาน (Hydrologist Operator)",
+          "resolution_type": "SENSOR",
+          "verified_water_level": 2.54,
+          "resolution_notes": "ยืนยันค่าจริงหน้างานโดยผู้เชี่ยวชาญ",
+          "new_measurement_id": 731
+        }
+      }
+    }
+  ],
+  "archived_ids": [
+    "ING-DB-663",
+    "ING-DB-644",
+    "ING-DB-668",
+    "ING-DB-660",
+    "ING-DB-611",
+    "ING-DB-654",
+    "ING-DB-647",
+    "ING-DB-665"
+  ]
 }

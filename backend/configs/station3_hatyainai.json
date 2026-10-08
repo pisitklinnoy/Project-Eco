@@ -6,13 +6,28 @@
   "location": "Hatyainai Bridge, Lower Khlong U-Tapao, Hat Yai, Songkhla",
   "station_id": 469,
   "station_group_id": 1269,
-  "reference_frame_resolution": [1920, 1080],
+  "reference_frame_resolution": [
+    1920,
+    1080
+  ],
   "detection_top_y": 7,
   "staff_gauge_polygon": {
-    "top_left": [1334, 80],
-    "top_right": [1367, 80],
-    "bottom_right": [1286, 1080],
-    "bottom_left": [1259, 1080]
+    "top_left": [
+      1334,
+      80
+    ],
+    "top_right": [
+      1367,
+      80
+    ],
+    "bottom_right": [
+      1286,
+      1080
+    ],
+    "bottom_left": [
+      1259,
+      1080
+    ]
   },
   "rectified_roi": {
     "width": 40,
@@ -25,17 +40,50 @@
   },
   "junction_description": "รอยต่อระหว่างเลข 1 กับเลข 9 (Junction Between 1 and 9)",
   "piecewise_anchors": [
-    [9.00, 0],
-    [8.00, 202],
-    [7.00, 422],
-    [6.00, 642],
-    [5.00, 871],
-    [4.00, 1095],
-    [3.00, 1350],
-    [2.00, 1600],
-    [1.00, 1860],
-    [0.60, 2140],
-    [0.00, 2252]
+    [
+      9.0,
+      0
+    ],
+    [
+      8.0,
+      202
+    ],
+    [
+      7.0,
+      422
+    ],
+    [
+      6.0,
+      642
+    ],
+    [
+      5.0,
+      871
+    ],
+    [
+      4.0,
+      1095
+    ],
+    [
+      3.0,
+      1350
+    ],
+    [
+      2.0,
+      1600
+    ],
+    [
+      1.0,
+      1860
+    ],
+    [
+      0.6,
+      2140
+    ],
+    [
+      0.0,
+      2252
+    ]
   ],
   "unit": "meters",
   "datum": "R.T.K.",
@@ -44,8 +92,16 @@
     "warning_m": 5.5,
     "critical_flood_m": 6.0
   },
-  "baseline_water_level_m": 0.60,
+  "baseline_water_level_m": 0.6,
   "baseline_water_y_px": 2140,
   "baseline_y": 2140,
-  "calibration_bias_m": 0.0
+  "calibration_bias_m": 0.0003,
+  "staff_gauge_bbox": {
+    "x1": 807,
+    "y1": 140,
+    "x2": 1114,
+    "y2": 918,
+    "width": 307,
+    "height": 778
+  }
 }

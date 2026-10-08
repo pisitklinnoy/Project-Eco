@@ -321,13 +321,18 @@ def render_model_v2_detection_view(
         ax1, ay1, ax2, ay2 = hybrid_info["aligned_bbox"]
         raw_box = hybrid_info.get("raw_yolo_bbox")
 
-        # แสดงเฉพาะกรอบ Bounding Box ที่ตรวจจับได้จากโมเดล YOLO โดยตรง (หรือ Aligned Box) เพียงกรอบเดียว
+        # แสดงเฉพาะกรอบ Bounding Box ที่ตรวจจับได้จากโมเดล YOLO โดยตรง (หรือ Aligned Box) แนบสนิทเฉพาะตัวเสา ไม่ครอบเกิน
         if raw_box and len(raw_box) == 4 and not is_manual:
             bx1, by1, bx2, by2 = raw_box
-            # ครอบคลุมลงมาถึงฐานเสาและผิวน้ำตาม aligned_bbox เสมอ
-            by2 = max(by2, ay2)
         else:
             bx1, by1, bx2, by2 = ax1, ay1, ax2, ay2
+
+        fh, fw = out.shape[:2]
+        pad = 2
+        bx1 = max(0, int(bx1) - pad)
+        by1 = max(0, int(by1) - pad)
+        bx2 = min(fw, int(bx2) + pad)
+        by2 = min(fh, int(by2) + pad)
 
         if is_manual:
             box_color = (0, 165, 255)  # Amber

@@ -964,7 +964,8 @@ class ReviewService:
 
                 new_x1 = int(round((med_x_pct / 100.0) * ref_w))
                 new_y1 = int(round((med_y_pct / 100.0) * ref_h))
-                new_w = max(30, int(round((med_w_pct / 100.0) * ref_w)))
+                max_allowed_w = 60 if ref_w >= 3000 else 45
+                new_w = min(max_allowed_w, max(24, int(round((med_w_pct / 100.0) * ref_w))))
                 new_h = max(200, int(round((med_h_pct / 100.0) * ref_h)))
                 new_x2 = new_x1 + new_w
                 new_y2 = new_y1 + new_h

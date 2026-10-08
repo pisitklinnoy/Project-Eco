@@ -521,20 +521,11 @@ class StaffGaugeAutoLocalizer:
             # ถ้าน้ำท่วมบังเสาท่อนล่าง det_h จะหดสั้นกว่าความสูงจริง base_h
             is_submerged = (det_h < base_h * 0.85)
 
-            if is_submerged:
-                # ต่อยอดความยาวเสาเต็มต้น (Extrapolate) ลงไปใต้น้ำตามเรขาคณิตของ Config
-                aligned_y2 = aligned_y1 + base_h
-            else:
-                aligned_y2 = aligned_y1 + max(det_h, base_h)
+            # คำนวณพิกัด source_points สำหรับดัดมุมมอง (Homography / Scale Calibrator) ให้ logic การวัดระดับน้ำสมบูรณ์ 100%
+            full_y2 = min(float(fh), max(aligned_y1 + max(det_h, base_h), ref_y2))
+            full_x1 = int(round(gcx - base_w / 2.0))
+            full_x2 = int(round(gcx + base_w / 2.0))
 
-            aligned_y2 = min(float(fh), max(aligned_y2, ref_y2))
-
-            aligned_x1 = int(round(gcx - base_w / 2.0))
-            aligned_x2 = int(round(gcx + base_w / 2.0))
-            aligned_y1 = int(round(aligned_y1))
-            aligned_y2 = int(round(aligned_y2))
-
-            # ปรับพิกัด 4 จุดสำหรับดัดมุมมอง (Homography Source Points)
             if has_poly:
                 aligned_pts = base_pts.copy()
                 aligned_pts[:, 0] += dx_clamped
@@ -543,17 +534,25 @@ class StaffGaugeAutoLocalizer:
                 aligned_pts[2:, 1] = np.maximum(aligned_pts[2:, 1] + dy_clamped, base_pts[2:, 1])
             else:
                 aligned_pts = np.float32([
-                    [aligned_x1, aligned_y1],
-                    [aligned_x2, aligned_y1],
-                    [aligned_x2, aligned_y2],
-                    [aligned_x1, aligned_y2]
+                    [full_x1, aligned_y1],
+                    [full_x2, aligned_y1],
+                    [full_x2, full_y2],
+                    [full_x1, full_y2]
                 ])
+
+            # สำหรับ aligned_bbox (กรอบ Bounding Box): ให้ครอบเฉพาะตัวเสาจริง แนบสนิท ไม่ครอบเกินออกนอกเสา (เผื่อขอบเพียง 2px)
+            pad = 2
+            tight_x1 = int(round(max(0, bx1 - pad)))
+            tight_x2 = int(round(min(fw, bx2 + pad)))
+            tight_y1 = int(round(max(0, gy1 - pad)))
+            tight_y2 = int(round(min(fh, gy2 + pad)))
+            tight_bbox = [tight_x1, tight_y1, tight_x2, tight_y2]
 
             # บันทึกพิกัดเสาลงแคชประจำสถานี (สำหรับใช้ต่อในเวลากลางคืน)
             stn_code = station_config.get("station_code") or station_config.get("station_name") or "default"
             if best_g.get("confidence", 0.0) >= 0.20:
                 self.station_anchors[stn_code] = {
-                    "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                    "aligned_bbox": tight_bbox,
                     "raw_yolo_bbox": [int(bx1), int(gy1), int(bx2), int(gy2)],
                     "source_points": aligned_pts.copy(),
                     "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
@@ -563,7 +562,7 @@ class StaffGaugeAutoLocalizer:
                 }
 
             return {
-                "aligned_bbox": [aligned_x1, aligned_y1, aligned_x2, aligned_y2],
+                "aligned_bbox": tight_bbox,
                 "source_points": aligned_pts,
                 "camera_shift": {"dx": round(dx_clamped, 1), "dy": round(dy_clamped, 1)},
                 "is_camera_shifted": abs(dx_clamped) > 3.0 or abs(dy_clamped) > 3.0,

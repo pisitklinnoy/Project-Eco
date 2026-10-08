@@ -34,7 +34,8 @@ class NotificationService:
                         }
                     ]
                 }
-                res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=payload, timeout=5)
+                res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=payload, timeout=10)
+                print(f"[NotificationService] LINE Push Response: {res.status_code} - {res.text}")
                 alert.is_sent_line = (res.status_code == 200)
                 alert.line_response_code = res.status_code
                 alert.sent_at = datetime.utcnow()

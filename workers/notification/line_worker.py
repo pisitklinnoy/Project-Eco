@@ -35,8 +35,8 @@ async def send_async_line_notification(ctx, payload: dict):
     }
 
     try:
-        res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=body, timeout=5)
-        print(f"[Notification Worker] LINE Response Status: {res.status_code}")
+        res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=body, timeout=10)
+        print(f"[Notification Worker] LINE Response Status: {res.status_code} - {res.text}")
         return {"status": "sent", "code": res.status_code}
     except Exception as e:
         print(f"[Notification Worker] LINE delivery failed (non-fatal): {e}")

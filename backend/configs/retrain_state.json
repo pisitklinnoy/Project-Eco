@@ -2,11 +2,51 @@
   "pending_count": 0,
   "target_count": 20,
   "current_model_name": "StaffGauge-Vision-Detector",
-  "current_model_version": "v2.5",
+  "current_model_version": "v2.6",
   "last_mae_meters": 1.5967,
-  "last_retrained_at": "2026-10-08T06:09:00.885204",
+  "last_retrained_at": "2026-10-08T07:22:53.037399",
   "is_retraining": false,
   "history": [
+    {
+      "id": "retrain-1791444173",
+      "model_version": "v2.6",
+      "trigger_type": "MANUAL_OVERRIDE",
+      "images_count": 52,
+      "train_samples": 42,
+      "val_samples": 10,
+      "mae_meters": 1.5967,
+      "pixel_error_px": 364.6,
+      "mean_iou": 0.393,
+      "timestamp": "2026-10-08T07:22:53.036088",
+      "status": "SUCCESS",
+      "mlflow_run_id": "3eebc2039e6a4f6f804fff8e858d780e",
+      "neural_network_training": {
+        "status": "success",
+        "version": "v20261008_072059",
+        "weights_file": "best.pt",
+        "training_samples": 52,
+        "train_samples": 42,
+        "val_samples": 10,
+        "split_ratio": 0.8,
+        "mlflow_run_id": "3eebc2039e6a4f6f804fff8e858d780e",
+        "metrics": {
+          "mAP50": 0.078,
+          "mAP50-95": 0.0531,
+          "box_loss": 0.024,
+          "device": "0",
+          "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "epochs": 2,
+          "batch_size": 8,
+          "imgsz": 320,
+          "train_samples": 42,
+          "val_samples": 10,
+          "total_samples": 52,
+          "split_ratio": 0.8,
+          "mode": "REAL_PYTORCH_DEEP_LEARNING"
+        },
+        "deployed_at": "2026-10-08T07:22:53.036047+00:00"
+      }
+    },
     {
       "id": "retrain-1791439740",
       "model_version": "v2.5",
@@ -590,18 +630,6 @@
         },
         "deployed_at": "2026-10-06T20:03:13.723681+00:00"
       }
-    },
-    {
-      "id": "retrain-1791315163",
-      "model_version": "v1.10",
-      "trigger_type": "MANUAL_OVERRIDE",
-      "images_count": 83,
-      "mae_meters": 2.4604,
-      "pixel_error_px": 561.9,
-      "mean_iou": 0.899,
-      "timestamp": "2026-10-06T19:32:43.878564",
-      "status": "SUCCESS",
-      "mlflow_run_id": "5b99c425d82f44ec82aa330e4c5113ed"
     }
   ],
   "last_retrained_count": 34

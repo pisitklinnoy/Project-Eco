@@ -130,6 +130,9 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - FORECAST_MAX_AGE_MINUTES=${FORECAST_MAX_AGE_MINUTES:-120}
       - FORECAST_MODEL_FAMILY=${FORECAST_MODEL_FAMILY:-delta}
+      - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN:-}
+      - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET:-}
+      - LINE_TARGET_USER_OR_GROUP_ID=${LINE_TARGET_USER_OR_GROUP_ID:-}
     volumes:
       - ./backend:/app
       - ./time_series_ecosystem:/time_series_ecosystem

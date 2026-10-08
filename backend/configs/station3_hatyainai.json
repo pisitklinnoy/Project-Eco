@@ -97,11 +97,11 @@
   "baseline_y": 2140,
   "calibration_bias_m": 0.0003,
   "staff_gauge_bbox": {
-    "x1": 1259,
-    "y1": 80,
-    "x2": 1367,
-    "y2": 1050,
-    "width": 108,
-    "height": 970
+    "x1": 1033,
+    "y1": 110,
+    "x2": 1110,
+    "y2": 984,
+    "width": 45,
+    "height": 778
   }
 }

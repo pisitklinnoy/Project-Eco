@@ -14,6 +14,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+import numpy as np
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -304,6 +305,100 @@ class TimeSeriesRetrainService:
                     mlflow.log_metric("challenger_mae_meters", challenger_mae)
                     mlflow.log_metric("champion_mae_meters", old_champion_mae)
                     mlflow.log_metric("mae_improvement_percent", improvement_pct)
+
+                    # 0. บันทึก Metric ราย Iteration (Loss Curves over Boosting Rounds) สำหรับวาดกราฟเส้นใน MLflow UI
+                    evals_result = pipeline_res.get("evals_result", {})
+                    train_l1 = evals_result.get("training", {}).get("l1", [])
+                    val_l1 = evals_result.get("validation", {}).get("l1", [])
+                    train_l2 = evals_result.get("training", {}).get("l2", [])
+                    val_l2 = evals_result.get("validation", {}).get("l2", [])
+
+                    try:
+                        import time
+                        from mlflow.entities import Metric
+                        from mlflow.tracking import MlflowClient
+                        mf_client = MlflowClient(tracking_uri)
+                        now_ms = int(time.time() * 1000)
+                        batch_metrics = []
+                        for step_i in range(len(train_l1)):
+                            step = step_i + 1
+                            batch_metrics.append(Metric("train_mae_loss", float(train_l1[step_i]), now_ms + step, step))
+                            batch_metrics.append(Metric("val_mae_loss", float(val_l1[step_i]), now_ms + step, step))
+                            if step_i < len(train_l2):
+                                batch_metrics.append(Metric("train_rmse_loss", float(np.sqrt(train_l2[step_i])), now_ms + step, step))
+                                batch_metrics.append(Metric("val_rmse_loss", float(np.sqrt(val_l2[step_i])), now_ms + step, step))
+
+                        for i in range(0, len(batch_metrics), 800):
+                            mf_client.log_batch(run_id=run.info.run_id, metrics=batch_metrics[i:i+800])
+                    except Exception as batch_err:
+                        print(f"[TimeSeriesRetrain] Log batch metrics note: {batch_err}")
+
+                    # 0.1 สร้างและบันทึก Evaluation Plot Figures เข้าสู่ MLflow Artifacts
+                    try:
+                        import matplotlib
+                        matplotlib.use('Agg')
+                        import matplotlib.pyplot as plt
+                        import tempfile
+
+                        with tempfile.TemporaryDirectory() as tmp_plots_dir:
+                            plots_path = Path(tmp_plots_dir)
+
+                            # Plot 1: Loss Curve (Training vs Validation Loss)
+                            if train_l1 and val_l1:
+                                fig, ax = plt.subplots(figsize=(8, 5))
+                                ax.plot(range(1, len(train_l1) + 1), train_l1, label="Training MAE Loss", color="#1f77b4", linewidth=2)
+                                ax.plot(range(1, len(val_l1) + 1), val_l1, label="Validation MAE Loss", color="#ff7f0e", linewidth=2)
+                                ax.set_title("Unified LightGBM - Training & Validation Loss Curve", fontsize=13, fontweight="bold")
+                                ax.set_xlabel("Boosting Iterations (Trees)", fontsize=11)
+                                ax.set_ylabel("Mean Absolute Error (Meters)", fontsize=11)
+                                ax.grid(True, linestyle="--", alpha=0.6)
+                                ax.legend(fontsize=11)
+                                fig.tight_layout()
+                                loss_fig_path = plots_path / "loss_curve.png"
+                                fig.savefig(str(loss_fig_path), dpi=150)
+                                plt.close(fig)
+                                mlflow.log_artifact(str(loss_fig_path), artifact_path="evaluation_plots")
+
+                            # Plot 2: Actual vs Predicted
+                            y_test = pipeline_res.get("y_test")
+                            pred_delta = pipeline_res.get("pred_delta")
+                            if y_test is not None and pred_delta is not None and len(y_test) > 0:
+                                fig, ax = plt.subplots(figsize=(7, 6))
+                                ax.scatter(y_test, pred_delta, alpha=0.4, color="#2ca02c", edgecolors="none", s=25)
+                                min_val = min(float(np.min(y_test)), float(np.min(pred_delta)))
+                                max_val = max(float(np.max(y_test)), float(np.max(pred_delta)))
+                                ax.plot([min_val, max_val], [min_val, max_val], "r--", linewidth=2, label="Ideal 1:1 Fit")
+                                ax.set_title(f"Predicted vs Actual Water Level Delta (MAE: {challenger_mae:.4f}m)", fontsize=12, fontweight="bold")
+                                ax.set_xlabel("Actual Water Level Delta (m)", fontsize=11)
+                                ax.set_ylabel("Predicted Delta (m)", fontsize=11)
+                                ax.grid(True, linestyle="--", alpha=0.5)
+                                ax.legend()
+                                fig.tight_layout()
+                                pred_fig_path = plots_path / "predicted_vs_actual.png"
+                                fig.savefig(str(pred_fig_path), dpi=150)
+                                plt.close(fig)
+                                mlflow.log_artifact(str(pred_fig_path), artifact_path="evaluation_plots")
+
+                            # Plot 3: Feature Importance
+                            challenger_model = pipeline_res.get("challenger_model")
+                            if challenger_model is not None and hasattr(challenger_model, "feature_importances_"):
+                                from time_series_ecosystem.retraining_pipeline import FEATURE_COLUMNS
+                                feat_imp = challenger_model.feature_importances_
+                                top_idx = np.argsort(feat_imp)[-12:]
+                                fig, ax = plt.subplots(figsize=(9, 6))
+                                ax.barh(range(len(top_idx)), feat_imp[top_idx], color="#4C72B0", align="center")
+                                ax.set_yticks(range(len(top_idx)))
+                                ax.set_yticklabels([FEATURE_COLUMNS[i] for i in top_idx], fontsize=10)
+                                ax.set_xlabel("Splits / Importance Gain", fontsize=11)
+                                ax.set_title("Top Feature Importances (Hydrology & Rainfall Drivers)", fontsize=12, fontweight="bold")
+                                ax.grid(axis="x", linestyle="--", alpha=0.6)
+                                fig.tight_layout()
+                                feat_fig_path = plots_path / "feature_importance.png"
+                                fig.savefig(str(feat_fig_path), dpi=150)
+                                plt.close(fig)
+                                mlflow.log_artifact(str(feat_fig_path), artifact_path="evaluation_plots")
+                    except Exception as plt_err:
+                        print(f"[TimeSeriesRetrain] Evaluation plots generation note: {plt_err}")
 
                     # 1. บันทึก Dataset ลง MLflow (Datasets used จะไม่เป็น - อีกต่อไป)
                     train_df = pipeline_res.get("train_df")

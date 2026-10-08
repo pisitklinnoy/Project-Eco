@@ -61,9 +61,22 @@ def build_dashboard(
     is_shifted = yolo_info.get("is_camera_shifted", False) if yolo_info else False
     conf_display = f"{yolo_conf*100:.1f}%" if has_yolo else "85.0%"
 
-    # คำนวณพิกัดเสาใน frame_resized จาก source points ล่าสุดที่ผ่าน Hybrid Alignment
+    # คำนวณพิกัดเสาใน frame_resized:
+    # ใช้อันดับแรกจาก aligned_bbox (หรือ raw_yolo_bbox) เพื่อให้กรอบ BBox กระชับแนบสนิทเฉพาะตัวเสา ไม่ยาวเลยลงไปในแม่น้ำ
     pts_src = pole_mgr.last_pts_src
-    if pts_src is not None:
+    if yolo_info and "aligned_bbox" in yolo_info and yolo_info["aligned_bbox"]:
+        bx1, by1, bx2, by2 = yolo_info["aligned_bbox"]
+        fx1 = int(round(bx1 * scale_x))
+        fy1 = int(round(by1 * scale_y))
+        fx2 = int(round(bx2 * scale_x))
+        fy2 = int(round(by2 * scale_y))
+    elif yolo_info and "raw_yolo_bbox" in yolo_info and yolo_info["raw_yolo_bbox"]:
+        bx1, by1, bx2, by2 = yolo_info["raw_yolo_bbox"]
+        fx1 = int(round(bx1 * scale_x))
+        fy1 = int(round(by1 * scale_y))
+        fx2 = int(round(bx2 * scale_x))
+        fy2 = int(round(by2 * scale_y))
+    elif pts_src is not None:
         fx1 = int(round(pts_src[:, 0].min() * scale_x))
         fy1 = int(round(pts_src[:, 1].min() * scale_y))
         fx2 = int(round(pts_src[:, 0].max() * scale_x))
@@ -220,15 +233,17 @@ def render_cctv_frame(frame, water_info, pole_mgr, calibrator, cfg, yolo_info=No
     water_level = water_info["water_level"]
     water_y = water_info["water_y"]
 
-    # 1. พิกัดเสา
-    if pole_mgr.last_pts_src is not None:
+    # 1. พิกัดเสา: ให้ใช้ aligned_bbox จาก YOLO เป็นอันดับแรก ไม่ยืดกรอบลงแม่น้ำ
+    if yolo_info and "aligned_bbox" in yolo_info and yolo_info["aligned_bbox"]:
+        fx1, fy1, fx2, fy2 = yolo_info["aligned_bbox"]
+    elif yolo_info and "raw_yolo_bbox" in yolo_info and yolo_info["raw_yolo_bbox"]:
+        fx1, fy1, fx2, fy2 = yolo_info["raw_yolo_bbox"]
+    elif pole_mgr.last_pts_src is not None:
         pts_src = pole_mgr.last_pts_src
         fx1 = int(round(pts_src[:, 0].min()))
         fy1 = int(round(pts_src[:, 1].min()))
         fx2 = int(round(pts_src[:, 0].max()))
         fy2 = int(round(pts_src[:, 1].max()))
-    elif yolo_info and "aligned_bbox" in yolo_info and yolo_info["aligned_bbox"]:
-        fx1, fy1, fx2, fy2 = yolo_info["aligned_bbox"]
     elif yolo_info and "bbox" in yolo_info and yolo_info["bbox"]:
         fx1, fy1, fx2, fy2 = yolo_info["bbox"]
     else:

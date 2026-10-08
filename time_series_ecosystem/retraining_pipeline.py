@@ -110,7 +110,15 @@ def run_retrain_pipeline(csv_path: str, model_save_path: str, force_promote: boo
         verbose=-1,
         n_jobs=-1
     )
-    challenger.fit(X_train, y_train, sample_weight=weights)
+    evals_result = {}
+    challenger.fit(
+        X_train, y_train,
+        sample_weight=weights,
+        eval_set=[(X_train, y_train), (X_test, y_test)],
+        eval_names=['training', 'validation'],
+        eval_metric=['l1', 'l2'],
+        callbacks=[lgb.record_evaluation(evals_result)]
+    )
 
     # ประเมินประสิทธิภาพ Challenger
     pred_delta = challenger.predict(X_test)
@@ -155,7 +163,11 @@ def run_retrain_pipeline(csv_path: str, model_save_path: str, force_promote: boo
         "train_samples": len(X_train),
         "test_samples": len(X_test),
         "challenger_model": challenger,
-        "train_df": train_df
+        "train_df": train_df,
+        "evals_result": evals_result,
+        "X_test": X_test,
+        "y_test": y_test,
+        "pred_delta": pred_delta
     }
 
 
